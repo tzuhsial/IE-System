@@ -3,7 +3,7 @@ import json
 import random
 
 from agent import Agent
-from photoshopapi import PhotoshopAPI
+from lightroom import LightroomAPI
 from user import AgendaBasedUserSimulator as User
 import util
 from world import ImageEditWorld as World
@@ -11,21 +11,18 @@ from world import ImageEditWorld as World
 
 def main():
 
-    task_pickle = 'task.debug.pickle'
+    scenario_pickle = 'scenario.lightroom.pickle'
 
-    tasks = util.load_from_pickle(task_pickle)
-    profiles, goals = tasks
+    scenarios = util.load_from_pickle(scenario_pickle)
 
-    photoshop = PhotoshopAPI()
+    lightroom = LightroomAPI()
     user = User()
     agent = Agent()
-    world = World([photoshop, user, agent])
+    world = World([lightroom, user, agent])
 
-    for profile, goal in itertools.product(profiles, goals):
-
-        user.set_profile(profile)
-        user.set_goal(goal)
-
+    for profile, multi_goal in scenarios:
+        user.setup_scenario(profile, multi_goal)
+        user.print_agenda()
         world.reset()
         episode_done = False
 
@@ -34,7 +31,8 @@ def main():
             world.parley()
 
             episode_done = world.episode_done()
-            import pdb; pdb.set_trace()
+        import pdb
+        pdb.set_trace()
 
 
 if __name__ == "__main__":

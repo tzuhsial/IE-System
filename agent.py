@@ -83,7 +83,10 @@ class Agent(FSMBase):
                 sys_act['type'] = 'inform'
                 sys_act['action_type'] = 'adjust'
                 sys_act['slot'] = user_act.get('slot')
-                sys_act['value'] = user_act.get('value')
+                user_value = user_act.get('value')
+                system_value = self.convert_user_value_to_system_value(
+                    user_value)
+                sys_act['value'] = system_value
             elif user_act['type'] == 'end':
                 episode_done = True
                 sys_act = {}
@@ -98,20 +101,61 @@ class Agent(FSMBase):
         agent_act['system_acts'] = system_acts
         agent_act['system_utterance'] = system_utterance_obj
         agent_act['episode_done'] = episode_done
-
         return agent_act
 
-    def template_nlu(self):
-        """
-            Simple natural language understanding for template language
-        """
-        pass
+    ####################################
+    #   Convert estimation to action   #
+    ####################################
+    def convert_user_value_to_system_value(self, user_value):
+        # tmp
+        user_value_dict = {
+            'a lot more': 40,
+            'more': 15,
+            'a little more': 5,
+            'a little less': -5,
+            'less': -15,
+            'a lot less': -40
+        }
+        system_value = user_value_dict.get(user_value)
+        return system_value
 
     def template_nlg(self, system_acts):
         """
             Templated based natural language generation for crowd source paraphrasing
         """
-        return None
+
+        tokens = list()
+        slots = list()
+        for sys_act in system_acts:
+            if sys_act['type'] == 'inform':
+                if sys_act['action_type'] == "adjust":
+                    act_tokens = ['adjust', sys_act['slot'],
+                                  'by', str(sys_act['value'])]
+                else:
+                    act_tokens = ['set', sys_act['slot'],
+                                  'to', str(sys_act['value'])]
+                if len(tokens):
+                    tokens += ["and"]
+
+                slot_start = len(tokens) + 1
+                slot_end = len(tokens) + 2
+                value_start = len(tokens) + 3
+                value_end = len(tokens) + 4
+
+                slot = {'slot': sys_act['slot'],
+                        'slot_start': slot_start, 'slot_end': slot_end,
+                        'value_start': value_start, 'value_end': value_end}
+                slots.append(slot)
+            elif sys_act['type'] == 'bye':
+                act_tokens = ['bye']
+            tokens += act_tokens
+        text = ' '.join(tokens)
+        # Build utterance object
+        system_utterance_obj = {}
+        system_utterance_obj['text'] = text
+        system_utterance_obj['tokens'] = tokens
+        system_utterance_obj['slots'] = slots
+        return system_utterance_obj
 
     ###################################
     #  State Transition Dialogue Act  #

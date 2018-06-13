@@ -1,13 +1,12 @@
 """
-    The class where the image edit interaction takes place
+    The world where the image edit interaction takes place
 """
-
 
 class ImageEditWorld(object):
     def __init__(self, agents, verbose=True):
         """
             Arguments:
-            - agents: 1. photoshopapi 2. user 3. agent
+            - agents: 1. apiapi 2. user 3. agent
         """
         self.agents = agents
 
@@ -24,17 +23,17 @@ class ImageEditWorld(object):
 
     def parley(self):
         """
-            The image observation is provided by photoshop
-            Photoshop observes agent
-            User observes photoshop and agent
-            Agent observes photoshop and user
+            The image observation is provided by api
+            api observes agent
+            User observes api and agent
+            Agent observes api and user
         """
         # 0, 1, 2
-        photoshop, user, agent = self.agents
+        api, user, agent = self.agents
 
-        # First Photoshop
-        self.acts[0] = photoshop.act()
-        photoshop.observe(self.acts[2])
+        # First api
+        self.acts[0] = api.act()
+        api.observe(self.acts[2])
 
         # Then User
         user.observe(self.acts[0])
@@ -46,8 +45,8 @@ class ImageEditWorld(object):
         agent.observe(self.acts[1])
         self.acts[2] = agent.act()
 
-        # Photoshop then observes the agent act
-        photoshop.observe(self.acts[2])
+        # api then observes the agent act
+        api.observe(self.acts[2])
 
         if self.verbose:
             print(self.agents[0].name, self.acts[0])

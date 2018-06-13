@@ -27,4 +27,7 @@ pip install -r requirementst.txt
 ```
 
 ### TODO
+1. adjust slots
+2. non_adjust slots
+3. integration with photoshop api
 
