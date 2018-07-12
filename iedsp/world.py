@@ -1,8 +1,7 @@
 """
-    The world where the image edit interaction takes place
+    Worlds that define interactions among agents
 """
-
-class ImageEditWorld(object):
+class SelfPlayWorld(object):
     def __init__(self, agents, verbose=True):
         """
             Arguments:
@@ -13,12 +12,10 @@ class ImageEditWorld(object):
         self.verbose = verbose
 
     def reset(self):
-
         for agent in self.agents:
             agent.reset()
 
         self.acts = [{}] * len(self.agents)
-
         self.turn_count = 0
 
     def parley(self):

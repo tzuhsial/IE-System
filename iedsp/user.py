@@ -2,9 +2,7 @@ import copy
 import random
 
 import numpy as np
-
-import lightroom
-
+    
 
 def generate_random_profile():
     """
@@ -33,27 +31,43 @@ def generate_random_profile():
 
 class AgendaBasedUserSimulator(object):
     """
-        User Simulator
+        Agenda Based User Simulator: Photoshop actions
     """
 
-    def __init__(self):
+    def __init__(self, opt):
         """
             agenda stores the current agenda
             global_agenda stores the remaining action list
         """
         self.agenda = list()  # Local agenda
-        self.global_agenda = list()  # Global agenda
-        self.threshold = 5
+        self.adjust_threshold = opt['user_adjust_threshold']
 
     @property
     def name(self):
         return self.__class__.__name__
 
-    def display_agenda(self):
+    def print_agenda(self):
         """
             prints the agenda in human readable format
         """
-        pass
+        def act_to_str(act):
+            string = "| {: >15} | {: >20} | {: >25} |"\
+                .format(act['type'], act['slot'], act['value'])
+            return string
+
+        print("-" * 70)
+        print("|" + " " * 31 + "Agenda" + " " * 31 + "|")
+        print("-" * 70)
+        for act in self.agenda:
+            print(act_to_str(act))
+        print("-" * 70)
+
+        print("-" * 70)
+        print("|" + " " * 27 + "Global Agenda" + " " * 28 + "|")
+        print("-" * 70)
+        for act in self.global_agenda:
+            print(act_to_str(act))
+        print("-" * 70)
 
     def setup_scenario(self, profile, multi_goal):
         """
@@ -73,78 +87,56 @@ class AgendaBasedUserSimulator(object):
             A goal can be
                 a. 1 or more adjust slots
                 b. 1 non_adjust slot
-            This function pops a goal from global_agenda and inserts into
-            agenda
+            Pop a goal from global_agenda and insert into agenda
         """
         assert len(self.agenda) == 0, "Current agenda should be empty!"
 
         # Treat agenda as Queues
         while len(self.global_agenda):
-            slot_dict = self.global_agenda[0]  # front of queue
+            # Get front of global_agenda
+            slot_dict = self.global_agenda[0]
+            slot_name = slot_dict['slot']
             slot_type = slot_dict['type']
-            if slot_type == "non_adjust":
-                if len(self.agenda) == 0:  # Push to agenda if agenda is empty
-                    slot_dict = self.global_agenda.pop(0)
-                    self.agenda.append(slot_dict)
-                break
-            elif slot_type == "adjust":  # Push adjust actions into agenda
+            slot_value = slot_dict['value']
+            assert slot_type in lightroom.schema.slot_types
+
+            # If slot is already satisfied, pop from agenda
+            if (slot_type == "adjust" and abs(self.observation[slot_name] - slot_value) <= self.threshold)\
+                    or (slot_type == "non_adjust" and self.observation[slot_name] == slot_value):
+                self.global_agenda.pop(0)
+                continue
+
+            # Same action types can be merged together
+            if len(self.agenda) == 0 or slot_type == self.agenda[-1]['type']:
                 slot_dict = self.global_agenda.pop(0)
                 self.agenda.append(slot_dict)
             else:
-                raise ValueError("Unknown slot type: {}!".format(slot_type))
+                break
+
+        # all agenda items are completed
+        if len(self.agenda) == 0 and len(self.global_agenda) == 0:
+            end_slot = {'type': 'end'}
+            self.agenda.append(end_slot)
 
     def _build_current_goal_from_agenda(self):
         # Bulid a goal with all slot values set to default
-        goal = lightroom.schema.default_goal_factory()
-
-        # TODO: continuing slots
+        goal = copy.deepcopy(self.observation)
         for slot_dict in self.agenda:
-            goal[ slot_dict['slot'] ] = slot_dict['value']
-
+            goal[slot_dict['slot']] = slot_dict['value']
         self.current_goal = goal
 
     def reset(self):
-        self.observation = {}
+        self.agenda = list()
+        self.global_agenda = list()
+
+        self.observation = lightroom.schema.default_goal_factory()
+        self.goal = {}
 
     def observe(self, observation):
-        # Update observation
         self.observation.update(observation)
-        self._push_actions_to_agenda_from_observation()
+        self._flush_global_agenda_to_agenda()
+        self._build_current_goal_from_agenda()
         return self.observation
-
-    def _push_actions_to_agenda_from_observation(self):
-
-        # Compute distances
-        image_state = self.observation.get('image_state')
-        distances = self._compute_slot_distances(
-            image_state)  # Compute slot distances
-        distances = [slot_dist for slot_dist in distances if abs(
-            slot_dist['distance']) > self.threshold]  # Filter slots above threshold
-
-        # Decide according to actions
-        system_acts = self.observation.get(
-            'system_acts', [{'type': 'inform'}])  # Dummy System Act
-
-        for sys_act in system_acts:
-            if sys_act['type'] == "inform":
-                # We flush the agenda
-                self.agenda.clear()
-                # Sort from low to high, since pops from back, see def act(self)
-                distances.sort(key=lambda tup: abs(
-                    tup['distance']))
-                for slot_dist in distances:
-                    user_act = {}
-                    user_act['type'] = 'inform'
-                    user_act['slot'] = slot_dist.get('slot')
-
-                    dist = slot_dist.get('distance')
-                    estimated_value = self.estimate_distance_to_value(dist)
-                    user_act['value'] = estimated_value
-                    self.agenda.append(user_act)
-
-                # Add end dialogue act
-                if not len(self.agenda):
-                    self.agenda.append({'type': 'end'})
 
     def act(self):
         """
@@ -153,12 +145,14 @@ class AgendaBasedUserSimulator(object):
         """
         assert len(self.agenda)
         # Episode done
-        episode_done = self.agenda[0]['type'] == 'end'
+        episode_done = (self.agenda[0]['type'] == 'end')
+
         # Get user dialogue acts
         user_dialogue_acts = list()
         for _ in range(self._sample_num_actions()):
-            user_dialogue_act = self.agenda.pop()
+            user_dialogue_act = self.agenda.pop(0)
             user_dialogue_acts.append(user_dialogue_act)
+
         # Build user utterance
         user_utterance = self.template_nlg(user_dialogue_acts)
 
@@ -186,7 +180,7 @@ class AgendaBasedUserSimulator(object):
             - self.goal
             - image_state
             Return:
-            - distances: list of dict [{"slot": "slot_1", "distance": 500}] )
+            - distances: list of dict [{"slot": "slot_1", "distance": 500}]
         """
         distances = list()
         for slot in self.goal.keys():
@@ -239,7 +233,7 @@ class AgendaBasedUserSimulator(object):
         slots = list()
         for user_act in user_acts:
             if user_act['type'] == 'inform':
-                act_tokens = ['make', user_act['slot'], user_act['value']]
+                act_tokens = ['make', user_act['slot'], str(user_act['value'])]
                 if len(tokens):
                     tokens += ["and"]
 

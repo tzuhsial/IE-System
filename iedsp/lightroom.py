@@ -86,17 +86,18 @@ class LightroomAPI(object):
             # Get parameters
             dialogue_act_type = sys_act.get('type')
             action_type = sys_act.get('action_type', 'null')
-            slot = sys_act.get('slot', 'null')
-            value = sys_act.get('value', 'null')
+            slot_type = sys_act.get('type')
+            slot_name = sys_act.get('slot')
+            slot_value = sys_act.get('value')
 
             # Execute actions
-            if dialogue_act_type == "request" or action_type == 'null':
+            if action_type == 'null':
                 pass
             elif dialogue_act_type == "inform":
-                if action_type == "adjust":
-                    self._status[slot] += value
-                elif action_type == "non_adjust":
-                    self._status[slot] = value
+                if slot_type == "adjust":
+                    self._status[slot_name] += slot_value
+                elif slot_type == "non_adjust":
+                    self._status[slot_name] = slot_value
             else:
                 raise NotImplementedError(
                     "Unknown dialogue_act_type \"{}\"".format(dialogue_act_type))

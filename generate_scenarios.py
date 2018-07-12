@@ -3,6 +3,7 @@ import random
 import pickle
 
 import lightroom
+import photoshop
 import user
 import util
 
@@ -40,13 +41,21 @@ def generate_multi_goal_agenda_lightroom():
     return goal
 
 
-def generate_multi_goal_agenda_photoshop():
-    raise NotImplementedError
+def generate_photoshop_agenda():
+    """
+        Action example: { type: "edit", slot: "adjust", value: 50 }
+    """
+    num_of_slots = 5
+    agenda = list()
+    for _ in range(num_of_slots):
+        action = photoshop.schema.random_action_factory()
+        agenda.append(action)
+    return agenda
 
 
 goal_factory_dict = {
     0: generate_multi_goal_agenda_lightroom,
-    1: generate_multi_goal_agenda_photoshop
+    1: generate_photoshop_agenda,
 }
 
 if __name__ == "__main__":
@@ -60,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument('-num-of-scenarios', dest='num_of_tasks',
                         type=int, default=None, help='Number of tasks to generate')
     parser.add_argument('-save', dest='save', type=str,
-                        default='scenario.lightroom.pickle', help='Pickle file path to save tasks')
+                        default='scenario.photoshop.pickle', help='Pickle file path to save tasks')
     args = parser.parse_args()
 
     # Get arguments

@@ -21,9 +21,9 @@ def main():
     world = World([lightroom, user, agent])
 
     for profile, multi_goal in scenarios:
+        world.reset()
         user.setup_scenario(profile, multi_goal)
         user.print_agenda()
-        world.reset()
         episode_done = False
 
         while not episode_done:
@@ -31,6 +31,7 @@ def main():
             world.parley()
 
             episode_done = world.episode_done()
+
         import pdb
         pdb.set_trace()
 
