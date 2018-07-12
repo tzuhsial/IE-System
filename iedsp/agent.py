@@ -4,6 +4,8 @@
 
 from transitions import Machine
 
+from .cvengine import CVEngineAPI
+
 
 def sys_act_builder(dialogue_act, slots=None):
     sys_act = {}
@@ -57,6 +59,9 @@ class RuleBasedDialogueManager(object):
         self.machine.add_transition(
             trigger='bye', source='ask_ier', dest='end_session')
 
+    def on_enter_ask_ier(self):
+        self.clear_ier()
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -80,6 +85,8 @@ class RuleBasedDialogueManager(object):
         self.confirm_slots = []
         self.query_slots = []
 
+        self.mask_slots = []
+
     def observe(self, observation):
         """ Updates observation and clears actions
         """
@@ -96,6 +103,8 @@ class RuleBasedDialogueManager(object):
             return self.act_confirm()
         elif self.state == "request":
             return self.act_request()
+        elif self.state == "ask_user_label":
+            return self.act_ask_user_label()
         else:
             raise ValueError("Unknown state {}!".format(self.state))
 
@@ -124,7 +133,8 @@ class RuleBasedDialogueManager(object):
         assert user_acts[0]['dialogue_act'] == "open"
         self.greeting()
         sys_act = sys_act_builder('greeting')
-        return [sys_act], False
+        sys_act2 = sys_act_builder('ask')
+        return [sys_act, sys_act2], False
 
     @observe_apply_return
     def act_ask_ier(self, user_acts):
@@ -147,6 +157,7 @@ class RuleBasedDialogueManager(object):
             self.update_slots(user_act['slots'])
             sys_act = self.nl_transition()
         elif dialogue_act == "bye":
+            self.bye()
             sys_act = sys_act_builder('bye')
             episode_done = True
         system_acts.append(sys_act)
@@ -164,11 +175,13 @@ class RuleBasedDialogueManager(object):
         for user_act in user_acts:
             user_dialogue_act = user_act['dialogue_act']
             if user_dialogue_act == "affirm":
+                # Responding to previous choice
                 self.query_slots += self.confirm_slots[:1]
                 self.confirm_slots.pop(0)
             elif user_dialogue_act == "negate":
                 # Responding to previous choice
-                self.request_slots += [d['slot'] for d in self.confirm_slots]
+                self.request_slots += [d['slot']
+                                       for d in self.confirm_slots[:1]]
                 self.confirm_slots.pop(0)
             elif user_dialogue_act == "inform":
                 self.update_slots(user_act['slots'])
@@ -215,7 +228,18 @@ class RuleBasedDialogueManager(object):
             sys_act = sys_act_builder('repeat')
         else:
             self.highNLConf_noMissing()
-            sys_act = sys_act_builder('execute', self.query_slots)
+
+            has_select = self.act_query()
+
+            if has_select and len(self.mask_slots) != 1:
+                self.lowCVConf()
+                sys_act = sys_act_builder(
+                    'request_label', slots=self.mask_slots)
+            else:
+                self.highCVConf()
+                sys_act = sys_act_builder(
+                    'execute', self.query_slots + self.mask_slots)
+                self.result()
         return sys_act
 
     @staticmethod
@@ -227,19 +251,29 @@ class RuleBasedDialogueManager(object):
         return -1, None
 
     def update_slots(self, inform_slots):
-        """ Updates request, confirm, query slots
+        """ Updates request, confirm, query, select slots
         """
         action_idx, action_slot = self.find_slot_with_key(
             'action_type', inform_slots)
         if action_idx < 0:  # Not found, look for existing
             _, action_slot = self.find_slot_with_key(
                 'action_type', self.query_slots)
+
         action_type = action_slot['value']
+        action_conf = action_slot['conf']
+        if action_conf < 0.5:
+            return
 
         if action_type == "adjust":
-            query_slot_names = ['action_type', 'attribute', 'adjustValue']
+            query_slot_names = ['action_type',
+                                'attribute', 'adjustValue', 'select']
+        elif action_type in ["select"]:
+            query_slot_names = ['select']
+        elif action_type in ["redo", "undo"]:
+            query_slot_names = ['action_type']
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                "Unknown action_type: {}".format(action_type))
 
         for query_name in query_slot_names:
             inform_idx, slot = self.find_slot_with_key(
@@ -250,7 +284,6 @@ class RuleBasedDialogueManager(object):
                         not any(query_name == d['slot'] for d in self.query_slots):
                     self.request_slots.append(query_name)
             else:  # Found in inform
-
                 if any(query_name == d['slot'] for d in self.confirm_slots):
                     confirm_idx, _ = self.find_slot_with_key(
                         query_name, self.confirm_slots)
@@ -271,12 +304,68 @@ class RuleBasedDialogueManager(object):
     def hasRequestSlots(self):
         return len(self.request_slots) != 0
 
-    def query_cv_engine(self):
-        pass
+    ###########################
+    #       CV Related        #
+    ###########################
+    def act_query(self):
+        """queries cv engine to obtain masks
+           returns whether select is present
+        """
+
+        select_idx, select_slot = self.find_slot_with_key(
+            'select', self.query_slots)
+        if select_idx < 0:
+            return False
+
+        b64_img_str = self.observation.get('b64_img_str')
+
+        noun = select_slot['value']
+
+        masks = CVEngineAPI.fake_select(noun, b64_img_str)
+
+        self.mask_slots.clear()
+        for idx, mask_str in enumerate(masks):
+            mask_name = 'mask' + str(idx)
+            mask_slot = {'slot': mask_name, 'value': mask_str}
+            self.mask_slots.append(mask_slot)
+
+        return True
+
+    @observe_apply_return
+    def act_ask_user_label(self, user_acts):
+        system_acts = []
+        for user_act in user_acts:
+            user_dialogue_act = user_act['dialogue_act']
+            if user_dialogue_act == "negate":
+                self.noLabel()
+                self.clear_ier()
+                sys_act = sys_act_builder('clear_edit')
+            elif user_dialogue_act == "tool_select":
+                self.hasLabel()
+                select_slots = user_act['slots']
+
+                selected_mask_slots = []
+                for slot in select_slots:
+                    idx, mask_slot = self.find_slot_with_key(
+                        slot['value'], self.mask_slots)
+                    if idx >= 0:
+                        selected_mask_slots.append(mask_slot)
+
+                self.mask_slots = selected_mask_slots
+
+                #query_mask_slots = [ d['value'] for d in self.mask_slots ]
+
+                sys_act = sys_act_builder(
+                    'execute', self.query_slots + self.mask_slots)
+                self.result()
+
+            system_acts.append(sys_act)
+        return system_acts, False
 
     ###########################
     #   Simple Template NLG   #
     ###########################
+
     def template_nlg(self, system_acts):
         """Given system_acts, return an utterance string
         """
@@ -292,7 +381,7 @@ class RuleBasedDialogueManager(object):
                 utt = "Can you please repeat again?"
             elif sys_act['dialogue_act'] == 'request':
                 request_slots = sys_act['slots']
-                utt = "What " + ','.join(request_slots) + " do you want?"
+                utt = "What " + ', '.join(request_slots) + " do you want?"
             elif sys_act['dialogue_act'] == 'confirm':
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
@@ -305,10 +394,19 @@ class RuleBasedDialogueManager(object):
                 utt += ','.join(confirm_list) + "?"
 
             elif sys_act['dialogue_act'] == 'request_label':
-                utt = "I can not identify the object. Can you label it for me?"
+                mask_slots = sys_act['slots']
+                if len(mask_slots) == 0:
+                    utt = "I can not identify the object. Can you label it for me?"
+                else:
+                    utt = "I can not identify the object. Can you select it for me?"
             elif sys_act['dialogue_act'] == 'execute':
-                utt = "Executing..."
+                execute_slots = sys_act['slots']
 
+                slot_list = [slot['slot'] + "=" + slot['value']
+                             for slot in execute_slots]
+                utt = "Execute: " + ', '.join(slot_list)
+            elif sys_act['dialogue_act'] == 'clear_edit':
+                utt = "Edit forfeited. Status cleared."
             elif sys_act['dialogue_act'] == 'bye':
                 utt = "Goodbye! See you next time!"
             else:
@@ -317,58 +415,3 @@ class RuleBasedDialogueManager(object):
 
         full_utterance = ' '.join(utt_list)
         return full_utterance
-
-
-if __name__ == "__main__":
-
-    agent = RuleBasedDialogueManager()
-    agent.reset()
-
-    # Turn 1
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'open'}
-        ]
-    }
-    agent.observe(observation)
-    print(agent.act())
-
-    # Turn 2
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'action_type', 'value': 'adjust', 'conf': 0.8},
-                 {'slot': 'attribute', 'value': 'brightness', 'conf': 0.9},
-                 {'slot': 'adjustValue', 'value': 'more', 'conf': 0.6},
-             ]
-             }
-        ]
-    }
-
-    agent.observe(observation)
-    print(agent.act())
-
-    # Turn 3
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'negate'},
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'adjustValue', 'value': 'less', 'conf': 0.8}
-             ]}
-        ]
-    }
-    agent.observe(observation)
-    print(agent.act())
-
-    import pdb
-    pdb.set_trace()
-    # Turn 100
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'bye'}
-        ]
-    }
-    agent.observe(observation)
-    print(agent.act())

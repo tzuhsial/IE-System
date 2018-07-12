@@ -17,6 +17,12 @@ def user_template_nlg(user_acts):
             utt = "Yes."
         elif user_dialogue_act == "negate":
             utt = "No."
+        elif user_dialogue_act == "tool_select":
+            slots = user_act['slots']
+            slot_list = []
+            for slot in slots:
+                slot_list.append(slot['value'])
+            utt = "Selecting " + ", ".join(slot_list)
         elif user_dialogue_act == "bye":
             utt = "Bye."
         utt_list.append(utt)
@@ -120,10 +126,10 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "ask_ier"
-    assert dialogue_act == 'greeting'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "ask_ier"
+    assert dialogue_act == 'greeting'
 
     # Turn 2
     observation = {
@@ -140,10 +146,10 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "ask_ier"
-    assert dialogue_act == 'repeat'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "ask_ier"
+    assert dialogue_act == 'repeat'
 
     # Turn 3
     observation = {
@@ -152,6 +158,8 @@ def test_nl_flow_dialogue_act():
              'slots': [
                  {'slot': 'action_type', 'value': 'adjust', 'conf': 0.7},
                  {'slot': 'attribute', 'value': 'brightness', 'conf': 0.5},
+                 {'slot': 'select', 'value': 'dog', 'conf': 0.7
+                  }
              ]
              }
         ]
@@ -160,10 +168,10 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "confirm"
+    assert dialogue_act == 'confirm'
 
     # Turn 4
     observation = {
@@ -175,12 +183,13 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
 
-    # Turn 4
+    assert agent.state == "confirm"
+    assert dialogue_act == 'confirm'
+
+    # Turn 5
     observation = {
         'user_acts': [
             {'dialogue_act': 'negate'},
@@ -194,12 +203,27 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "request"
-    assert dialogue_act == 'request'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "confirm"
+    assert dialogue_act == 'confirm'
 
-    # Turn 5
+    # Turn 6
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'affirm'},
+        ]
+    }
+
+    agent.observe(observation)
+    act = agent.act()
+    dialogue_act = act['system_acts'][0]['dialogue_act']
+    print("User", user_template_nlg(observation['user_acts']))
+    print("Agent", act['system_utterance'])
+    assert agent.state == "request"
+    assert dialogue_act == 'request'
+
+    # Turn 7
     observation = {
         'user_acts': [
             {'dialogue_act': 'inform',
@@ -212,18 +236,18 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "confirm"
+    assert dialogue_act == 'confirm'
 
-    # Turn 6
+    # Turn 8
     observation = {
         'user_acts': [
             {'dialogue_act': 'negate'},
             {'dialogue_act': 'inform',
              'slots': [
-                 {'slot': 'adjustValue', 'value': 'less', 'conf': 0.8}
+                 {'slot': 'adjustValue', 'value': 'less', 'conf': 0.8},
              ]}
         ]
     }
@@ -231,9 +255,61 @@ def test_nl_flow_dialogue_act():
     agent.observe(observation)
     act = agent.act()
     dialogue_act = act['system_acts'][0]['dialogue_act']
-    assert agent.state == "query_cv_engine"
-    assert dialogue_act == 'execute'
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
+    assert agent.state == "ask_user_label"
+    assert dialogue_act == 'request_label'
+
+    # Turn 9
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'tool_select',
+             'slots': [
+                 {'slot': 'select', 'value': 'mask1'}
+             ]
+             },
+        ]
+    }
+
+    agent.observe(observation)
+    act = agent.act()
+    dialogue_act = act['system_acts'][0]['dialogue_act']
+    print("User", user_template_nlg(observation['user_acts']))
+    print("Agent", act['system_utterance'])
+    assert agent.state == "ask_ier"
+    assert dialogue_act == 'execute'
+
+    # Turn 10
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'inform',
+             'slots': [
+                 {'slot': 'action_type', 'value': 'undo', 'conf': 0.8}
+             ]},
+        ]
+    }
+
+    agent.observe(observation)
+    act = agent.act()
+    dialogue_act = act['system_acts'][0]['dialogue_act']
+    print("User", user_template_nlg(observation['user_acts']))
+    print("Agent", act['system_utterance'])
+    assert agent.state == "ask_ier"
+    assert dialogue_act == 'execute'
+
+    # Turn 10
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'bye'},
+        ]
+    }
+
+    agent.observe(observation)
+    act = agent.act()
+    dialogue_act = act['system_acts'][0]['dialogue_act']
+    print("User", user_template_nlg(observation['user_acts']))
+    print("Agent", act['system_utterance'])
+    assert agent.state == "end_session"
+    assert dialogue_act == 'bye'
 
     assert False

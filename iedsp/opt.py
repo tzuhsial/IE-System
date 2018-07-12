@@ -26,6 +26,5 @@ def add_user_opt(parser):
     parser.add_argument('-user_adjust_threshold', type=int, default=5)
     return parser
 
-
 def add_agent_opt(parser):
     return parser
