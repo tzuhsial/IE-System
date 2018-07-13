@@ -111,7 +111,7 @@ def test_state_transitions():
     assert agent.state == 'ask_ier'
 
 
-def test_nl_flow_dialogue_act():
+def test_dialogue_flow_and_dialogue_act():
     """ Here the agent interacts with user acts
     """
     agent = RuleBasedDialogueManager()
@@ -120,16 +120,23 @@ def test_nl_flow_dialogue_act():
     # Turn 1
     observation = {
         'user_acts': [
-            {'dialogue_act': 'open'}
+            {'dialogue_act': 'open',
+             'slots': [
+                 {'slot': 'action_type', 'value': 'open', 'conf': 1.0},
+                 {'slot': 'image_path',
+                  'value': '/Users/tzlin/Documents/code/SimplePhotoshop/images/3.jpg',
+                  'conf': 1.0}
+             ]
+             }
         ]
     }
     agent.observe(observation)
     act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
+    dialogue_acts = [a['dialogue_act'] for a in act['system_acts']]
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
     assert agent.state == "ask_ier"
-    assert dialogue_act == 'greeting'
+    assert dialogue_acts == ['execute', 'greeting', 'ask']
 
     # Turn 2
     observation = {
