@@ -1,1 +1,1 @@
-from .backend import SimplePhotoshopAPI
+from .photoshop import SimplePhotoshopAPI

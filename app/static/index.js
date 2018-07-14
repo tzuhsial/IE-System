@@ -17,8 +17,8 @@ var previewFile = function () {
                 {
                     'dialogue_act': 'load',
                     'slots': [
-                        { 'slot': 'action_type', 'value': 'load' },
-                        { 'slot': 'b64_img_str', 'value': b64_img_str }
+                        { 'slot': 'action_type', 'value': 'load', 'conf': 1.0 },
+                        { 'slot': 'b64_img_str', 'value': b64_img_str, 'conf': 1.0 }
                     ]
                 }
             ]
@@ -58,11 +58,12 @@ var getObservation = function () {
             }
         ]
     };
+    console.log("getObservation", observation);
+    return observation;
 }
 
 var submitRequest = function (observation) {
-
-    if (observation['user_acts']['slots'].length == 0) return;
+    if (observation['user_acts'][0]['slots'].length == 0) return;
 
     var data = {
         'observation': JSON.stringify(observation)
@@ -73,7 +74,15 @@ var submitRequest = function (observation) {
 
     toggleLoading(true);
     $.post(ierUrl, data, function (response) {
-        loadImage(response['b64_img_str']);
+        console.log(response);
+        // parse b64_img_str from action
+        var system_acts = response['system_acts']
+
+        if ('b64_img_str' in response) {
+            loadImage(response['b64_img_str']);
+        }
+
+        loadUtterance(response['system_utterance']);
     }).always(function () {
         toggleLoading(false);
     })
@@ -90,6 +99,11 @@ var toggleLoading = function (show) {
 var loadImage = function (b64_img_str) {
     var display_string = "data:image/png;base64," + b64_img_str;
     $("#image").attr('src', display_string);
+    console.log("Image loaded!");
+}
+
+var loadUtterance = function (utterance) {
+    $("#system-message").text(utterance);
 }
 
 

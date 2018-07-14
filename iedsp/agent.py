@@ -10,11 +10,13 @@ from .util import find_slot_with_key
 
 
 def sys_act_builder(dialogue_act, slots=None):
+    """Build sys_act list with dialogue_act and slots
+    """
     sys_act = {}
     sys_act['dialogue_act'] = dialogue_act
     if slots is not None:
         sys_act['slots'] = slots
-    return sys_act
+    return [sys_act]
 
 
 class RuleBasedDialogueManager(object):
@@ -42,7 +44,7 @@ class RuleBasedDialogueManager(object):
         self.machine.add_transition(trigger='lowNLConf', source=[
                                     'ask_ier', 'request', 'confirm'], dest='confirm')
         self.machine.add_transition(trigger='highNLConf_missing', source=[
-                                    'ask_ier', 'confirm'], dest='request')
+                                    'ask_ier', 'confirm', 'request'], dest='request')
         self.machine.add_transition(trigger='highNLConf_noMissing', source=[
                                     'ask_ier', 'confirm', 'request'], dest='query_cv_engine')
 
@@ -136,7 +138,10 @@ class RuleBasedDialogueManager(object):
             Goes through state transition
         """
         assert len(user_acts) == 1
-        assert user_acts[0]['dialogue_act'] == "open"
+        assert user_acts[0]['dialogue_act'] in ["open", "load"]
+
+        system_acts = []
+
         self.greeting()  # start_session -> ask_ier
 
         self.update_slots(user_acts[0]['slots'])
@@ -147,14 +152,13 @@ class RuleBasedDialogueManager(object):
 
         self.highCVConf()  # query_cv_engine -> execute_api
 
-        sys_act = self.act_execute()  # action in execute_api
+        system_acts += self.act_execute()  # action in execute_api
 
         self.result()  # execute_api -> ask_ier
 
-        sys_act2 = sys_act_builder('greeting')
-        sys_act3 = sys_act_builder('ask')
+        system_acts += sys_act_builder('greeting')
+        system_acts += sys_act_builder('ask')
 
-        system_acts = [sys_act, sys_act2, sys_act3]
         return system_acts, False
 
     @observe_apply_return
@@ -176,12 +180,13 @@ class RuleBasedDialogueManager(object):
         dialogue_act = user_act['dialogue_act']
         if dialogue_act == "inform":
             self.update_slots(user_act['slots'])
-            sys_act = self.state_transition()
+            system_acts += self.state_transition()
         elif dialogue_act == "bye":
             self.bye()
-            sys_act = sys_act_builder('bye')
+            system_acts += sys_act_builder('bye')
             episode_done = True
-        system_acts.append(sys_act)
+        else:
+            raise ValueError("Invalid dialogue_act: {}".format(dialogue_act))
         return system_acts, episode_done
 
     @observe_apply_return
@@ -192,7 +197,6 @@ class RuleBasedDialogueManager(object):
             - request
             - query
         """
-        system_acts = []
         for user_act in user_acts:
             user_dialogue_act = user_act['dialogue_act']
             if user_dialogue_act == "affirm":
@@ -208,8 +212,7 @@ class RuleBasedDialogueManager(object):
                 self.update_slots(user_act['slots'])
 
         # Build sys_act
-        sys_act = self.state_transition()
-        system_acts.append(sys_act)
+        system_acts = self.state_transition()
         return system_acts, False
 
     @observe_apply_return
@@ -228,8 +231,7 @@ class RuleBasedDialogueManager(object):
         self.update_slots(user_act['slots'])
 
         # Build sys_act
-        sys_act = self.state_transition()
-        system_acts.append(sys_act)
+        system_acts += self.state_transition()
 
         return system_acts, False
 
@@ -238,33 +240,45 @@ class RuleBasedDialogueManager(object):
             Returns a sys_act object
         """
         # Build sys_act
+        system_acts = []
         if self.hasConfirmSlots():
             self.lowNLConf()
-            sys_act = sys_act_builder('confirm', self.confirm_slots[:1])
+            system_acts += sys_act_builder('confirm', self.confirm_slots[:1])
         elif self.hasRequestSlots():
             self.highNLConf_missing()
-            sys_act = sys_act_builder('request', self.request_slots)
+            system_acts += sys_act_builder('request', self.request_slots)
         elif len(self.query_slots) == 0:  # Nothing learned
             self.zeroNLConf()
-            sys_act = sys_act_builder('repeat')
+            system_acts += sys_act_builder('repeat')
         else:
             self.highNLConf_noMissing()
 
-            has_select = self.act_query()
+            has_object = self.act_query()
 
-            if has_select and len(self.mask_slots) != 1:
+            if has_object and len(self.mask_slots) > 1:
                 self.lowCVConf()
-                sys_act = sys_act_builder(
+                system_acts += sys_act_builder(
                     'request_label', slots=self.mask_slots)
+            elif has_object and len(self.mask_slots) == 0:  # No mask
+                # This is when the CV engine cannot recognize the object
+                # Should let the user use tools in photoshop
+                # Currently, we treat it as out of domain error
+                self.lowCVConf()
+                self.noLabel()
+                system_acts += sys_act_builder('ood_cv')
+                system_acts += sys_act_builder('ask')
             else:
                 self.highCVConf()
-                sys_act = self.act_execute()
+                system_acts += self.act_execute()
                 self.result()
-        return sys_act
+                system_acts += sys_act_builder('ask')
+
+        return system_acts
 
     def update_slots(self, inform_slots):
         """ Updates request, confirm, query, select slots
         """
+        # Determine current action_type
         action_idx, action_slot = find_slot_with_key(
             'action_type', inform_slots)
         if action_idx < 0:  # Not found, look for existing
@@ -279,6 +293,7 @@ class RuleBasedDialogueManager(object):
         # Get argument list from Ontology
         query_slot_names = Ontology.get(action_type)
 
+        # Update confirm, request, query slots
         for query_name in query_slot_names:
             inform_idx, slot = find_slot_with_key(
                 query_name, inform_slots)
@@ -316,21 +331,23 @@ class RuleBasedDialogueManager(object):
            returns boolean, indicating whether select is present
         """
 
-        select_idx, select_slot = find_slot_with_key(
-            'select', self.query_slots)
-        if select_idx < 0:
+        object_idx, object_slot = find_slot_with_key(
+            'object', self.query_slots)
+        if object_idx < 0 or object_slot['value'] == "image":
+            # No object is needed for execution,
+            # or the object is the whole image, which we don't need any masks
             return False
 
         b64_img_str = self.observation.get('b64_img_str')
 
-        noun = select_slot['value']
+        noun = object_slot['value']
 
-        masks = CVEngineAPI.fake_select(noun, b64_img_str)
+        masks = CVEngineAPI.select(noun, b64_img_str)
+        #masks = CVEngineAPI.fake_select(noun, b64_img_str)
 
         self.mask_slots.clear()
         for idx, mask_str in enumerate(masks):
-            mask_name = 'mask' + str(idx)
-            mask_slot = {'slot': mask_name, 'value': mask_str}
+            mask_slot = {'slot': str(idx), 'value': mask_str}
             self.mask_slots.append(mask_slot)
 
         return True
@@ -341,27 +358,34 @@ class RuleBasedDialogueManager(object):
         for user_act in user_acts:
             user_dialogue_act = user_act['dialogue_act']
             if user_dialogue_act == "negate":
-                self.noLabel()
-                self.clear_ier()
-                sys_act = sys_act_builder('clear_edit')
-            elif user_dialogue_act == "tool_select":
+                self.noLabel()  # ask_user_label -> ask_ier, clears_ier
+                system_acts += sys_act_builder('clear_edit')
+            elif user_dialogue_act == "select_object_mask_id":
                 self.hasLabel()
-                select_slots = user_act['slots']
 
-                selected_mask_slots = []
-                for slot in select_slots:
-                    idx, mask_slot = find_slot_with_key(
-                        slot['value'], self.mask_slots)
-                    if idx >= 0:
-                        selected_mask_slots.append(mask_slot)
+                user_mask_slots = user_act['slots']
 
-                self.mask_slots = selected_mask_slots
+                assert len(user_mask_slots) == 1
 
-                sys_act = self.act_execute()
+                # User selection will only be the mask ids
+                mask_id_slot = user_mask_slots[0]
+                assert mask_id_slot['slot'] == "object_mask_id"
+                mask_id = mask_id_slot['value']
+                assert isinstance(mask_id, str)
+
+                _, selected_mask_slot = find_slot_with_key(
+                    mask_id, self.mask_slots)
+                self.mask_slots = [selected_mask_slot]
+
+                system_acts += self.act_execute()
 
                 self.result()
 
-            system_acts.append(sys_act)
+                system_acts += sys_act_builder('ask')
+            else:
+                raise ValueError(
+                    "Invalid user_dialogue_act: {}".format(user_dialogue_act))
+
         return system_acts, False
 
     def act_execute(self):
@@ -386,8 +410,10 @@ class RuleBasedDialogueManager(object):
                 utt = "Hello! My name is PS. I am here to help you edit your image!"
             elif sys_act['dialogue_act'] == 'ask':
                 utt = "What would you like to do?"
-            elif sys_act['dialogue_act'] == 'ood':
+            elif sys_act['dialogue_act'] == 'ood_nl':
                 utt = "Sorry, Photoshop currently does not support this function."
+            elif sys_act['dialogue_act'] == 'ood_cv':
+                utt = "Sorry, Photoshop's CV engine cannot find what you are looking for."
             elif sys_act['dialogue_act'] == 'repeat':
                 utt = "Can you please repeat again?"
             elif sys_act['dialogue_act'] == 'request':

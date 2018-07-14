@@ -28,10 +28,11 @@ def image_edit_request():
     agent_act = agent.act()
 
     backend.observe(agent_act)
-    backend_act = backend.act()
-
+    backend_act = backend.act() # Contains only b64_img_str, actually
+    
+    agent_act.update(backend_act)
     # Build return object
-    obj = backend_act
+    obj = agent_act
     return jsonify(obj)
 
 

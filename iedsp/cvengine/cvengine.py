@@ -17,8 +17,13 @@ class CVEngineAPI:
             'imgstr': b64_img_str,
             'text': noun
         }
-        response = requests.post(SELECT_URL, data=data)
-        masks = response.json()
+        try:
+            response = requests.post(SELECT_URL, data=data)
+            response.raise_for_status()
+            masks = response.json()
+        except Exception as e:
+            print(e)
+            masks = []
         return masks
 
     def fake_select(noun, b64_img_str):

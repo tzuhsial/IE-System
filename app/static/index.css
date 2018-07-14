@@ -10,3 +10,8 @@
 span {
     display: block;
 }
+
+#system-message {
+    height: 100px;
+    border: 1px black solid;
+}

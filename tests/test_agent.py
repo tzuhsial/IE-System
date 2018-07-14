@@ -1,4 +1,5 @@
 from iedsp.agent import RuleBasedDialogueManager
+from iedsp.photoshop import SimplePhotoshopAPI
 
 
 def user_template_nlg(user_acts):
@@ -17,7 +18,7 @@ def user_template_nlg(user_acts):
             utt = "Yes."
         elif user_dialogue_act == "negate":
             utt = "No."
-        elif user_dialogue_act == "tool_select":
+        elif user_dialogue_act == "select_object_mask":
             slots = user_act['slots']
             slot_list = []
             for slot in slots:
@@ -25,6 +26,13 @@ def user_template_nlg(user_acts):
             utt = "Selecting " + ", ".join(slot_list)
         elif user_dialogue_act == "bye":
             utt = "Bye."
+        elif user_dialogue_act == "select_object_mask_id":
+            slot = user_act['slots'][0]
+            mask_id = slot['value']
+            utt = "I want to select object {}.".format(mask_id)
+        else:
+            raise ValueError(
+                "Unknown user_dialogue_act: {}".format(user_dialogue_act))
         utt_list.append(utt)
 
     utterance = ' '.join(utt_list)
@@ -165,8 +173,6 @@ def test_dialogue_flow_and_dialogue_act():
              'slots': [
                  {'slot': 'action_type', 'value': 'adjust', 'conf': 0.7},
                  {'slot': 'attribute', 'value': 'brightness', 'conf': 0.5},
-                 {'slot': 'select', 'value': 'dog', 'conf': 0.7
-                  }
              ]
              }
         ]
@@ -212,13 +218,16 @@ def test_dialogue_flow_and_dialogue_act():
     dialogue_act = act['system_acts'][0]['dialogue_act']
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
+    assert agent.state == "request"
+    assert dialogue_act == "request"
 
     # Turn 6
     observation = {
         'user_acts': [
-            {'dialogue_act': 'affirm'},
+            {'dialogue_act': 'inform',
+             'slots': [
+                 {'slot': 'adjustValue', 'value': 'more', 'conf': 0.8}
+             ]}
         ]
     }
 
@@ -228,14 +237,14 @@ def test_dialogue_flow_and_dialogue_act():
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
     assert agent.state == "request"
-    assert dialogue_act == 'request'
+    assert dialogue_act == "request"
 
     # Turn 7
     observation = {
         'user_acts': [
             {'dialogue_act': 'inform',
              'slots': [
-                 {'slot': 'adjustValue', 'value': 'more', 'conf': 0.5}
+                 {'slot': 'object', 'value': 'dog', 'conf': 0.6}
              ]}
         ]
     }
@@ -246,16 +255,12 @@ def test_dialogue_flow_and_dialogue_act():
     print("User", user_template_nlg(observation['user_acts']))
     print("Agent", act['system_utterance'])
     assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
+    assert dialogue_act == "confirm"
 
     # Turn 8
     observation = {
         'user_acts': [
-            {'dialogue_act': 'negate'},
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'adjustValue', 'value': 'less', 'conf': 0.8},
-             ]}
+            {'dialogue_act': 'affirm'}
         ]
     }
 
@@ -270,9 +275,9 @@ def test_dialogue_flow_and_dialogue_act():
     # Turn 9
     observation = {
         'user_acts': [
-            {'dialogue_act': 'tool_select',
+            {'dialogue_act': 'select_object_mask_id',
              'slots': [
-                 {'slot': 'select', 'value': 'mask1'}
+                 {'slot': 'object_mask_id', 'value': "1", 'conf': 1.0}
              ]
              },
         ]
@@ -318,5 +323,3 @@ def test_dialogue_flow_and_dialogue_act():
     print("Agent", act['system_utterance'])
     assert agent.state == "end_session"
     assert dialogue_act == 'bye'
-
-    assert False
