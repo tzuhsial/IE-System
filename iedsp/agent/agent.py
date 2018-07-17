@@ -425,6 +425,11 @@ class RuleBasedDialogueManager(object):
                     mask_id, self.mask_str_slots)
                 self.mask_str_slots = [selected_mask_slot]
 
+                intent_idx, intent_slot = find_slot_with_key(
+                    'intent', self.query_slots)
+                if intent_idx >= 0:
+                    self.query_slots.pop(intent_idx)
+
                 self.query_slots += mask_id_slots
 
                 self.noMaskMissing()  # ier_complete -> execute_api
