@@ -4,9 +4,9 @@
 
 from transitions import Machine
 
-from .cvengine import CVEngineAPI
-from .ontology import Ontology
-from .util import find_slot_with_key
+from ..cvengine import CVEngineAPI
+from ..ontology import Ontology
+from ..util import find_slot_with_key
 
 
 def sys_act_builder(dialogue_act, slots=None):
@@ -24,8 +24,8 @@ class RuleBasedDialogueManager(object):
         Define finite state transitions here
     """
     states = [
-        'start_session', 'ask_ier', 'confirm', 'request', 'query_cv_engine', 'execute_api', 'ask_user_label',
-        'end_session'
+        'start_session', 'ask_ier', 'confirm', 'request', 'ier_complete',
+        'query_cv_engine', 'execute_api', 'ask_user_label', 'end_session'
     ]
 
     def __init__(self):
@@ -35,6 +35,7 @@ class RuleBasedDialogueManager(object):
         self.machine = Machine(
             model=self, states=self.states, initial='start_session')
 
+        # NLU Part
         self.machine.add_transition(
             trigger='greeting', source='start_session', dest='ask_ier')
         self.machine.add_transition(
@@ -46,25 +47,52 @@ class RuleBasedDialogueManager(object):
         self.machine.add_transition(trigger='highNLConf_missing', source=[
                                     'ask_ier', 'confirm', 'request'], dest='request')
         self.machine.add_transition(trigger='highNLConf_noMissing', source=[
-                                    'ask_ier', 'confirm', 'request'], dest='query_cv_engine')
+                                    'ask_ier', 'confirm', 'request'], dest='ier_complete')
 
+        # CV Part
         self.machine.add_transition(
-            trigger='highCVConf', source='query_cv_engine', dest='execute_api')
+            trigger='maskMissing', source='ier_complete', dest='query_cv_engine')
+        self.machine.add_transition(
+            trigger='highCVConf', source='query_cv_engine', dest='ier_complete')
         self.machine.add_transition(
             trigger='lowCVConf', source='query_cv_engine', dest='ask_user_label')
         self.machine.add_transition(
-            trigger='hasLabel', source='ask_user_label', dest='execute_api')
-
+            trigger='hasLabel', source='ask_user_label', dest='ier_complete')
         self.machine.add_transition(
             trigger='noLabel', source='ask_user_label', dest='ask_ier')
 
+        # Execute
+        self.machine.add_transition(
+            trigger='noMaskMissing', source="ier_complete", dest="execute_api")
         self.machine.add_transition(
             trigger='result', source='execute_api', dest='ask_ier')
         self.machine.add_transition(
             trigger='bye', source='ask_ier', dest='end_session')
 
+        # Storing stuff
+        self.observation = {}
+
+        self.request_slots = []
+        self.confirm_slots = []
+        self.query_slots = []
+
+        self.mask_str_slots = []
+
     def on_enter_ask_ier(self):
-        self.clear_ier()
+
+        self.request_slots = []
+        self.confirm_slots = []
+
+        intent_idx, intent_slot = find_slot_with_key(
+            'intent', self.query_slots)
+        object_idx, object_slot = find_slot_with_key(
+            'object', self.query_slots)
+
+        if object_idx >= 0 and intent_idx >= 0 and intent_slot['value'] in ['select_object', 'select_object_mask_id']:
+            self.query_slots = [object_slot]
+        else:
+            self.query_slots.clear()
+            self.mask_str_slots.clear()
 
     @property
     def name(self):
@@ -75,6 +103,8 @@ class RuleBasedDialogueManager(object):
         """
         self.clear_ier()
         self.to_start_session()  # Check on_enter_ask_ier for more ops
+
+        self.observation = {}
 
     def print_status(self):
         print('state', self.state)
@@ -89,12 +119,13 @@ class RuleBasedDialogueManager(object):
         self.confirm_slots = []
         self.query_slots = []
 
-        self.mask_slots = []
+    def clear_mask(self):
+        self.mask_str_slots = []
 
     def observe(self, observation):
         """ Updates observation and clears actions
         """
-        self.observation = observation
+        self.observation.update(observation)
 
     def act(self):
         """ Handle actions according to state
@@ -111,6 +142,8 @@ class RuleBasedDialogueManager(object):
             return self.act_ask_user_label()
         else:
             raise ValueError("Unknown state {}!".format(self.state))
+
+        self.observation = {}
 
     ########################################
     #   Different act according to states  #
@@ -146,11 +179,9 @@ class RuleBasedDialogueManager(object):
 
         self.update_slots(user_acts[0]['slots'])
 
-        self.highNLConf_noMissing()  # ask_ier -> query_cv_engine
+        self.highNLConf_noMissing()  # ask_ier -> ier_complete
 
-        self.act_query()  # action in query_cv_engine
-
-        self.highCVConf()  # query_cv_engine -> execute_api
+        self.noMaskMissing()  # ier_complete -> execute_api
 
         system_acts += self.act_execute()  # action in execute_api
 
@@ -251,24 +282,31 @@ class RuleBasedDialogueManager(object):
             self.zeroNLConf()
             system_acts += sys_act_builder('repeat')
         else:
-            self.highNLConf_noMissing()
+            self.highNLConf_noMissing()  # -> ier_complete
 
-            has_object = self.act_query()
-
-            if has_object and len(self.mask_slots) > 1:
-                self.lowCVConf()
-                system_acts += sys_act_builder(
-                    'request_label', slots=self.mask_slots)
-            elif has_object and len(self.mask_slots) == 0:  # No mask
-                # This is when the CV engine cannot recognize the object
-                # Should let the user use tools in photoshop
-                # Currently, we treat it as out of domain error
-                self.lowCVConf()
-                self.noLabel()
-                system_acts += sys_act_builder('ood_cv')
-                system_acts += sys_act_builder('ask')
+            # Check if object needs to be queried
+            mask_missing = self.act_ier_complete()
+            if mask_missing:
+                self.maskMissing()
+                high_cv_conf = self.act_query()
+                if high_cv_conf:
+                    self.highCVConf()
+                    self.noMaskMissing()
+                    system_acts += self.act_execute()
+                    self.result()
+                    system_acts += sys_act_builder('ask')
+                else:
+                    self.lowCVConf()
+                    if len(self.mask_str_slots) == 0:
+                        # Treat this case as ood currently
+                        self.noLabel()
+                        system_acts += sys_act_builder('ood_cv')
+                        system_acts += sys_act_builder('ask')
+                    else:
+                        system_acts += sys_act_builder(
+                            'request_label', slots=self.mask_str_slots)
             else:
-                self.highCVConf()
+                self.noMaskMissing()
                 system_acts += self.act_execute()
                 self.result()
                 system_acts += sys_act_builder('ask')
@@ -276,22 +314,21 @@ class RuleBasedDialogueManager(object):
         return system_acts
 
     def update_slots(self, inform_slots):
-        """ Updates request, confirm, query, select slots
+        """ Updates request, confirm, query slots
         """
-        # Determine current action_type
-        action_idx, action_slot = find_slot_with_key(
-            'action_type', inform_slots)
-        if action_idx < 0:  # Not found, look for existing
-            _, action_slot = find_slot_with_key(
-                'action_type', self.query_slots)
+        # Determine current intent_type
+        intent_idx, intent_slot = find_slot_with_key(
+            'intent', inform_slots)
+        if intent_idx < 0:  # Not found, look for existing
+            _, intent_slot = find_slot_with_key(
+                'intent', self.query_slots)
 
-        action_type = action_slot['value']
-        action_conf = action_slot['conf']
-        if action_conf < 0.5:
+        if intent_slot is None or intent_slot.get('conf') < 0.5:
             return
 
         # Get argument list from Ontology
-        query_slot_names = Ontology.get(action_type)
+        intent_type = intent_slot.get('value')
+        query_slot_names = Ontology.get(intent_type)
 
         # Update confirm, request, query slots
         for query_name in query_slot_names:
@@ -302,20 +339,20 @@ class RuleBasedDialogueManager(object):
                         not any(query_name == d['slot'] for d in self.confirm_slots) and \
                         not any(query_name == d['slot'] for d in self.query_slots):
                     self.request_slots.append(query_name)
-            else:  # Found in inform
+            else:
+                # Found in confirm_slots
                 if any(query_name == d['slot'] for d in self.confirm_slots):
                     confirm_idx, _ = find_slot_with_key(
                         query_name, self.confirm_slots)
                     self.confirm_slots.pop(confirm_idx)
+                # Found in request_slots
                 if query_name in self.request_slots:
                     self.request_slots.remove(query_name)
 
                 if slot['conf'] >= 0.8:
                     self.query_slots.append(slot)
-                elif slot['conf'] >= 0.5:
+                else:
                     self.confirm_slots.append(slot)
-                else:  # Do nothing
-                    pass
 
     def hasConfirmSlots(self):
         return len(self.confirm_slots) != 0
@@ -326,56 +363,71 @@ class RuleBasedDialogueManager(object):
     ###########################
     #       CV Related        #
     ###########################
-    def act_query(self):
-        """queries cv engine to obtain masks
-           returns boolean, indicating whether select is present
+    def act_ier_complete(self):
+        """action at state ier_complete
+           checks if the object slot is present or whether mask is present
         """
-
         object_idx, object_slot = find_slot_with_key(
             'object', self.query_slots)
-        if object_idx < 0 or object_slot['value'] == "image":
-            # No object is needed for execution,
-            # or the object is the whole image, which we don't need any masks
+        if object_idx < 0 or object_slot['value'] == "image" \
+                or len(self.mask_str_slots) == 1:
+            # No object is needed, whole image or already has mask
             return False
+        return True
 
+    def act_query(self):
+        """queries cv engine to obtain masks
+            return True for high CV conf, False for low conf
+        """
         b64_img_str = self.observation.get('b64_img_str')
 
+        _, object_slot = find_slot_with_key('object', self.query_slots)
         noun = object_slot['value']
 
-        masks = CVEngineAPI.select(noun, b64_img_str)
-        #masks = CVEngineAPI.fake_select(noun, b64_img_str)
+        masks = CVEngineAPI.select_object(noun, b64_img_str)
 
-        self.mask_slots.clear()
+        self.mask_str_slots.clear()
         for idx, mask_str in enumerate(masks):
-            mask_slot = {'slot': str(idx), 'value': mask_str}
-            self.mask_slots.append(mask_slot)
+            mask_str_slot = {'slot': str(idx), 'value': mask_str}
+            self.mask_str_slots.append(mask_str_slot)
 
-        return True
+        return len(self.mask_str_slots) == 1
 
     @observe_apply_return
     def act_ask_user_label(self, user_acts):
+        """action at the state ask_user_label
+        """
         system_acts = []
         for user_act in user_acts:
             user_dialogue_act = user_act['dialogue_act']
             if user_dialogue_act == "negate":
                 self.noLabel()  # ask_user_label -> ask_ier, clears_ier
+                self.clear_mask()
                 system_acts += sys_act_builder('clear_edit')
-            elif user_dialogue_act == "select_object_mask_id":
-                self.hasLabel()
 
-                user_mask_slots = user_act['slots']
+            elif user_dialogue_act == "inform":
+                self.hasLabel()  # ask_user_label -> ier_complete
 
-                assert len(user_mask_slots) == 1
+                intent_idx, intent_slot = find_slot_with_key(
+                    'intent', user_act['slots'])
+                assert intent_idx >= 0 and intent_slot['value'] == "select_object_mask_id"
 
-                # User selection will only be the mask ids
-                mask_id_slot = user_mask_slots[0]
-                assert mask_id_slot['slot'] == "object_mask_id"
-                mask_id = mask_id_slot['value']
+                mask_id_slots = user_act['slots']
+
+                _, object_mask_id_slot = find_slot_with_key(
+                    'object_mask_id', mask_id_slots)
+
+                assert object_mask_id_slot['slot'] == "object_mask_id"
+                mask_id = object_mask_id_slot['value']
                 assert isinstance(mask_id, str)
 
                 _, selected_mask_slot = find_slot_with_key(
-                    mask_id, self.mask_slots)
-                self.mask_slots = [selected_mask_slot]
+                    mask_id, self.mask_str_slots)
+                self.mask_str_slots = [selected_mask_slot]
+
+                self.query_slots += mask_id_slots
+
+                self.noMaskMissing()  # ier_complete -> execute_api
 
                 system_acts += self.act_execute()
 
@@ -390,12 +442,11 @@ class RuleBasedDialogueManager(object):
 
     def act_execute(self):
         """ action at the state execute_api
-            Interesting here is that, 
-            since the PhotoshopAPI is also an agent in the environment
+            Interesting thing is, since Photoshop is also an agent in the environment
             the only thing we need to do here is to create a sys_act object
         """
         sys_act = sys_act_builder(
-            'execute', self.query_slots + self.mask_slots)
+            'execute', self.query_slots + self.mask_str_slots)
         return sys_act
 
     ###########################
@@ -431,8 +482,8 @@ class RuleBasedDialogueManager(object):
                 utt += ','.join(confirm_list) + "?"
 
             elif sys_act['dialogue_act'] == 'request_label':
-                mask_slots = sys_act['slots']
-                if len(mask_slots) == 0:
+                mask_str_slots = sys_act['slots']
+                if len(mask_str_slots) == 0:
                     utt = "I can not identify the object. Can you label it for me?"
                 else:
                     utt = "I can not identify the object. Can you select it for me?"

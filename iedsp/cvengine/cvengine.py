@@ -9,7 +9,7 @@ SELECT_URL = "http://isupreme:5100/selection"
 
 
 class CVEngineAPI:
-    def select(noun, b64_img_str):
+    def select_object(noun, b64_img_str):
         """ Calls Server and returns mask array
         """
         # Post request and get results
@@ -26,7 +26,7 @@ class CVEngineAPI:
             masks = []
         return masks
 
-    def fake_select(noun, b64_img_str):
+    def fake_select_object(noun, b64_img_str):
         """Fake select 
         """
         return ["mask0_str", "mask1_str"]

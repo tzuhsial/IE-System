@@ -18,12 +18,12 @@ def user_template_nlg(user_acts):
             utt = "Yes."
         elif user_dialogue_act == "negate":
             utt = "No."
-        elif user_dialogue_act == "select_object_mask":
+        elif user_dialogue_act == "select_object":
             slots = user_act['slots']
             slot_list = []
             for slot in slots:
                 slot_list.append(slot['value'])
-            utt = "Selecting " + ", ".join(slot_list)
+            utt = "I want to select " + ", ".join(slot_list)
         elif user_dialogue_act == "bye":
             utt = "Bye."
         elif user_dialogue_act == "select_object_mask_id":
@@ -71,7 +71,7 @@ def test_state_transitions():
 
     agent.state = "ask_ier"
     agent.highNLConf_noMissing()
-    assert agent.state == "query_cv_engine"
+    assert agent.state == "ier_complete"
 
     agent.state = "ask_ier"
     agent.bye()
@@ -84,7 +84,7 @@ def test_state_transitions():
 
     agent.state = "confirm"
     agent.highNLConf_noMissing()
-    assert agent.state == "query_cv_engine"
+    assert agent.state == "ier_complete"
 
     # source: request
     agent.state = 'request'
@@ -93,7 +93,16 @@ def test_state_transitions():
 
     agent.state = 'request'
     agent.highNLConf_noMissing()
+    assert agent.state == 'ier_complete'
+
+    # source: ier_complete
+    agent.state = 'ier_complete'
+    agent.maskMissing()
     assert agent.state == 'query_cv_engine'
+
+    agent.state = 'ier_complete'
+    agent.noMaskMissing()
+    assert agent.state == 'execute_api'
 
     # source: query_cv_engine
     agent.state = 'query_cv_engine'
@@ -102,12 +111,12 @@ def test_state_transitions():
 
     agent.state = 'query_cv_engine'
     agent.highCVConf()
-    assert agent.state == 'execute_api'
+    assert agent.state == 'ier_complete'
 
     # source: ask_user_label
     agent.state = 'ask_user_label'
     agent.hasLabel()
-    assert agent.state == 'execute_api'
+    assert agent.state == 'ier_complete'
 
     agent.state = 'ask_user_label'
     agent.noLabel()
@@ -122,15 +131,34 @@ def test_state_transitions():
 def test_dialogue_flow_and_dialogue_act():
     """ Here the agent interacts with user acts
     """
+
     agent = RuleBasedDialogueManager()
+    photoshop = SimplePhotoshopAPI()
     agent.reset()
+    photoshop.reset()
+
+    def interact(observation, agent, photoshop):
+        print("User", user_template_nlg(observation['user_acts']))
+
+        photoshop_act = photoshop.act()
+
+        agent.observe(photoshop_act)
+        agent.observe(observation)
+        agent_act = agent.act()
+
+        print("Agent", agent_act['system_utterance'])
+
+        photoshop.observe(agent_act)
+        photoshop.act()
+        dialogue_acts = [a['dialogue_act'] for a in agent_act['system_acts']]
+        return dialogue_acts, agent.state
 
     # Turn 1
     observation = {
         'user_acts': [
             {'dialogue_act': 'open',
              'slots': [
-                 {'slot': 'action_type', 'value': 'open', 'conf': 1.0},
+                 {'slot': 'intent', 'value': 'open', 'conf': 1.0},
                  {'slot': 'image_path',
                   'value': '/Users/tzlin/Documents/code/SimplePhotoshop/images/3.jpg',
                   'conf': 1.0}
@@ -138,71 +166,78 @@ def test_dialogue_flow_and_dialogue_act():
              }
         ]
     }
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_acts = [a['dialogue_act'] for a in act['system_acts']]
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "ask_ier"
+
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
     assert dialogue_acts == ['execute', 'greeting', 'ask']
+    assert agent_state == "ask_ier"
 
     # Turn 2
     observation = {
         'user_acts': [
             {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'action_type', 'value': 'adjust', 'conf': 0.2},
-                 {'slot': 'attribute', 'value': 'brightness', 'conf': 0.3},
-                 {'slot': 'adjustValue', 'value': 'more', 'conf': 0.4},
-             ]}
+             'slots': []}
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "ask_ier"
-    assert dialogue_act == 'repeat'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['repeat']
+    assert agent_state == "ask_ier"
 
     # Turn 3
     observation = {
         'user_acts': [
             {'dialogue_act': 'inform',
              'slots': [
-                 {'slot': 'action_type', 'value': 'adjust', 'conf': 0.7},
-                 {'slot': 'attribute', 'value': 'brightness', 'conf': 0.5},
+                 {'slot': 'intent', 'value': 'select_object', 'conf': 1.0},
+                 {'slot': 'object', 'value': 'dog', 'conf': 0.7},
              ]
              }
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['confirm']
+    assert agent_state == "confirm"
 
     # Turn 4
     observation = {
         'user_acts': [
-            {'dialogue_act': 'affirm'},
+            {'dialogue_act': 'affirm'}
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-
-    assert agent.state == "confirm"
-    assert dialogue_act == 'confirm'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['request_label']
+    assert agent_state == "ask_user_label"
 
     # Turn 5
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'inform',
+             'slots': [
+                 {'slot': 'intent', 'value': 'select_object_mask_id', 'conf': 1.0},
+                 {'slot': 'object_mask_id', 'value': "1", 'conf': 1.0}
+             ]
+             },
+        ]
+    }
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['execute', 'ask']
+    assert agent_state == "ask_ier"
+
+    # Turn 6
+    observation = {
+        'user_acts': [
+            {'dialogue_act': 'inform',
+             'slots': [
+                 {'slot': 'intent', 'value': 'adjust', 'conf': 0.9},
+                 {'slot': 'attribute', 'value': 'brightness', 'conf': 0.7},
+             ]
+             }
+        ]
+    }
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['confirm']
+    assert agent_state == "confirm"
+
+    # Turn 7
     observation = {
         'user_acts': [
             {'dialogue_act': 'negate'},
@@ -212,102 +247,35 @@ def test_dialogue_flow_and_dialogue_act():
              ]}
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "request"
-    assert dialogue_act == "request"
-
-    # Turn 6
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'adjustValue', 'value': 'more', 'conf': 0.8}
-             ]}
-        ]
-    }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "request"
-    assert dialogue_act == "request"
-
-    # Turn 7
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'object', 'value': 'dog', 'conf': 0.6}
-             ]}
-        ]
-    }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "confirm"
-    assert dialogue_act == "confirm"
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['request']
+    assert agent_state == "request"
 
     # Turn 8
     observation = {
         'user_acts': [
-            {'dialogue_act': 'affirm'}
+            {'dialogue_act': 'inform',
+             'slots': [
+                 {'slot': 'adjustValue', 'value': '30', 'conf': 0.8}
+             ]}
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "ask_user_label"
-    assert dialogue_act == 'request_label'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['execute', 'ask']
+    assert agent_state == "ask_ier"
 
     # Turn 9
     observation = {
         'user_acts': [
-            {'dialogue_act': 'select_object_mask_id',
-             'slots': [
-                 {'slot': 'object_mask_id', 'value': "1", 'conf': 1.0}
-             ]
-             },
-        ]
-    }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "ask_ier"
-    assert dialogue_act == 'execute'
-
-    # Turn 10
-    observation = {
-        'user_acts': [
             {'dialogue_act': 'inform',
              'slots': [
-                 {'slot': 'action_type', 'value': 'undo', 'conf': 0.8}
+                 {'slot': 'intent', 'value': 'undo', 'conf': 0.8}
              ]},
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "ask_ier"
-    assert dialogue_act == 'execute'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['execute', 'ask']
+    assert agent_state == "ask_ier"
 
     # Turn 10
     observation = {
@@ -315,11 +283,6 @@ def test_dialogue_flow_and_dialogue_act():
             {'dialogue_act': 'bye'},
         ]
     }
-
-    agent.observe(observation)
-    act = agent.act()
-    dialogue_act = act['system_acts'][0]['dialogue_act']
-    print("User", user_template_nlg(observation['user_acts']))
-    print("Agent", act['system_utterance'])
-    assert agent.state == "end_session"
-    assert dialogue_act == 'bye'
+    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    assert dialogue_acts == ['bye']
+    assert agent_state == "end_session"

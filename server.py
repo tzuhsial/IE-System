@@ -16,21 +16,27 @@ app = Flask(
 @app.route('/')
 def index():
     agent.reset()
+    backend.reset()
     return render_template('index.html')
 
 
 @app.route('/ier', methods=["POST"])
 def image_edit_request():
+    user_observation = json.loads(request.form.get('observation'))
+    backend_observation = backend.act()
 
-    observation = json.loads(request.form.get('observation'))
-
-    agent.observe(observation)
+    agent.observe(user_observation)
+    agent.observe(backend_observation)
     agent_act = agent.act()
 
+    for act in agent_act['system_acts']:
+        print("agent", act['dialogue_act'], act.get('slots', []))
+
     backend.observe(agent_act)
-    backend_act = backend.act() # Contains only b64_img_str, actually
-    
+    backend_act = backend.act()  # Contains only b64_img_str, actually
+
     agent_act.update(backend_act)
+
     # Build return object
     obj = agent_act
     return jsonify(obj)

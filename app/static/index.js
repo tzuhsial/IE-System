@@ -17,7 +17,7 @@ var previewFile = function () {
                 {
                     'dialogue_act': 'load',
                     'slots': [
-                        { 'slot': 'action_type', 'value': 'load', 'conf': 1.0 },
+                        { 'slot': 'intent', 'value': 'load', 'conf': 1.0 },
                         { 'slot': 'b64_img_str', 'value': b64_img_str, 'conf': 1.0 }
                     ]
                 }

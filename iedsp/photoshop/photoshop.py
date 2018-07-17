@@ -17,12 +17,14 @@ class SimplePhotoshopAPI(object):
         self.control_url = api_url + "/control"
         self.check_url = api_url + "/check"
 
+        self.observation = {}
+
     @property
     def name(self):
         return self.__class__.__name__
 
     def reset(self):
-        pass
+        self.observation = {}
 
     def observe(self, observation):
         self.observation = observation
@@ -41,23 +43,24 @@ class SimplePhotoshopAPI(object):
                 slots = sys_act['slots']
 
                 # Edit or Control
-                _, action_slot = find_slot_with_key('action_type', slots)
-                action_type = action_slot['value']
-                if action_type in ["open", "load", "select_object", "select_object_mask_id", "redo", "undo"]:
-                    action_type_key = 'control_type'
+                intent_idx, intent_slot = find_slot_with_key(
+                    'intent', slots)
+                intent_type = intent_slot['value']
+                if intent_type in ["open", "load", "select_object", "select_object_mask_id", "redo", "undo"]:
+                    intent_type_key = 'control_type'
                     url = self.control_url
-                elif action_type in ["adjust"]:
-                    action_type_key = 'edit_type'
+                elif intent_type in ["adjust"]:
+                    intent_type_key = 'edit_type'
                     url = self.edit_url
                 else:
                     raise ValueError(
-                        "Unknown action_type: {}".format(action_type))
+                        "Unknown intent_type: {}".format(intent_type))
 
-                slot_names = Ontology.get(action_type)
+                slot_names = Ontology.get(intent_type)
 
                 # Build post data to backend
                 data = {}
-                data[action_type_key] = action_type
+                data[intent_type_key] = intent_type
                 args = {}
                 for slot_name in slot_names:
                     _, slot = find_slot_with_key(slot_name, slots)
@@ -72,11 +75,11 @@ class SimplePhotoshopAPI(object):
                 data['args'] = json.dumps(args)
 
                 # Execute action
-                # TODO: handle error upon request
                 res = requests.post(url, data=data)
                 res.raise_for_status()
+
             elif sys_dialogue_act == "request_label":
-                # Agent will need to pass all the masks to photoshop
+                # Agent querys cv engine and passes all masks to photoshop for display
                 slots = sys_act['slots']
 
                 # Get masks from slots
@@ -97,9 +100,11 @@ class SimplePhotoshopAPI(object):
                 res.raise_for_status()
 
         # Retrieve Image
-        res = requests.post(self.check_url, data={'action_type': 'check'})
+        res = requests.post(self.check_url, data={'intent': 'check'})
         res.raise_for_status()
         obj = res.json()
 
         backend_act.update(obj)
+
+        self.observation = {}
         return backend_act
