@@ -1,3 +1,5 @@
-numpy==1.14.4
--e git+https://github.com/facebookresearch/ParlAI.git@bf7f974a871bed9e1f1b8a0353dafe92d4767d68#egg=parlai
+Flask==1.0.2
+numpy==1.14.5
+requests==2.18.4
+scikit-image==0.14.0
 transitions==0.6.8
