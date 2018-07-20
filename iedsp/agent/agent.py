@@ -328,7 +328,7 @@ class RuleBasedDialogueManager(object):
 
         # Get argument list from Ontology
         intent_type = intent_slot.get('value')
-        query_slot_names = Ontology.get(intent_type)
+        query_slot_names = Ontology.getArguments(intent_type)
 
         # Update confirm, request, query slots
         for query_name in query_slot_names:

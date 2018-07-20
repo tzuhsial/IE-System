@@ -1,5 +1,6 @@
 import base64
 import colorsys
+import json
 import pickle
 
 import cv2
@@ -44,6 +45,21 @@ def load_from_pickle(filepath):
     with open(filepath, 'rb') as fin:
         obj = pickle.load(fin)
     return obj
+
+
+def save_to_jsonlines(list_of_json, filepath):
+    with open(filepath, 'w') as fout:
+        for json_obj in list_of_json:
+            json_line = json.dumps(json_obj)
+            fout.write(json_line + '\n')
+
+def load_from_jsonlines(filepath):
+    list_of_json = []
+    with open(filepath, 'r') as fin:
+        for line in fin.readlines():    
+            json_obj = json.loads(line)
+            list_of_json.append(json_obj)
+    return list_of_json
 
 
 def find_slot_with_key(key, slots):
