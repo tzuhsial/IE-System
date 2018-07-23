@@ -1,56 +1,64 @@
 """
     Worlds that define interactions among agents
 """
+
+
 class SelfPlayWorld(object):
-    def __init__(self, agents, verbose=True):
+    def __init__(self, agents):
         """
-            Arguments:
-            - agents: 1. apiapi 2. user 3. agent
+        Args:
+            agents (list):  user 2. channel 3. agent 4. photoshop
         """
         self.agents = agents
 
-        self.verbose = verbose
-
     def reset(self):
+        """
+        Resets for another interaction
+        """
         for agent in self.agents:
             agent.reset()
 
         self.acts = [{}] * len(self.agents)
+
         self.turn_count = 0
 
     def parley(self):
+        """ 
+        Here we define the interaction among agents
         """
-            The image observation is provided by api
-            api observes agent
-            User observes api and agent
-            Agent observes api and user
-        """
-        # 0, 1, 2
-        api, user, agent = self.agents
+        # 0, 1, 2, 3
+        user, channel, system, photoshop = self.agents
+        user_idx, channel_idx, system_idx, photoshop_idx = 0, 1, 2, 3
 
-        # First api
-        self.acts[0] = api.act()
-        api.observe(self.acts[2])
+        # User observes Agent, Photoshop
+        user.observe(self.acts[system_idx])
+        user.observe(self.acts[photoshop_idx])
+        self.acts[user_idx] = user.act()
 
-        # Then User
-        user.observe(self.acts[0])
-        user.observe(self.acts[2])
-        self.acts[1] = user.act()
+        print("[User]", self.acts[user_idx]['user_utterance'])
 
-        # Finally Agent
-        agent.observe(self.acts[0])
-        agent.observe(self.acts[1])
-        self.acts[2] = agent.act()
+        # Channel observes User
+        channel.observe(self.acts[user_idx])
+        self.acts[channel_idx] = channel.act()
 
-        # api then observes the agent act
-        api.observe(self.acts[2])
+        # Agent observes User from Channel and Photoshop
+        system.observe(self.acts[channel_idx])
+        system.observe(self.acts[photoshop_idx])
+        self.acts[system_idx] = system.act()
 
-        if self.verbose:
-            print(self.agents[0].name, self.acts[0])
-            print(self.agents[1].name, self.acts[1]['user_acts'])
-            print(self.agents[2].name, self.acts[2]['system_acts'])
+        print("[System]", self.acts[system_idx]['system_utterance'])
+
+        # Photoshop observes agent action
+        photoshop.observe(self.acts[system_idx])
+        self.acts[photoshop_idx] = photoshop.act()
 
         self.turn_count += 1
+        print("[World]",self.turn_count)
+        import pdb
+        pdb.set_trace()
 
     def episode_done(self):
-        return self.acts[1]['episode_done'] or self.acts[2]['episode_done']
+        """
+        Return user episode done
+        """
+        return self.acts[0]['episode_done']

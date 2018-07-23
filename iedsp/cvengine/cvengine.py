@@ -9,16 +9,13 @@ from ..util import img_to_b64, b64_to_img
 SELECT_URL = "http://isupreme:5100/selection"
 
 
-class CVEngineAPI(object):
+class CVEngineClient(object):
     """
         API Interface to CV Engine
     """
 
     def __init__(self, cvengine_uri):
         self.uri = cvengine_uri
-
-    def check_cvengine(self):
-        return requests.head(self.uri).status_code == 200
 
     def select_object(self, noun, b64_img_str):
         """ Calls Server and returns mask array
@@ -38,11 +35,6 @@ class CVEngineAPI(object):
             print(e)
             masks = []
         return masks
-
-    def fake_select_object(self, noun, b64_img_str):
-        """Fake select 
-        """
-        return ["mask0_str", "mask1_str"]
 
 
 if __name__ == "__main__":

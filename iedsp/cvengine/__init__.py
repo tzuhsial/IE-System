@@ -1,1 +1,1 @@
-from .cvengine import CVEngineAPI
+from .cvengine import CVEngineClient

@@ -1,1 +1,1 @@
-from .photoshop import SimplePhotoshopAPI
+from .photoshop import PhotoshopGateway

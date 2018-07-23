@@ -5,7 +5,8 @@
 from transitions import Machine
 
 from ..cvengine import CVEngineAPI
-from ..ontology import Ontology
+from .dialoguestate import DialogueState
+from ..ontology import getOntologyByName
 from ..util import find_slot_with_key
 
 
@@ -19,9 +20,9 @@ def sys_act_builder(dialogue_act, slots=None):
     return [sys_act]
 
 
-class RuleBasedDialogueManager(object):
+class FiniteStateMachine(object):
     """
-        Define finite state transitions here
+        Define the finite state transition for dialogue manager
     """
     states = [
         'start_session', 'ask_ier', 'confirm', 'request', 'ier_complete',
@@ -69,39 +70,25 @@ class RuleBasedDialogueManager(object):
         self.machine.add_transition(
             trigger='bye', source='ask_ier', dest='end_session')
 
+
+class RuleBasedDialogueManager(FiniteStateMachine):
+    def __init__(self, config):
+        super(RuleBasedDialogueManager, self).__init__()
+
+        # Configurations
+        self.confirm_threshold = config['CONFIRM_THRESHOLD']
+        self.cvengine = CVEngineAPI(config['CVENGINE_URI'])
+        self.dialogueState = DialogueState(getOntologyByName(config['ONTOLOGY']))
+
         # Storing stuff
         self.observation = {}
 
-        self.request_slots = []
-        self.confirm_slots = []
-        self.query_slots = []
-
-        self.mask_str_slots = []
-
-    def on_enter_ask_ier(self):
-
-        self.request_slots = []
-        self.confirm_slots = []
-
-        intent_idx, intent_slot = find_slot_with_key(
-            'intent', self.query_slots)
-        object_idx, object_slot = find_slot_with_key(
-            'object', self.query_slots)
-
-        if object_idx >= 0 and intent_idx >= 0 and intent_slot['value'] in ['select_object', 'select_object_mask_id']:
-            self.query_slots = [object_slot]
-        else:
-            self.query_slots.clear()
-            self.mask_str_slots.clear()
-
-    @property
     def name(self):
         return self.__class__.__name__
 
     def reset(self):
         """ Resets session
         """
-        self.clear_ier()
         self.to_start_session()  # Check on_enter_ask_ier for more ops
 
         self.observation = {}
@@ -117,6 +104,7 @@ class RuleBasedDialogueManager(object):
         """
         self.request_slots = []
         self.confirm_slots = []
+        self.intent_slots = []
         self.query_slots = []
 
     def clear_mask(self):
@@ -171,13 +159,16 @@ class RuleBasedDialogueManager(object):
             Goes through state transition
         """
         assert len(user_acts) == 1
-        assert user_acts[0]['dialogue_act'] in ["open", "load"]
+        user_act = user_acts[0]
+        assert user_act['dialogue_act'] in ["open", "load"]
+        intent = user_act['intent']
+        slots = user_act['slots']
 
         system_acts = []
 
         self.greeting()  # start_session -> ask_ier
 
-        self.update_slots(user_acts[0]['slots'])
+        self.update_slots(intent, slots)
 
         self.highNLConf_noMissing()  # ask_ier -> ier_complete
 
@@ -259,7 +250,7 @@ class RuleBasedDialogueManager(object):
         user_act = user_acts[0]
         assert user_act['dialogue_act'] == 'inform'
 
-        self.update_slots(user_act['slots'])
+        self.update_slots(user_act['intent'], user_act['slots'])
 
         # Build sys_act
         system_acts += self.state_transition()
@@ -313,22 +304,10 @@ class RuleBasedDialogueManager(object):
 
         return system_acts
 
-    def update_slots(self, inform_slots):
+    def update_slots(self, intent, inform_slots):
         """ Updates request, confirm, query slots
         """
-        # Determine current intent_type
-        intent_idx, intent_slot = find_slot_with_key(
-            'intent', inform_slots)
-        if intent_idx < 0:  # Not found, look for existing
-            _, intent_slot = find_slot_with_key(
-                'intent', self.query_slots)
-
-        if intent_slot is None or intent_slot.get('conf') < 0.5:
-            return
-
-        # Get argument list from Ontology
-        intent_type = intent_slot.get('value')
-        query_slot_names = Ontology.getArguments(intent_type)
+        query_slot_names = Ontology.getArgumentsWithIntent(intent)
 
         # Update confirm, request, query slots
         for query_name in query_slot_names:
@@ -450,6 +429,9 @@ class RuleBasedDialogueManager(object):
             Interesting thing is, since Photoshop is also an agent in the environment
             the only thing we need to do here is to create a sys_act object
         """
+
+        # Execute Intent
+
         sys_act = sys_act_builder(
             'execute', self.query_slots + self.mask_str_slots)
         return sys_act

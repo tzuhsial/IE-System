@@ -1,21 +1,120 @@
 import json
 import requests
-
-from ..ontology import Ontology
-from ..util import find_slot_with_key
+from urllib.parse import urljoin
 
 
-class SimplePhotoshopAPI(object):
+from .sps import SimplePhotoshop
+
+from ..dialogueacts import SystemAct
+from ..ontology import ImageEditOntology
+from ..util import find_slot_with_key, img_to_b64
+
+
+def PhotoshopGateway(config):
     """
-        Simple Photoshop Backend Agent
+    Photoshop Getter
+    """
+    use_sps = bool(int(config['USE_SPS']))
+    use_sps_client = bool(int(config['USE_SPS_CLIENT']))
+
+    if use_sps:
+        if use_sps_client:
+            return SimplePhotoshopClient(config)
+        else:
+            return SimplePhotoshopAgent(config)
+    else:
+        raise NotImplementedError
+
+
+def slots_to_args(slots):
+    """
+    Converts list of dicts to argument dict 
+    """
+    args = {}
+    for slot_dict in slots:
+        args[slot_dict['slot']] = slot_dict['value']
+    return args
+
+
+class SimplePhotoshopAgent(SimplePhotoshop):
+    """
+       This class inherits SimplePhotoshop and adds agent methods
+       For more methods, please look into ./sps directory 
+       or SimplePhotoshop repo
+       Since this is SimplePhotoshop, it uses the ImageEditOntology
     """
 
-    def __init__(self, api_url="http://localhost:2005"):
+    def __init__(self, config):
+        """
+        Calls parent class for initialization
+        """
+        super(SimplePhotoshopAgent, self).__init__()
+
+    def reset(self):
+        """
+        Reset
+        """
+        self.observation = {}
+
+    def observe(self, observation):
+        """
+        Observes system act
+        """
+        self.observation = observation
+
+    def act(self):
+        """ 
+        Act according to observation from system
+        Returns:
+            photoshop_act (dict):
+        """
+        system_acts = self.observation.get('system_acts', list())
+        for sys_act in system_acts:
+            if sys_act['dialogue_act'] == SystemAct.EXECUTE:
+                # Execute command
+                intent = sys_act['intent']
+                slots = sys_act['slots']
+                assert intent in ImageEditOntology.domain_type_map
+
+                intent_type = ImageEditOntology.domain_type_map.get(intent)
+                args = slots_to_args(slots)
+                if intent_type == "control":
+                    result = self.control(intent, args)
+                elif intent_type == "edit":
+                    result = self.execute(intent, args)
+                else:
+                    raise ValueError(
+                        "Unknown intent_type: {}".format(intent_type))
+
+            elif sys_act['dialogue_act'] == SystemAct.REQUEST_LABEL:
+                # System provide masks to the Photoshop for the user to label
+                if sys_act.get("slots") is not None:
+                    intent = "load_masks"
+                    args = slots_to_args(sys_act['slots'])
+                    self.control(intent, args)
+
+        # Build return object
+        photoshop_act = {}
+        if self.getImage() is not None:
+            b64_img_str = img_to_b64(self.getImage())
+            photoshop_act['b64_img_str'] = b64_img_str
+        return photoshop_act
+
+
+class SimplePhotoshopClient(object):
+    """
+        API interface to Photoshop
+    """
+
+    def __init__(self, config):
         """Stores the api for connection
         """
-        self.edit_url = api_url + "/edit"
-        self.control_url = api_url + "/control"
-        self.check_url = api_url + "/check"
+        # Configuration
+        self.photoshop_uri = config["PHOTOSHOP_URI"]
+
+        self.edit_url = urljoin(self.photoshop_uri, "edit")
+        self.control_url = urljoin(self.photoshop_uri, "/control")
+        self.check_url = urljoin(self.photoshop_uri, "/check")
 
         self.observation = {}
 
@@ -42,10 +141,8 @@ class SimplePhotoshopAPI(object):
 
                 slots = sys_act['slots']
 
-                # Edit or Control
-                intent_idx, intent_slot = find_slot_with_key(
-                    'intent', slots)
-                intent_type = intent_slot['value']
+                intent_type = sys_act['intent']
+
                 if intent_type in ["open", "load", "select_object", "select_object_mask_id", "redo", "undo"]:
                     intent_type_key = 'control_type'
                     url = self.control_url
@@ -56,7 +153,7 @@ class SimplePhotoshopAPI(object):
                     raise ValueError(
                         "Unknown intent_type: {}".format(intent_type))
 
-                slot_names = Ontology.get(intent_type)
+                slot_names = Ontology.getArgumentsWithIntent(intent_type)
 
                 # Build post data to backend
                 data = {}
@@ -98,6 +195,8 @@ class SimplePhotoshopAPI(object):
 
                 res = requests.post(url, data=data)
                 res.raise_for_status()
+            else:
+                assert s
 
         # Retrieve Image
         res = requests.post(self.check_url, data={'intent': 'check'})

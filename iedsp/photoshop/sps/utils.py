@@ -1,9 +1,13 @@
 import base64
 import colorsys
-import json
-import pickle
+import random
+import sys
 
 import cv2
+if not 'matplotlib' in sys.modules:
+    import matplotlib
+    matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -24,7 +28,7 @@ def img_to_b64(img):
 
 
 def b64_to_img(b64_img_str):
-    """Converts base64 string back to numpy array
+    """Converts base64 string back to numpy array using shape
     """
     buf = base64.b64decode(b64_img_str)
     nparr = np.frombuffer(buf, np.uint8)
@@ -32,45 +36,13 @@ def b64_to_img(b64_img_str):
     return img
 
 
-def save_to_pickle(obj, filepath):
-    """Save to pickle
-    """
-    with open(filepath, 'wb') as fout:
-        pickle.dump(obj, fout)
-
-
-def load_from_pickle(filepath):
-    """Load from pickle
-    """
-    with open(filepath, 'rb') as fin:
-        obj = pickle.load(fin)
-    return obj
-
-
-def save_to_jsonlines(list_of_json, filepath):
-    with open(filepath, 'w') as fout:
-        for json_obj in list_of_json:
-            json_line = json.dumps(json_obj)
-            fout.write(json_line + '\n')
-
-
-def load_from_jsonlines(filepath):
-    list_of_json = []
-    with open(filepath, 'r') as fin:
-        for line in fin.readlines():
-            json_obj = json.loads(line)
-            list_of_json.append(json_obj)
-    return list_of_json
-
-
-def find_slot_with_key(key, slots):
-    # First check is edit or control
-    for idx, slot_dict in enumerate(slots):
-        if slot_dict['slot'] == key:
-            return idx, slot_dict
-    return -1, None
-
-
+##########################
+#   Plotting Functions   #
+##########################
+"""
+    Mask plotting functions mostly borrowed from 
+    https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py
+"""
 def random_colors(N, bright=True):
     """
     Generate random colors.
@@ -103,3 +75,21 @@ def apply_mask(image, mask, color=None, alpha=0.5):
     masked_image = masked_image.astype(np.uint8)
 
     return masked_image
+
+
+def plot_diff(img1, img2, cmap=None, figname='diff.png'):
+    if img1.ndim == 2:
+        cmap = 'gray'
+    plt.figure()
+    plt.subplot(121)
+    plt.imshow(img1, cmap=cmap)
+    plt.subplot(122)
+    plt.imshow(img2)
+    if figname is not None:
+        plt.savefig(figname)
+
+
+if __name__ == "__main__":
+    image_path = "../images/1.jpg"
+
+    imread(image_path)

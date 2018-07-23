@@ -36,3 +36,6 @@ def test_config_format():
 
     # System
     assert probability_validator(config['SYSTEM']['CONFIRM_THRESHOLD'])
+
+    # User
+    assert probability_validator(config['USER']['SELECT_OBJECT_FIRST'])

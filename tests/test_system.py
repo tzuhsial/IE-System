@@ -1,5 +1,5 @@
-from iedsp.agent import RuleBasedDialogueManager
 from iedsp.photoshop import SimplePhotoshopAPI
+from iedsp.system import RuleBasedDialogueManager
 
 
 def user_template_nlg(user_acts):
