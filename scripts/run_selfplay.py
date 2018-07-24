@@ -20,7 +20,7 @@ def main(argv):
     config_file = argv[1]
 
     # Configsc
-    config = ConfigParser()
+    config = ConfigParser(allow_no_value=True)
     config.read(config_file)
 
     agendas = util.load_from_pickle(config['DEFAULT']['AGENDA_PICKLE'])
