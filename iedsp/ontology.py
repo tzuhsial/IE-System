@@ -16,15 +16,14 @@ class OntologyUnit(object):
 
 
 class ImageEditSlot(OntologyUnit):
-    def __init__(self, slot_type, name, threshold, possible_values=[], permit_new_value=True):
+    def __init__(self, slot_type, name, default_values=[], permit_new_value=True):
         self.slot_type = slot_type
         self.name = name
-        self.threshold = threshold
-        self.possible_values = possible_values
-        self.permit_new = permit_new_value
+        self.default_values = default_values
+        self.permit_new_value = permit_new_value
 
-    def getPossibleValues(self):
-        return self.possible_values
+    def get_default_values(self):
+        return self.default_values
 
 
 class ImageEditDomain(OntologyUnit):
@@ -33,7 +32,7 @@ class ImageEditDomain(OntologyUnit):
         self.name = name
         self.slots = slots
 
-    def getSlotNames(self):
+    def get_slot_names(self):
         return [slot.name for slot in self.slots]
 
 
@@ -41,6 +40,10 @@ class ImageEditOntology(OntologyUnit):
     """
     Ontology for Image Editing
     """
+    # Special Keywords for convenience
+    DIALOGUE_ACT = "dialogue_act"
+    DOMAIN = "domain"
+
     class Domains:
         OPEN = "open"
         LOAD = "load"
@@ -74,38 +77,32 @@ class ImageEditOntology(OntologyUnit):
         """
         # Get default slot threshold
 
-        slot_thresh = config.get('SLOT_DEFAULT_THRESHOLD', 0.7)
         #########################
         #      Build Slots      #
         #########################
 
         # Slot: image_path
-        image_path_thresh = config.get("IMAGE_PATH_THRESHOLD", slot_thresh)
         image_path_slot = ImageEditSlot(
-            self.SlotTypes.PSTOOL_SLOT, self.Slots.IMAGE_PATH, image_path_thresh)
+            self.SlotTypes.PSTOOL_SLOT, self.Slots.IMAGE_PATH)
 
         # Slot: b64_img_str
-        b64_img_str_thresh = config.get("B64_IMG_STR_THRESHOLD", slot_thresh)
         b64_img_str_slot = ImageEditSlot(
-            self.SlotTypes.PSTOOL_SLOT, self.Slots.B64_IMG_STR, b64_img_str_thresh)
+            self.SlotTypes.PSTOOL_SLOT, self.Slots.B64_IMG_STR)
 
         # Slot: attribute
-        attribute_thresh = config.get("ATTRIBUTE_THRESHOLD", slot_thresh)
         attribute_values = ["brightness", "contrast",
                             "hue", "saturation", "lightness"]
         attribute_slot = ImageEditSlot(
-            self.SlotTypes.BELIEF_SLOT, self.Slots.ATTRIBUTE, attribute_thresh, attribute_values, False)
+            self.SlotTypes.BELIEF_SLOT, self.Slots.ATTRIBUTE, attribute_values, False)
 
         # Slot: adjust_value
-        adjust_value_thresh = config.get("ADJUST_VALUE_THRESHOLD", slot_thresh)
         adjust_value_values = [-40, -25, -10, 10, 25, 40]
         adjust_value_slot = ImageEditSlot(
-            self.SlotTypes.BELIEF_SLOT, self.Slots.ADJUST_VALUE, adjust_value_thresh, adjust_value_values)
+            self.SlotTypes.BELIEF_SLOT, self.Slots.ADJUST_VALUE, adjust_value_values)
 
         # Slot: object
-        object_thresh = config.get("OBJECT_THRESHOLD", slot_thresh)
         object_slot = ImageEditSlot(
-            self.SlotTypes.BELIEF_SLOT, self.Slots.OBJECT, object_thresh)
+            self.SlotTypes.BELIEF_SLOT, self.Slots.OBJECT)
 
         # Build slot dictionary
         self.slots = {
@@ -161,7 +158,7 @@ class ImageEditOntology(OntologyUnit):
         return self.slots.get(slot_name, None)
 
 
-def getOntology(ontology_config):
+def getOntologyWithName(ontology_name):
     """
     Returns Ontology Class with config
     Args:
@@ -169,8 +166,8 @@ def getOntology(ontology_config):
     Returns:
         class: corresponding ontology class
     """
-    if config["ONTOLOGY"] == "ImageEditOntology":
-        return ImageEditOntology(config)
+    if ontology_name == "ImageEditOntology":
+        return ImageEditOntology()
     else:
         raise ValueError("Unknown ontology: {}".format(ontology))
 
@@ -180,6 +177,6 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read('../config.dev.ini')
 
-    ontology = ImageEditOntology(config['ONTOLOGY'])
+    ontology = ImageEditOntology()
     import pdb
     pdb.set_trace()

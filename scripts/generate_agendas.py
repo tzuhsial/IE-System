@@ -125,7 +125,7 @@ class ImageEditAgendaGenerator(object):
 
                 domain_name = np.random.choice(domains, p=domain_probs)
                 slot_names = self.ont.getDomainWithName(
-                    domain_name).getSlotNames()
+                    domain_name).get_slot_names()
                 slots = []
                 for slot_name in slot_names:
                     if slot_name == "object":
@@ -161,7 +161,7 @@ class ImageEditAgendaGenerator(object):
                         value: v1
                         """
                         possible_values = self.ont.getSlotWithName(
-                            slot_name).getPossibleValues()
+                            slot_name).get_default_values()
                         value = random.choice(possible_values)
 
                     slots.append(Hermes.build_slot_dict(slot_name, value))

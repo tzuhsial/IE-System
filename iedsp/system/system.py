@@ -1,26 +1,8 @@
-"""
-    Finite State Machine Agent version 2
-"""
-
-from transitions import Machine
-
-from ..common import build_act
 from ..cvengine import CVEngineClient
-from ..dialogueacts import SystemAct, UserAct
-from .dialoguestate import DialogueState
-from ..ontology import getOntologyByName
+from ..core import Agent, SystemAct, UserAct, Hermes
+from ..dialoguestate import DialogueState
+from ..ontology import getOntologyWithName
 from ..util import find_slot_with_key
-
-
-def sys_act_builder(dialogue_act, intent, slots=None):
-    """Build sys_act list with dialogue_act and slots
-    """
-    sys_act = {}
-    sys_act['dialogue_act'] = dialogue_act
-    sys_act['intent'] = intent
-    if slots is not None:
-        sys_act['slots'] = slots
-    return sys_act
 
 
 class RuleBasedDialogueManager(object):
@@ -35,16 +17,16 @@ class RuleBasedDialogueManager(object):
         observation (dict)
     """
 
+    SPEAKER = Agent.SYSTEM
+
     def __init__(self, config):
         super(RuleBasedDialogueManager, self).__init__()
 
         # Configurations
-        self.confirm_threshold = float(config['CONFIRM_THRESHOLD'])
         self.cvengine = CVEngineClient(config['CVENGINE_URI'])
-        self.ontology = getOntologyByName(config['ONTOLOGY'])
 
         # Construct dialogue state based on Ontology
-        self.dialogueState = DialogueState(self.ontology)
+        self.state = DialogueState(config)
 
         # Storing stuff
         self.observation = {}
@@ -54,7 +36,7 @@ class RuleBasedDialogueManager(object):
         Resets for a new dialogue session
         """
         self.observation = {}
-        self.dialogueState.clear()
+        self.state.clear()
         self.turn_id = 0
 
     def observe(self, observation):
@@ -63,6 +45,71 @@ class RuleBasedDialogueManager(object):
             observation (dict): observation given by user passed through channel
         """
         self.observation.update(observation)
+        self.turn_id += 1
+
+    def state_update(self):
+        """
+        Update dialogue state with user_acts
+        """
+        # State Update
+        user_acts = self.observation.get('user_acts')
+        for user_act in user_acts:
+            # Usually have only one user_act
+            user_dialogue_act = user_act['dialogue_act']
+            user_slots = user_act.get('slots')
+            self.state.update(
+                user_dialogue_act, user_slots, self.turn_id)
+
+    def goals(self):
+        """
+        A simple getter from the dialogue state
+        """
+        goals = {}
+        goals['request'] = self.state.request_slots
+        goals['confirm'] = self.state.confirm_slots
+        goals['query'] = self.state.query_slots
+        goals['execute'] = self.state.execute_slots
+        return goals
+
+    def policy(self):
+        """
+        A rule-based policy conditioned on dialogueState
+        Returns:
+            system_acts (list): list of sys_acts
+        """
+        # Here we implement a rule-based policy
+        system_acts = []
+
+        self.state.print_goals()
+        import pdb
+        pdb.set_trace()
+        if len(self.state.confirm_slots) > 0:
+            sys_act = Hermes.build_act(
+                SystemAct.CONFIRM, self.state.confirm_slots[:1], self.SPEAKER)
+            system_acts += [sys_act]
+        elif len(self.state.request_slots) > 0:
+            sys_act = ActionHelper.build_act(
+                self.SPEAKER, SystemAct.REQUEST, slots=self.state.request_slots)
+            system_acts += [sys_act]
+        elif len(self.state.query_slots) > 0:
+            print("QUERY")
+            raise NotImplementedError
+        else:
+            # Executable
+            domain_name = self.state.get_current_domain().name
+            if domain_name == self.state.ontology.Domains.OPEN:
+                sys_act = Hermes.build_act(
+                    SystemAct.EXECUTE, self.state.execute_slots, self.SPEAKER)
+                sys_act2 = Hermes.build_act(
+                    SystemAct.GREETING, speaker=self.SPEAKER)
+                sys_act3 = Hermes.build_act(
+                    SystemAct.ASK, speaker=self.SPEAKER)
+                system_acts += [sys_act, sys_act2, sys_act3]
+            else:
+                import pdb
+                pdb.set_trace()
+
+        return system_acts
 
     def act(self):
         """ 
@@ -70,73 +117,20 @@ class RuleBasedDialogueManager(object):
         Returns:
             system_act (dict)
         """
-        user_acts = self.observation.get('user_acts')
-        episode_done = self.observation.get('episode_done', False)
-        b64_img_str = self.observation.get('b64_img_str', None)
 
-        # Here we implement a rule-based policy
-        system_acts = []
-        for user_act in user_acts:
-            user_dialogue_act = user_act['dialogue_act']
-            # Default: Out of domain
-            user_intent = user_act.get('intent', self.ontology.OOD)
-            # Default: Empty List
-            user_slots = user_act.get('slots', list())
+        #b64_img_str = self.observation.get('b64_img_str', None)
 
-            self.dialogueState.update(user_intent, user_slots, self.turn_id)
+        # Update state
+        self.state_update()
 
-            if user_dialogue_act == UserAct.OPEN:
-                assert user_intent == self.ontology.OPEN
-                # Issue Request
-                sys_act = sys_act_builder(
-                    SystemAct.EXECUTE, self.ontology.OPEN, user_slots)
-                # Remove values from table
-                self.dialogueState.clear(user_intent)
-            elif user_dialogue_act in ["inform"]:
-                # Get slot from current domain
-                confirm_slots, request_slots, query_slots = \
-                    self.dialogueState.getCurrentDomainTable().getCurrentSlots(self.confirm_threshold)
+        # Policy
+        system_acts = self.policy()
 
-                if len(confirm_slots) > 0:
-                    # Confirm one at a time
-                    sys_act = sys_act_builder(
-                        SystemAct.CONFIRM, 'confirm', confirm_slots[:1])
-                elif len(request_slots) > 0:
-                    # Request all
-                    sys_act = sys_act_builder(
-                        SystemAct.REQUEST, 'request', request_slots)
-                else:
-                    # Query CV Engine
-                    _, object_slot = find_slot_with_key("object", query_slots)
-                    noun = object_slot['value']
-                    mask_strs = self.cvengine.select_object(noun, b64_img_str)
-
-                    if len(mask_strs) == 0:
-                        sys_act = sys_act_builder(
-                            SystemAct.REQUEST_LABEL, 'request_label')
-                    else:
-                        # When CV engine return masks
-                        sys_act = sys_act_builder(
-                            SystemAct.REQUEST_LABEL, 'request_label')
-
-            elif user_dialogue_act in ["affirm"]:
-                confirm_slots, request_slots, query_slots = \
-                    self.dialogueState.getCurrentDomainTable().getCurrentSlots(self.confirm_threshold)
-            elif user_dialogue_act in ["negate"]:
-                pass
-            elif user_dialogue_act in ["close"]:
-                sys_act = sys_act_builder(
-                    SystemAct.BYE, self.ontology.CLOSE)  # No slots are needed
-            else:
-                raise ValueError(
-                    "Unknown user_dialogue_act: {}".format(user_dialogue_act))
-
-            system_acts.append(sys_act)
-
+        # Build Return object
         system_act = {}
         system_act['system_acts'] = system_acts
         system_act['system_utterance'] = self.template_nlg(system_acts)
-        system_act['episode_done'] = episode_done
+        system_act['episode_done'] = self.observation['episode_done']
         return system_act
 
     ###########################
@@ -149,20 +143,21 @@ class RuleBasedDialogueManager(object):
         """
         utt_list = []
         for sys_act in system_acts:
-            if sys_act['dialogue_act'] == SystemAct.GREETING:
+            sys_dialogue_act = sys_act['dialogue_act']['value']
+            if sys_dialogue_act == SystemAct.GREETING:
                 utt = "Hello! My name is PS. I am here to help you edit your image!"
-            elif sys_act['dialogue_act'] == SystemAct.ASK:
+            elif sys_dialogue_act == SystemAct.ASK:
                 utt = "What would you like to do?"
-            elif sys_act['dialogue_act'] == SystemAct.OOD_NL:
+            elif sys_dialogue_act == SystemAct.OOD_NL:
                 utt = "Sorry, Photoshop currently does not support this function."
-            elif sys_act['dialogue_act'] == SystemAct.OOD_CV:
+            elif sys_dialogue_act == SystemAct.OOD_CV:
                 utt = "Sorry, Photoshop's CV engine cannot find what you are looking for."
-            elif sys_act['dialogue_act'] == SystemAct.REPEAT:
+            elif sys_dialogue_act == SystemAct.REPEAT:
                 utt = "Can you please repeat again?"
-            elif sys_act['dialogue_act'] == SystemAct.REQUEST:
-                request_slots = sys_act['slots']
+            elif sys_dialogue_act == SystemAct.REQUEST:
+                request_slots = [s['slot'] for s in sys_act['slots']]
                 utt = "What " + ', '.join(request_slots) + " do you want?"
-            elif sys_act['dialogue_act'] == SystemAct.CONFIRM:
+            elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
 
@@ -173,15 +168,15 @@ class RuleBasedDialogueManager(object):
 
                 utt += ','.join(confirm_list) + "?"
 
-            elif sys_act['dialogue_act'] == SystemAct.REQUEST_LABEL:
+            elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
                 utt = "I can not identify the object. Can you label it for me?"
-            elif sys_act['dialogue_act'] == SystemAct.EXECUTE:
+            elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
 
                 slot_list = [slot['slot'] + "=" + slot['value']
                              for slot in execute_slots]
                 utt = "Execute: " + ', '.join(slot_list)
-            elif sys_act['dialogue_act'] == SystemAct.BYE:
+            elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:
                 utt = ""

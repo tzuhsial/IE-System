@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 
 from .sps import SimplePhotoshop
 
-from ..dialogueacts import SystemAct
+from ..core import SystemAct
 from ..ontology import ImageEditOntology
 from ..util import find_slot_with_key, img_to_b64
 

@@ -1,7 +1,3 @@
-"""
-    Worlds that define interactions among agents
-"""
-
 
 class SelfPlayWorld(object):
     def __init__(self, agents):
@@ -53,7 +49,7 @@ class SelfPlayWorld(object):
         self.acts[photoshop_idx] = photoshop.act()
 
         self.turn_count += 1
-        print("[World]",self.turn_count)
+        print("[World] Turn", self.turn_count)
         import pdb
         pdb.set_trace()
 

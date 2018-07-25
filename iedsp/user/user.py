@@ -3,21 +3,9 @@ import random
 
 import numpy as np
 
-from ..common import build_act
-from ..dialogueacts import UserAct, SystemAct
+from ..core import Agent, UserAct, SystemAct, Hermes
 from ..ontology import ImageEditOntology
 from ..util import find_slot_with_key, b64_to_img
-
-
-def user_act_builder(dialogue_act, intent, slots=None):
-    """Build user_act list with dialogue_act and slots
-    """
-    user_act = {}
-    user_act['dialogue_act'] = dialogue_act
-    user_act['intent'] = intent
-    if slots is not None:
-        user_act['slots'] = slots
-    return user_act
 
 
 class AgendaBasedUserSimulator(object):
@@ -25,6 +13,8 @@ class AgendaBasedUserSimulator(object):
     An implementation of an agenda based user simulator
     for image editing requests.
     """
+
+    SPEAKER = Agent.USER
 
     def __init__(self, config):
         """
@@ -71,140 +61,90 @@ class AgendaBasedUserSimulator(object):
 
     def act(self):
         """
-        Agenda based action with configurations
+        Perform actions according to the current agenda
         """
         assert self.agenda is None or len(self.agenda) > 0
+
         user_acts = []
+        # The default action for the user is to inform the agenda
+        default_system_acts = [Hermes.build_act(
+            SystemAct.ASK, speaker=Agent.SYSTEM)]
+        system_acts = self.observation.get('system_acts', default_system_acts)
+        for sys_act in system_acts:
+            # We can do a for loop here of the system acts
+            # because there can only be one system act that
+            # requires a response from the user
+            sys_dialogue_act = sys_act['dialogue_act']['value']
+            if sys_dialogue_act == SystemAct.ASK:
+                user_act = self.act_inform_agenda()
+                user_acts += [user_act]
+            elif sys_dialogue_act == SystemAct.REQUEST:
+                import pdb
+                pdb.set_trace()
+                request_slots = sys_act['slots']
+                user_act = self.act_inform_request(request_slots)
 
-        if len(self.observation) == 0:
-            # Observation is empty => Open an image
-            user_act = self.act_open()
-            user_acts.append(user_act)
-        else:
-            system_acts = self.observation.get('system_acts', [])
-            for sys_act in system_acts:
-                if sys_act['dialogue_act'] == SystemAct.REQUEST:
+            elif sys_dialogue_act == SystemAct.CONFIRM:
+                assert len(sys_act['slots']) == 1
+                confirm_slot = sys_act['slots'][0]
+                confirm_name = confirm_slot['slot']
+                confirm_value = confirm_slot['value']
 
-                    import pdb
-                    pdb.set_trace()
-                elif sys_act['dialogue_act'] == SystemAct.CONFIRM:
-                    assert len(
-                        sys_act['slots']) == 1, "[User] System should only confirm one slot at a time!"
-                    confirm_slot = sys_act['slots'][0]
-                    confirm_slot_name = confirm_slot['slot']
-                    confirm_slot_value = confirm_slot['value']
+                # Confirm intent or normal slot values
+                if confirm_name == ImageEditOntology.DIALOGUE_ACT:
+                    slots = [self.agenda[0]['dialogue_act']]
+                else:
+                    slots = self.agenda[0]['slots']
 
-                    _, target_slot = find_slot_with_key(
-                        confirm_slot_name, self.agenda[0]['slots'])
+                _, target_slot = find_slot_with_key(confirm_name, slots)
 
-                    target_slot_name = target_slot['slot']
-                    if target_slot_name == "object":
-                        target_slot_value = target_slot['value']['name']
-                    else:
-                        target_slot_value = target_slot['value']
+                # Special case: object
+                target_name = target_slot['slot']
+                if target_name == ImageEditOntology.Slots.OBJECT:
+                    target_value = target_slot['value']['name']
+                else:
+                    target_value = target_slot['value']
 
-                    if confirm_slot_value == target_slot_value:
-                        user_act = self.act_affirm()
-                    else:
-                        user_act = self.act_negate()
-                    user_acts.append(user_act)
-                elif sys_act['dialogue_act'] == SystemAct.REQUEST_LABEL:
-                    print("SystemAct.REQUEST_LABEL")
+                # Decide Affirm or Negate
+                if confirm_value == target_value:
+                    user_dialogue_act = UserAct.AFFIRM
+                else:
+                    user_dialogue_act = UserAct.NEGATE
 
-                    import pdb
-                    pdb.set_trace()
-                elif sys_act['dialogue_act'] == SystemAct.EXECUTE:
-                    # Previous agenda has been executed
-                    self.agenda.pop(0)
-                    if self.agenda[0]['intent'] == "close":
-                        user_act = self.act_close()
-                    else:
-                        user_act = self.act_inform_agenda()
-                    user_acts.append(user_act)
+                # Build user_act
+                user_act = Hermes.build_act(
+                    user_dialogue_act, speaker=self.SPEAKER)
+                user_acts += [user_act]
+                # TODO: Probability of additional inform
+            elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
+                print("SystemAct.REQUEST_LABEL")
+                user_act = self.act_label()
+            elif sys_dialogue_act == SystemAct.EXECUTE:
+                # Previous agenda has been executed
+                self.agenda.pop(0)
 
         # Build return object
         user_act = {}
         user_act['user_acts'] = user_acts
         user_act['user_utterance'] = self.template_nlg(user_acts)
-        user_act['episode_done'] = self.agenda[0]['intent'] == "close"
-        return user_act
-
-    def act_open(self):
-        """
-        Returns:
-            user_act : open image user act
-        """
-        assert len(self.observation) == 0
-        currAgenda = self.agenda[0]
-        assert currAgenda['intent'] == ImageEditOntology.OPEN
-
-        user_act = copy.deepcopy(currAgenda)
-        user_act['dialogue_act'] = UserAct.OPEN
-        return user_act
-
-    def act_close(self):
-        """
-        Returns:
-            user_act: close image user act
-        """
-        assert len(self.agenda) == 1
-        currAgenda = self.agenda[0]
-        assert currAgenda['intent'] == ImageEditOntology.CLOSE
-
-        user_act = copy.deepcopy(currAgenda)
-        user_act['dialogue_act'] = UserAct.CLOSE
+        user_act['episode_done'] = self.agenda[0]['dialogue_act']['value'] == UserAct.CLOSE
         return user_act
 
     def act_inform_agenda(self):
         """
+        Informs according to agenda
         Returns:
             user_act (dict): user act object
         """
         agenda = self.agenda[0]
-
         user_act = copy.deepcopy(agenda)
-        user_act['dialogue_act'] = UserAct.INFORM
-        user_intent = user_act['intent']
-        if user_intent in ["adjust", "select_object"]:
+        user_dialogue_act = user_act['dialogue_act']['value']
+        user_act['speaker'] = Agent.USER
+        if user_dialogue_act == UserAct.ADJUST:
             # Set object value from { "mask_str": mask_str, "name": name } to name
             _, object_slot = find_slot_with_key('object', user_act['slots'])
             object_slot['value'] = object_slot['value']['name']
-
             # TODO: Number of slots filtered decided on probability
-        elif user_intent in ["undo", "redo"]:
-            # We don't have any slot values
-            pass
-        return user_act
-
-    def act_affirm(self):
-        """
-        Returns:
-            user_act (dict)
-        """
-        user_act = {}
-        user_act['dialogue_act'] = UserAct.AFFIRM
-        return user_act
-
-    def act_negate(self):
-        """
-        Returns:
-            user_act (dict)
-        """
-        user_act = {}
-        user_act['dialogue_act'] = UserAct.NEGATE
-        return user_act
-
-    def act_label(self):
-        """
-        Returns:
-            user_act (dict)
-        """
-        user_act = {}
-        user_act['dialogue_act'] = UserAct.LABEL
-        user_act['intent'] = "label"
-
-        import pdb
-        pdb.set_trace()
         return user_act
 
     def compute_dice(self, mask_str, target_mask_str=None):
@@ -225,7 +165,7 @@ class AgendaBasedUserSimulator(object):
         target_mask = b64_to_img(target_mask_str)
         assert mask.shape == target_mask.shape, "Weird shape"
 
-        dice = 2 * ( mask & target_mask ).sum() / ( mask | target_mask).sum()
+        dice = 2 * (mask & target_mask).sum() / (mask | target_mask).sum()
 
         return dice >= self.dice_threshold
 
@@ -239,10 +179,12 @@ class AgendaBasedUserSimulator(object):
         """
         utt_list = []
         for user_act in user_acts:
-            user_dialogue_act = user_act['dialogue_act']
+            user_dialogue_act = user_act['dialogue_act']['value']
             if user_dialogue_act == UserAct.OPEN:
                 utt = "(Open an image)"
-            elif user_dialogue_act == UserAct.INFORM:
+            elif user_dialogue_act == UserAct.LOAD:
+                utt = "(Loads an image)"
+            elif user_dialogue_act == UserAct.ADJUST:
                 slots = user_act['slots']
                 slot_list = []
                 for slot in slots:
@@ -253,18 +195,8 @@ class AgendaBasedUserSimulator(object):
                 utt = "Yes."
             elif user_dialogue_act == UserAct.NEGATE:
                 utt = "No."
-            elif user_dialogue_act == UserAct.TOOL_SELECT:
-                slots = user_act['slots']
-                slot_list = []
-                for slot in slots:
-                    slot_list.append(slot['value'])
-                utt = "I want to select " + ", ".join(slot_list)
             elif user_dialogue_act == UserAct.CLOSE:
-                utt = "Bye."
-            elif user_dialogue_act == "select_object_mask_id":
-                slot = user_act['slots'][0]
-                mask_id = slot['value']
-                utt = "I want to select object {}.".format(mask_id)
+                utt = "(Closes the image)"
             else:
                 raise ValueError(
                     "Unknown user_dialogue_act: {}".format(user_dialogue_act))

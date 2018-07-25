@@ -3,7 +3,8 @@ import json
 import logging
 import sys
 
-from .core import UserAct
+from .core import UserAct, Hermes
+from .ontology import getOntologyWithName
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -31,12 +32,11 @@ class Slot(object):
         Returns:
             obj (dict): slot dict
         """
-        obj = {}
-        obj['slot'] = self.name
         max_value, max_conf = self.get_max_conf_value()
-        obj['value'] = max_value
-        obj['conf'] = max_conf
-        return obj
+        if max_value is None:
+            return ActionHelper.build_slot_dict(self.name)
+        else:
+            return ActionHelper.build_slot_dict(self.name, max_value, max_conf)
 
 
 class BeliefSlot(Slot):
@@ -57,7 +57,7 @@ class BeliefSlot(Slot):
             value_validator (function): a function to validate the values
     """
 
-    def __init__(self, name, confirm_threshold, default_values=[], permit_new_value=True, value_validator=None):
+    def __init__(self, name, threshold, default_values=[], permit_new_value=True, value_validator=None):
         """
         Args:
             name (str): slot name
@@ -66,7 +66,7 @@ class BeliefSlot(Slot):
             value_validator (function): a function that validates the observed values
         """
         self.name = name
-        self.confirm_threshold = confirm_threshold
+        self.threshold = threshold
         self.default_values = default_values
         self.value_conf_map = {v: 0. for v in self.default_values}
         self.permit_new_value = permit_new_value
@@ -124,7 +124,7 @@ class BeliefSlot(Slot):
 
     def needs_confirm(self):
         max_value, max_conf = self.get_max_conf_value()
-        return 0. < max_conf < self.confirm_threshold
+        return 0. < max_conf < self.threshold
 
     def needs_query(self):
         return False
@@ -147,7 +147,7 @@ class PSToolSlot(BeliefSlot):
     Therefore, only one value can be present, and has confidence 1.0
     """
 
-    def __init__(self, name, confirm_threshold, default_values=[], permit_new_value=True, value_validator=None):
+    def __init__(self, name, threshold, default_values=[], permit_new_value=True, value_validator=None):
         """
         Args:
             name (str): slot name
@@ -156,7 +156,7 @@ class PSToolSlot(BeliefSlot):
         """
         assert len(default_values) <= 1
         super(PSToolSlot, self).__init__(
-            name, confirm_threshold, default_values, permit_new_value, value_validator)
+            name, threshold, default_values, permit_new_value, value_validator)
 
     def add_new_observation(self, value, conf, turn_id):
         """
@@ -192,12 +192,6 @@ class DomainTable(object):
         self.name = name
         self.slots = slots
 
-        # Slots
-        self.request_slots = []
-        self.confirm_slots = []
-        self.query_slots = []
-        self.execute_slots = []
-
     def add_new_observation(self, slot, value, conf, turn_id):
         """
         Adds new observation to slot
@@ -208,7 +202,7 @@ class DomainTable(object):
             self.slots[slot].add_new_observation(value, conf, turn_id)
             return True
         else:
-            return False
+            raise ValueError("Unknown slot: {}".format(slot))
 
     def pprint(self):
         """
@@ -218,7 +212,7 @@ class DomainTable(object):
         for slot in self.slots.values():
             print(json.dumps(slot.to_json()))
 
-    def update_slots(self):
+    def get_goal_slots(self):
         """
         Categorize slots by whether value is present and confirm threshold
         Returns:
@@ -227,23 +221,32 @@ class DomainTable(object):
             query_slots (list): list of slot dicts
             execute_slots (list): list of slot dicts
         """
-        self.confirm_slots = []
-        self.request_slots = []
-        self.query_slots = []
-        self.execute_slots = []
+        request_slots = []
+        confirm_slots = []
+        query_slots = []
+        execute_slots = []
 
         for slot in self.slots.values():
             slot_dict = slot.to_json()
             if slot.needs_request():
-                self.request_slots.append(slot_dict)
+                request_slots.append(slot_dict)
             elif slot.needs_confirm():
-                self.confirm_slots.append(slot_dict)
+                confirm_slots.append(slot_dict)
             elif slot.needs_query():
-                self.query_slots.append(slot_dict)
+                query_slots.append(slot_dict)
             elif slot.executable():
-                self.execute_slots.append(slot_dict)
+                execute_slots.append(slot_dict)
 
-        return self.confirm_slots, self.request_slots, self.query_slots, self.execute_slots
+        return request_slots, confirm_slots, query_slots, execute_slots
+
+    def executable(self):
+        """
+        Determine whether this table is ready to be executed
+        Returns:
+            bool : whether this domain is executable
+        """
+        _, _, _, execute_slots = self.get_goal_slots()
+        return len(execute_slots) == len(self.slots)
 
     def clear(self):
         """
@@ -263,143 +266,176 @@ class DialogueState(object):
         domainStack (list): list of domain
     """
 
-    def __init__(self, ontology, confirm_threshold):
+    def __init__(self, config):
         """
         In the constructor, we first build the slots and domain tables
 
         Args:
             ontology
         """
-
-        # Records intent stack and history
-        self.domainStack = list()
-
-        # Build Domain Belief Slot that record
-        self.domainSlot = BeliefSlot(
-            "domain", confirm_threshold, default_values=ontology.domain_slot_map.keys())
+        # Get ontology
+        self.ontology = getOntologyWithName(config["ONTOLOGY"])
+        self.default_thresh = float(config["DEFAULT_THRESHOLD"])
 
         # Build Slots first
         slots = {}
-        for slot_name, slot_class_name in ontology.slot_class_map.items():
-            if slot_class_name == "BeliefSlot":
-                slot = BeliefSlot(slot_name, ontology.slot_confirm_map.get(
-                    slot_name, confirm_threshold))
-            elif slot_class_name == "PSToolSlot":
-                slot = PSToolSlot(slot_name, ontology.slot_confirm_map.get(
-                    slot_name, confirm_threshold))
+        for slot_name, ont_slot_class in self.ontology.slots.items():
+            slot_thresh_key = slot_name.upper() + "_THRESHOLD"
+            slot_thresh = config.get(slot_thresh_key, self.default_thresh)
+
+            # Perhaps write a classmethod in the future
+            construct_args = copy.deepcopy(vars(ont_slot_class))
+            construct_args.pop('slot_type')
+            construct_args['threshold'] = slot_thresh
+
+            if ont_slot_class.slot_type == "BeliefSlot":
+                slot = BeliefSlot(**construct_args)
+            elif ont_slot_class.slot_type == "PSToolSlot":
+                slot = PSToolSlot(**construct_args)
             else:
                 raise ValueError(
-                    "Unknown slot_class_name: {}".format(slot_class_name))
+                    "Unknown slot_type: {}".format(ont_slot_class.slot_type))
             slots[slot.name] = slot
 
+        # Add a special dialogue_act table
+        dialogue_act_thresh = config.get(
+            "DIALOGUE_ACT_THRESHOLD", self.default_thresh)
+        dialogue_act_slot = BeliefSlot(
+            self.ontology.DIALOGUE_ACT, dialogue_act_thresh)
+        slots[dialogue_act_slot.name] = dialogue_act_slot
+
         # Build Domain dependencies
-        domains = {}
-        for domain_name, slot_names in ontology.domain_slot_map.items():
+        tables = {}
+        for domain_name, ont_domain_class in self.ontology.domains.items():
+            domain_slot_names = ont_domain_class.get_slot_names()
             domain_slots = {slot_name: slots[slot_name]
-                            for slot_name in slot_names}
-            domains[domain_name] = DomainTable(domain_name, domain_slots)
+                            for slot_name in domain_slot_names}
+            tables[domain_name] = DomainTable(domain_name, domain_slots)
+
+        # Add a special dialogue_act table
+        dialogue_act_slots = {dialogue_act_slot.name: dialogue_act_slot}
+        dialogue_act_table = DomainTable(
+            self.ontology.DIALOGUE_ACT, dialogue_act_slots)
+        tables[dialogue_act_table.name] = dialogue_act_table
+
+        # Add an dialogue_act table to determine dialogue_act
+        self.dialogue_act_table = dialogue_act_table
+        self.domain_stack = list()
 
         self.slots = slots
-        self.domains = domains
+        self.tables = tables
 
-    def update(self, dialogue_act, domain, slots, turn_id):
+        # Request, Confirm, Query, Execute are defined according to the domain
+        self.request_slots = []
+        self.confirm_slots = []
+        self.query_slots = []
+        self.execute_slots = []
+
+    def update(self, dialogue_act, slots, turn_id):
         """
         Update the dialogue state according to dialogue acts
         Args:
-            dialogue_act
-            domain
-            slots
-            turn_id
+            dialogue_act (dict): a slot dict 
+            slots (list): list of slot dicts
+            turn_id (int): turn index
         """
-        #
-        if dialogue_act in [UserAct.AFFIRM, UserAct.NEGATE]:
-            domainTable = self.getCurrentDomainTable()
-            if len(domainTable.confirm_slots) == 0:
-                logger.error("Confirm slots empty!")
-                return False
+        # TODO: dialogue_act & confirm confidence
+        user_dialogue_act = dialogue_act['value']
 
-            slot_dict = domainTable.confirm_slots.pop(0)
-            new_observation = copy.deepcopy(slot_dict)
+        # Current domain
+        if user_dialogue_act in UserAct.domain_acts():
+            self.prioritize_domain(user_dialogue_act)
+            self.update_domain(user_dialogue_act, slots, turn_id)
+        elif user_dialogue_act in UserAct.confirm_acts():
+            domain_table = self.get_current_domain()
+            confirm_dict = self.confirm_slots.pop(0)
+            new_observation = copy.deepcopy(confirm_dict)
             new_observation['turn_id'] = turn_id
-            if domain == UserAct.AFFIRM:
-                new_observation['conf'] = 1.
-                domainTable.add_new_observation(**new_observation)
-            else:  # UserAct.NEGATE
-                new_observation['conf'] = -1.  # set conf to -1.
-                domainTable.add_new_observation(**new_observation)
-            return True
-        elif dialogue_act in [UserAct.INFORM]:
-            pass
+            new_observation['conf'] = 1. if user_dialogue_act == UserAct.AFFIRM else -1.
+            domain_table.add_new_observation(**new_observation)
+        self.load_domain_goal_slots()
 
-    def updateDomain(self, dialogue_act, domain, slots, turn_id):
+    def update_dialogue_act(self, dialogue_act, turn_id):
+        """
+        Update dialogue_act tables
+        Returns:
+            bool: whether we are sure of this dialogue_act
+        """
+        # Update Domain Classifier Table first
+        dialogue_act_observation = copy.deepcopy(dialogue_act)
+        dialogue_act_observation['slot'] = self.ontology.DIALOGUE_ACT
+        dialogue_act_observation['turn_id'] = turn_id
+        self.dialogue_act_table.add_new_observation(**dialogue_act_observation)
+
+        domain_name = dialogue_act['value']
+        domain_table = self.tables[domain_name]
+
+        return self.dialogue_act_table.executable()
+
+    def update_domain(self, domain_name, slots, turn_id):
         """
         Args:
-            dialogue_act (str): user dialogue act
-            domain (str): domain name
+            dialogue_act (dict): {'slot': 'dialogue_act', 'value': v1, 'conf': c}
             slots (list): list of slot dict in { "slot": slot, "value": value, "conf": conf} format
+            turn_id (int): turn index
         Returns:
             bool : True is succesfully updated else False
         """
-        if domain in [UserAct.AFFIRM, UserAct.NEGATE]:
-            domainTable = self.getCurrentDomainTable()
-            if len(domainTable.confirm_slots) == 0:
-                logger.error("Confirm slots empty!")
-                return False
-
-            slot_dict = domainTable.confirm_slots.pop(0)
-            new_observation = copy.deepcopy(slot_dict)
-            new_observation['turn_id'] = turn_id
-            if domain == UserAct.AFFIRM:
-                new_observation['conf'] = 1.
-                domainTable.add_new_observation(**new_observation)
-            else:  # UserAct.NEGATE
-                new_observation['conf'] = -1.  # set conf to -1.
-                domainTable.add_new_observation(**new_observation)
-            return True
-
-        if domain not in self.domains:
-            logger.debug("Update failed, unknown domain: {}".format(domain))
-            raise ValueError
-
-        if domain in self.domainStack:
-            # Remove from stack
-            index = self.domainStack.index(domain)
-            self.domainStack.pop(index)
-
-        # Add to top of stack
-        self.domainStack.insert(0, domain)
-
-        domainTable = self.domains[domain]
+        domain_table = self.tables[domain_name]
         for slot_dict in slots:
             new_observation = copy.deepcopy(slot_dict)
             new_observation['turn_id'] = turn_id
-            domainTable.add_new_observation(**new_observation)
+            domain_table.add_new_observation(**new_observation)
 
-        # Update request, confirm, query, execute slots
-        domainTable.update_slots()
-        return True
+    def prioritize_domain(self, domain_name):
+        """
+        Move domain_table to top of stack
+        """
+        # Move domain_table to the top of stack
+        domain_table = self.tables[domain_name]
+        if domain_table in self.domain_stack:
+            index = self.domain_stack.index(domain_table)
+            self.domain_stack.pop(index)
+        self.domain_stack.insert(0, domain_table)
 
-    def getCurrentDomainTable(self):
+    def load_domain_goal_slots(self, domain_name=None):
+        """
+        Get goal slots of the specific domain
+        """
+        if domain_name is None:
+            domain_table = self.domain_stack[0]
+        else:
+            domain_table = self.tables[domain_name]
+
+        self.request_slots, self.confirm_slots, self.query_slots, self.execute_slots = \
+            domain_table.get_goal_slots()
+
+    def print_goals(self):
+        print("Dialogue State:")
+        print("request_slots", self.request_slots)
+        print("confirm_slots", self.confirm_slots)
+        print("query_slots", self.query_slots)
+        print("execute_slots", self.execute_slots)
+
+    def get_current_domain(self):
         """
         Gets current domain table, which is the top of the domainStack
         Returns:
-            domainTable if domainStack has domain, else None
+            domain_table if domainStack has domain, else None
         """
-        if len(self.domainStack) == 0:
+        if len(self.domain_stack) == 0:
             return None
-        domain = self.domainStack[0]
-        domainTable = self.domains[domain]
-        return domainTable
+        return self.domain_stack[0]
 
     def clear(self, domain=None):
         """
         Clears a single domain table if it is specified
         """
         if domain is not None:
-            self.domains[domain].clear()
+            self.tables[domain].clear()
         else:
-            for domain in self.domains.values():
-                domain.clear()
+            for table in self.tables.values():
+                table.clear()
 
 
 if __name__ == "__main__":

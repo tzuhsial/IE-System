@@ -5,7 +5,7 @@ import copy
 
 import numpy as np
 
-from ..dialogueacts import UserAct
+from ..core import UserAct
 
 
 class ConfChannel(object):
@@ -42,32 +42,44 @@ class ConfChannel(object):
         Returns:
             channel_act (dict): user_act with channel confidence scores
         """
+
         channel_act = copy.deepcopy(self.observation)
-
-        # Assign confidence scores
         for user_act in channel_act['user_acts']:
-            if user_act['dialogue_act'] in [UserAct.OPEN, UserAct.LOAD, UserAct.TOOL_SELECT, UserAct.CLOSE]:
-                # There can be no error. Since the user directly interacts with Photoshop
-                channel_conf = 1.
-            else:
-                channel_conf = self.sample_conf()
-                channel_conf = 1.
-
+            # Sample a confidence for dialogue_act
+            user_dialogue_act = user_act['dialogue_act']['value']
+            # Sample or not depends on user_dialogue_act
+            sample = not user_dialogue_act in UserAct.photoshop_acts()
+            #user_act['dialogue_act']['conf'] = self.generate_confidence(sample)
+            user_act['dialogue_act']['conf'] = 1.
             for slot_dict in user_act.get('slots', list()):
-                slot_dict['conf'] = channel_conf
+                slot_dict['conf'] = self.generate_confidence(sample)
 
         return channel_act
 
-    def sample_conf(self):
+    def corrupt(self, slot_dict, channel_conf):
         """
-        Samples a confidence scores from Gaussian with mean and std
+        Corrupts the slot_dict by assigning weird values
+        """
+        pass
+
+    def generate_confidence(self, sample=True):
+        """
+        if sample: 
+            Samples a confidence scores with mean and std and to 2 floating points
+        else:
+            returns a confidence score of 1.
+        Args:
+            sample (bool): 
         Returns:
             conf_score (float)
         """
-        conf_score = np.random.normal(self.conf_mean, self.conf_std)
-        conf_score = round(conf_score, 2)
-        conf_score = max(conf_score, 0.0)  # >= 0.
-        conf_score = min(conf_score, 1.0)  # <= 1.
+        if sample:
+            conf_score = np.random.normal(self.conf_mean, self.conf_std)
+            conf_score = round(conf_score, 2)
+            conf_score = max(conf_score, 0.0)  # >= 0.
+            conf_score = min(conf_score, 1.0)  # <= 1.
+        else:
+            conf_score = 1.0
         return conf_score
 
 
