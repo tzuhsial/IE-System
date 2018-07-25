@@ -67,8 +67,7 @@ class AgendaBasedUserSimulator(object):
 
         user_acts = []
         # The default action for the user is to inform the agenda
-        default_system_acts = [Hermes.build_act(
-            SystemAct.ASK, speaker=Agent.SYSTEM)]
+        default_system_acts = [Hermes.build_act(SystemAct.ASK)]
         system_acts = self.observation.get('system_acts', default_system_acts)
         for sys_act in system_acts:
             # We can do a for loop here of the system acts
@@ -79,11 +78,8 @@ class AgendaBasedUserSimulator(object):
                 user_act = self.act_inform_agenda()
                 user_acts += [user_act]
             elif sys_dialogue_act == SystemAct.REQUEST:
-                import pdb
-                pdb.set_trace()
                 request_slots = sys_act['slots']
-                user_act = self.act_inform_request(request_slots)
-
+                user_act = self.act_inform_agenda(request_slots)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 assert len(sys_act['slots']) == 1
                 confirm_slot = sys_act['slots'][0]
@@ -112,13 +108,14 @@ class AgendaBasedUserSimulator(object):
                     user_dialogue_act = UserAct.NEGATE
 
                 # Build user_act
-                user_act = Hermes.build_act(
-                    user_dialogue_act, speaker=self.SPEAKER)
+                user_act = Hermes.build_act(user_dialogue_act)
                 user_acts += [user_act]
                 # TODO: Probability of additional inform
             elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
                 print("SystemAct.REQUEST_LABEL")
-                user_act = self.act_label()
+                import pdb
+                pdb.set_trace()
+
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 # Previous agenda has been executed
                 self.agenda.pop(0)
@@ -128,11 +125,13 @@ class AgendaBasedUserSimulator(object):
         user_act['user_acts'] = user_acts
         user_act['user_utterance'] = self.template_nlg(user_acts)
         user_act['episode_done'] = self.agenda[0]['dialogue_act']['value'] == UserAct.CLOSE
+        user_act['speaker'] = self.SPEAKER
         return user_act
 
-    def act_inform_agenda(self):
+    def act_inform_agenda(self, request_slots=None):
         """
-        Informs according to agenda
+        Informs according to agenda, if request_slots are provided, 
+        then inform only slots in request
         Returns:
             user_act (dict): user act object
         """
@@ -140,11 +139,20 @@ class AgendaBasedUserSimulator(object):
         user_act = copy.deepcopy(agenda)
         user_dialogue_act = user_act['dialogue_act']['value']
         user_act['speaker'] = Agent.USER
+        if request_slots is not None:
+            # Filter only the slots requested
+            slots = []
+            for request_slot in request_slots:
+                _, inform_slot = find_slot_with_key(
+                    request_slot['slot'], user_act['slots'])
+                slots.append(inform_slot)
+            user_act['slots'] = slots
+
+        # Special case: object
         if user_dialogue_act == UserAct.ADJUST:
             # Set object value from { "mask_str": mask_str, "name": name } to name
             _, object_slot = find_slot_with_key('object', user_act['slots'])
             object_slot['value'] = object_slot['value']['name']
-            # TODO: Number of slots filtered decided on probability
         return user_act
 
     def compute_dice(self, mask_str, target_mask_str=None):
@@ -186,7 +194,7 @@ class AgendaBasedUserSimulator(object):
                 utt = "(Loads an image)"
             elif user_dialogue_act == UserAct.ADJUST:
                 slots = user_act['slots']
-                slot_list = []
+                slot_list = ["dialogue_act to be " + user_dialogue_act]
                 for slot in slots:
                     slot_list.append(
                         slot['slot'] + " to be " + str(slot['value']))
@@ -197,6 +205,8 @@ class AgendaBasedUserSimulator(object):
                 utt = "No."
             elif user_dialogue_act == UserAct.CLOSE:
                 utt = "(Closes the image)"
+            elif user_dialogue_act == UserAct.UNDO:
+                utt = "I want to undo my previous edit."
             else:
                 raise ValueError(
                     "Unknown user_dialogue_act: {}".format(user_dialogue_act))

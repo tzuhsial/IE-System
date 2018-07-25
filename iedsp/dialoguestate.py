@@ -34,9 +34,9 @@ class Slot(object):
         """
         max_value, max_conf = self.get_max_conf_value()
         if max_value is None:
-            return ActionHelper.build_slot_dict(self.name)
+            return Hermes.build_slot_dict(self.name)
         else:
-            return ActionHelper.build_slot_dict(self.name, max_value, max_conf)
+            return Hermes.build_slot_dict(self.name, max_value, max_conf)
 
 
 class BeliefSlot(Slot):
@@ -95,13 +95,14 @@ class BeliefSlot(Slot):
     def get_max_conf_value(self):
         """
         Returns:
-            value with the maximum confidence or None if value_conf_map is empty
+            value (str): 
+            conf (float):
         """
         if len(self.value_conf_map) == 0:
             return None, -1
         max_value, max_conf = max(
             self.value_conf_map.items(), key=lambda tup: tup[1])
-        if max_conf < 0:  # For neglected stuff
+        if max_conf <= 0:  # For neglected stuff
             return None, -1
         return max_value, max_conf
 
@@ -119,17 +120,37 @@ class BeliefSlot(Slot):
         return obj
 
     def needs_request(self):
+        """
+        Whether the slot needs to be requested
+        Returns:
+            bool
+        """
         max_value, max_conf = self.get_max_conf_value()
         return max_value == None
 
     def needs_confirm(self):
+        """
+        Whether the slot needs to be confirmed
+        Returns:
+            bool
+        """
         max_value, max_conf = self.get_max_conf_value()
         return 0. < max_conf < self.threshold
 
     def needs_query(self):
+        """
+        Whether the slot needs to be queried
+        Returns:
+            bool
+        """
         return False
 
     def executable(self):
+        """
+        Whether the slot can be executed
+        Returns:
+            bool
+        """
         return not self.needs_request() and not self.needs_confirm() and not self.needs_query()
 
     def clear(self):
@@ -204,6 +225,18 @@ class DomainTable(object):
         else:
             raise ValueError("Unknown slot: {}".format(slot))
 
+    def to_json(self):
+        """
+        Jsonify domain table
+        """
+        obj = {}
+        obj['domain'] = self.name
+        slots = []
+        for slot in self.slots.values():
+            slots.append(slot.to_json())
+        obj['slots'] = slots
+        return obj
+
     def pprint(self):
         """
         Pretty print out the current status of the table
@@ -256,6 +289,30 @@ class DomainTable(object):
             slot.clear()
 
 
+class DomainStack(object):
+    """
+    A C++ like stack to store domains
+    """
+
+    def __init__(self):
+        self._stack = list()
+
+    def top(self):
+        if len(self._stack):
+            return self._stack[0]
+        return None
+
+    def push(self, domain):
+        assert isinstance(domain, DomainTable)
+        self._stack.append(domain)
+
+    def pop(self):
+        self._stack.pop(0)
+
+    def size(self):
+        return len(self._stack)
+
+
 class DialogueState(object):
     """
     Multi-domain dialogue state based on Ontology
@@ -298,11 +355,11 @@ class DialogueState(object):
             slots[slot.name] = slot
 
         # Add a special dialogue_act table
-        dialogue_act_thresh = config.get(
+        da_thresh = config.get(
             "DIALOGUE_ACT_THRESHOLD", self.default_thresh)
-        dialogue_act_slot = BeliefSlot(
-            self.ontology.DIALOGUE_ACT, dialogue_act_thresh)
-        slots[dialogue_act_slot.name] = dialogue_act_slot
+        da_slot = BeliefSlot(
+            self.ontology.DIALOGUE_ACT, da_thresh)
+        slots[da_slot.name] = da_slot
 
         # Build Domain dependencies
         tables = {}
@@ -313,19 +370,20 @@ class DialogueState(object):
             tables[domain_name] = DomainTable(domain_name, domain_slots)
 
         # Add a special dialogue_act table
-        dialogue_act_slots = {dialogue_act_slot.name: dialogue_act_slot}
-        dialogue_act_table = DomainTable(
+        dialogue_act_slots = {da_slot.name: da_slot}
+        da_table = DomainTable(
             self.ontology.DIALOGUE_ACT, dialogue_act_slots)
-        tables[dialogue_act_table.name] = dialogue_act_table
+        tables[da_table.name] = da_table
 
         # Add an dialogue_act table to determine dialogue_act
-        self.dialogue_act_table = dialogue_act_table
-        self.domain_stack = list()
+        self.da_slot = da_slot
+        self.da_table = da_table
+        self.domain_stack = DomainStack()
 
         self.slots = slots
         self.tables = tables
 
-        # Request, Confirm, Query, Execute are defined according to the domain
+        # Goals: Request, Confirm, Query, Execute Slots
         self.request_slots = []
         self.confirm_slots = []
         self.query_slots = []
@@ -340,52 +398,104 @@ class DialogueState(object):
             turn_id (int): turn index
         """
         # TODO: dialogue_act & confirm confidence
-        user_dialogue_act = dialogue_act['value']
+        # Doing: dialogue_act_confidence
 
-        # Current domain
-        if user_dialogue_act in UserAct.domain_acts():
-            self.prioritize_domain(user_dialogue_act)
-            self.update_domain(user_dialogue_act, slots, turn_id)
-        elif user_dialogue_act in UserAct.confirm_acts():
-            domain_table = self.get_current_domain()
-            confirm_dict = self.confirm_slots.pop(0)
-            new_observation = copy.deepcopy(confirm_dict)
-            new_observation['turn_id'] = turn_id
-            new_observation['conf'] = 1. if user_dialogue_act == UserAct.AFFIRM else -1.
-            domain_table.add_new_observation(**new_observation)
-        self.load_domain_goal_slots()
+        user_da = dialogue_act['value']
 
-    def update_dialogue_act(self, dialogue_act, turn_id):
+        import pdb
+        pdb.set_trace()
+
+        da_confirmed = self.update_domain_stack(dialogue_act, turn_id)
+
+        if da_confirmed:
+            # This means we can focus on the domain in the domain_stack
+            self.update_slots(dialogue_act, slots, turn_id)
+            domain_name = self.get_current_domain().name
+        else:
+            domain_name = self.ontology.DIALOGUE_ACT
+
+        self.load_domain_goal_slots(domain_name)
+
+    def update_domain_stack(self, dialogue_act, turn_id):
         """
-        Update dialogue_act tables
+        Update domain_stack
         Returns:
-            bool: whether we are sure of this dialogue_act
+            executable (bool): confirmed dialogue_act
         """
-        # Update Domain Classifier Table first
-        dialogue_act_observation = copy.deepcopy(dialogue_act)
-        dialogue_act_observation['slot'] = self.ontology.DIALOGUE_ACT
-        dialogue_act_observation['turn_id'] = turn_id
-        self.dialogue_act_table.add_new_observation(**dialogue_act_observation)
+        # Update only dialogue_act
+        user_da = dialogue_act['value']
 
-        domain_name = dialogue_act['value']
-        domain_table = self.tables[domain_name]
+        if user_da in UserAct.domain_acts():
+            if self.domain_stack.size() > 0 and user_da == self.domain_stack.top().name:
+                # Same as previous dialogue_act, don't do anything
+                return True
+            else:
+                # A new dialogue act occurred
+                print("New dialogue_act occurred!")
+                da_obsrv = copy.deepcopy(dialogue_act)
+                da_obsrv['turn_id'] = turn_id
 
-        return self.dialogue_act_table.executable()
+                self.da_table.add_new_observation(**da_obsrv)
+                if self.da_table.executable():
+                    domain_name, _ = self.da_slot.get_max_conf_value()
+                    domain_table = self.tables[domain_name]
+                    self.domain_stack.push(domain_table)
+                    self.da_table.clear()
+                    return True
+                else:
+                    return False
 
-    def update_domain(self, domain_name, slots, turn_id):
+        elif user_da in UserAct.confirm_acts():
+            # Confirm dialogue_act in table
+            confirm_dict = self.confirm_slots.pop(0)
+
+            if confirm_dict['slot'] != self.ontology.DIALOGUE_ACT:
+                # User is not confirming the dialogue act, so skip this function
+                return True
+
+            # TODO Confidence matching
+            new_obsrv = copy.deepcopy(confirm_dict)
+            new_obsrv['turn_id'] = turn_id
+            new_obsrv['conf'] = 1. if user_da == UserAct.AFFIRM else -1.
+
+            self.da_table.add_new_observation(**new_obsrv)
+            if self.da_table.executable():
+                domain_name, _ = self.da_slot.get_max_conf_value()
+                domain_table = self.tables[domain_name]
+                self.domain_stack.push(domain_table)
+                self.da_table.clear()
+                return True
+            else:
+                return False
+
+        else:
+            raise ValueError("Unknown user_da: {}".format(user_da))
+
+        return False
+
+    def update_slots(self, dialogue_act, slots, turn_id):
         """
         Args:
-            dialogue_act (dict): {'slot': 'dialogue_act', 'value': v1, 'conf': c}
+            dialogue_act (dict): da dict
             slots (list): list of slot dict in { "slot": slot, "value": value, "conf": conf} format
             turn_id (int): turn index
         Returns:
             bool : True is succesfully updated else False
         """
-        domain_table = self.tables[domain_name]
-        for slot_dict in slots:
-            new_observation = copy.deepcopy(slot_dict)
-            new_observation['turn_id'] = turn_id
-            domain_table.add_new_observation(**new_observation)
+        user_da = dialogue_act['value']
+        if user_da in UserAct.confirm_acts():
+            confirm_dict = self.confirm_slots.pop(0)
+            new_obsrv = copy.deepcopy(confirm_dict)
+            new_obsrv['turn_id'] = turn_id
+            new_obsrv['conf'] = 1 if user_da == UserAct.AFFIRM else -1.  # NEGATE
+            slot_name = new_obsrv.pop('slot')
+            self.slots[slot_name].add_new_observation(**new_obsrv)
+        else:
+            for slot_dict in slots:
+                new_obsrv = copy.deepcopy(slot_dict)
+                new_obsrv['turn_id'] = turn_id
+                slot_name = new_obsrv.pop('slot')
+                self.slots[slot_name].add_new_observation(**new_obsrv)
 
     def prioritize_domain(self, domain_name):
         """
@@ -410,6 +520,13 @@ class DialogueState(object):
         self.request_slots, self.confirm_slots, self.query_slots, self.execute_slots = \
             domain_table.get_goal_slots()
 
+    def print_stack(self):
+        print("Domain Stack:")
+        print("---------------")
+        for idx, table in enumerate(self.domain_stack._stack):
+            print(idx, table.name)
+        print("---------------")
+
     def print_goals(self):
         print("Dialogue State:")
         print("request_slots", self.request_slots)
@@ -419,13 +536,20 @@ class DialogueState(object):
 
     def get_current_domain(self):
         """
-        Gets current domain table, which is the top of the domainStack
+        Gets the top of the domain_stack
         Returns:
             domain_table if domainStack has domain, else None
         """
-        if len(self.domain_stack) == 0:
+        if self.domain_stack.size() == 0:
             return None
-        return self.domain_stack[0]
+        else:
+            return self.domain_stack.top()
+
+    def clear_goals(self):
+        self.request_slots = []
+        self.confirm_slots = []
+        self.query_slots = []
+        self.execute_slots = []
 
     def clear(self, domain=None):
         """

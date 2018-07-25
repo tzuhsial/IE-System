@@ -49,8 +49,8 @@ class ConfChannel(object):
             user_dialogue_act = user_act['dialogue_act']['value']
             # Sample or not depends on user_dialogue_act
             sample = not user_dialogue_act in UserAct.photoshop_acts()
-            #user_act['dialogue_act']['conf'] = self.generate_confidence(sample)
-            user_act['dialogue_act']['conf'] = 1.
+            user_act['dialogue_act']['conf'] = self.generate_confidence(sample)
+            #user_act['dialogue_act']['conf'] = 1.
             for slot_dict in user_act.get('slots', list()):
                 slot_dict['conf'] = self.generate_confidence(sample)
 

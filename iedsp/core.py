@@ -77,7 +77,7 @@ class Hermes:
     TODO: validate functions
     """
     @staticmethod
-    def build_act(dialogue_act, slots=None, speaker=None):
+    def build_act(dialogue_act, slots=None):
         """
         Act
         {
@@ -85,8 +85,8 @@ class Hermes:
                 'value': intent, 'conf': intent_conf,
             },
             'slots': [
-                { 'slot': s1, 'value': v1, 'conf': c1 },
-                { 'slot': s2, 'value': v2, 'conf': c2 }
+                { 'slot': s1, 'value': v1 },
+                { 'slot': s2, 'value': v2 }
             ]
             'speaker': speaker,
         }
@@ -96,8 +96,6 @@ class Hermes:
             'dialogue_act', dialogue_act)
         if slots is not None:
             obj['slots'] = slots
-        if speaker is not None:
-            obj['speaker'] = speaker
         return obj
 
     @staticmethod
@@ -115,5 +113,5 @@ class Hermes:
         if value is not None:
             obj['value'] = value
         if conf is not None:
-            obj['conf']
+            obj['conf'] = conf 
         return obj

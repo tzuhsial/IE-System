@@ -80,35 +80,50 @@ class RuleBasedDialogueManager(object):
         # Here we implement a rule-based policy
         system_acts = []
 
+        self.state.print_stack()
         self.state.print_goals()
+        print("Policy")
         import pdb
         pdb.set_trace()
         if len(self.state.confirm_slots) > 0:
             sys_act = Hermes.build_act(
-                SystemAct.CONFIRM, self.state.confirm_slots[:1], self.SPEAKER)
+                SystemAct.CONFIRM, self.state.confirm_slots[:1])
             system_acts += [sys_act]
         elif len(self.state.request_slots) > 0:
-            sys_act = ActionHelper.build_act(
-                self.SPEAKER, SystemAct.REQUEST, slots=self.state.request_slots)
+            if find_slot_with_key('dialogue_act', self.state.request_slots)[0] >= 0:
+                sys_act = Hermes.build_act(SystemAct.ASK)
+            else:
+                sys_act = Hermes.build_act(
+                    SystemAct.REQUEST, self.state.request_slots)
             system_acts += [sys_act]
         elif len(self.state.query_slots) > 0:
             print("QUERY")
             raise NotImplementedError
-        else:
+        elif len(self.state.execute_slots) > 0:
             # Executable
             domain_name = self.state.get_current_domain().name
             if domain_name == self.state.ontology.Domains.OPEN:
                 sys_act = Hermes.build_act(
-                    SystemAct.EXECUTE, self.state.execute_slots, self.SPEAKER)
-                sys_act2 = Hermes.build_act(
-                    SystemAct.GREETING, speaker=self.SPEAKER)
-                sys_act3 = Hermes.build_act(
-                    SystemAct.ASK, speaker=self.SPEAKER)
+                    SystemAct.EXECUTE, self.state.execute_slots)
+                sys_act2 = Hermes.build_act(SystemAct.GREETING)
+                sys_act3 = Hermes.build_act(SystemAct.ASK)
                 system_acts += [sys_act, sys_act2, sys_act3]
+            elif domain_name == self.state.ontology.Domains.CLOSE:
+                sys_act = Hermes.build_act(SystemAct.BYE)
+                system_acts += [sys_act]
             else:
-                import pdb
-                pdb.set_trace()
+                sys_act = Hermes.build_act(
+                    SystemAct.EXECUTE, self.state.execute_slots)
+                system_acts += [sys_act]
 
+            # Execute intent, pop from domain
+            self.state.clear_goals()
+            self.state.domain_stack.pop()
+            import pdb
+            pdb.set_trace()
+        else:
+            sys_act = Hermes.build_act(SystemAct.ASK)
+            system_acts += [sys_act]
         return system_acts
 
     def act(self):
@@ -131,6 +146,7 @@ class RuleBasedDialogueManager(object):
         system_act['system_acts'] = system_acts
         system_act['system_utterance'] = self.template_nlg(system_acts)
         system_act['episode_done'] = self.observation['episode_done']
+        system_act['speaker'] = self.SPEAKER
         return system_act
 
     ###########################
@@ -160,14 +176,11 @@ class RuleBasedDialogueManager(object):
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
-
                 confirm_list = []
                 for slot_dict in confirm_slots:
                     sv = slot_dict['slot'] + " is " + str(slot_dict['value'])
                     confirm_list.append(sv)
-
                 utt += ','.join(confirm_list) + "?"
-
             elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
                 utt = "I can not identify the object. Can you label it for me?"
             elif sys_dialogue_act == SystemAct.EXECUTE:

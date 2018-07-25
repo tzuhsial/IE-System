@@ -1,201 +1,116 @@
-from iedsp.photoshop import SimplePhotoshopAPI
+import configparser
+
+
+from iedsp.core import UserAct, SystemAct, Hermes
+from iedsp.ontology import ImageEditOntology
+from iedsp.photoshop import PhotoshopGateway
 from iedsp.system import RuleBasedDialogueManager
-
-
-def user_template_nlg(user_acts):
-    utt_list = []
-    for user_act in user_acts:
-        user_dialogue_act = user_act['dialogue_act']
-        if user_dialogue_act == "open":
-            utt = "(Open an image)"
-        elif user_dialogue_act == "inform":
-            slots = user_act['slots']
-            slot_list = []
-            for slot in slots:
-                slot_list.append(slot['slot'] + " to be " + slot['value'])
-            utt = "I want " + ', '.join(slot_list) + "."
-        elif user_dialogue_act == "affirm":
-            utt = "Yes."
-        elif user_dialogue_act == "negate":
-            utt = "No."
-        elif user_dialogue_act == "select_object":
-            slots = user_act['slots']
-            slot_list = []
-            for slot in slots:
-                slot_list.append(slot['value'])
-            utt = "I want to select " + ", ".join(slot_list)
-        elif user_dialogue_act == "bye":
-            utt = "Bye."
-        elif user_dialogue_act == "select_object_mask_id":
-            slot = user_act['slots'][0]
-            mask_id = slot['value']
-            utt = "I want to select object {}.".format(mask_id)
-        else:
-            raise ValueError(
-                "Unknown user_dialogue_act: {}".format(user_dialogue_act))
-        utt_list.append(utt)
-
-    utterance = ' '.join(utt_list)
-    return utterance
-
-
-def test_state_transitions():
-    """Tests state transitions(triggers) in finite state machine
-    """
-    # source: start_session
-    agent = RuleBasedDialogueManager()
-    assert agent.state == "start_session"
-
-    agent.reset()
-    assert agent.state == "start_session"
-
-    agent.greeting()
-    assert agent.state == "ask_ier"
-
-    # source: ask_ier
-    agent.state = "ask_ier"
-    agent.outOfDomain()
-    assert agent.state == "ask_ier"
-
-    agent.state = "ask_ier"
-    agent.zeroNLConf()
-    assert agent.state == "ask_ier"
-
-    agent.state = "ask_ier"
-    agent.lowNLConf()
-    assert agent.state == "confirm"
-
-    agent.state = "ask_ier"
-    agent.highNLConf_missing()
-    assert agent.state == "request"
-
-    agent.state = "ask_ier"
-    agent.highNLConf_noMissing()
-    assert agent.state == "ier_complete"
-
-    agent.state = "ask_ier"
-    agent.bye()
-    assert agent.state == "end_session"
-
-    # source: confirm
-    agent.state = "confirm"
-    agent.highNLConf_missing()
-    assert agent.state == "request"
-
-    agent.state = "confirm"
-    agent.highNLConf_noMissing()
-    assert agent.state == "ier_complete"
-
-    # source: request
-    agent.state = 'request'
-    agent.lowNLConf()
-    assert agent.state == 'confirm'
-
-    agent.state = 'request'
-    agent.highNLConf_noMissing()
-    assert agent.state == 'ier_complete'
-
-    # source: ier_complete
-    agent.state = 'ier_complete'
-    agent.maskMissing()
-    assert agent.state == 'query_cv_engine'
-
-    agent.state = 'ier_complete'
-    agent.noMaskMissing()
-    assert agent.state == 'execute_api'
-
-    # source: query_cv_engine
-    agent.state = 'query_cv_engine'
-    agent.lowCVConf()
-    assert agent.state == 'ask_user_label'
-
-    agent.state = 'query_cv_engine'
-    agent.highCVConf()
-    assert agent.state == 'ier_complete'
-
-    # source: ask_user_label
-    agent.state = 'ask_user_label'
-    agent.hasLabel()
-    assert agent.state == 'ier_complete'
-
-    agent.state = 'ask_user_label'
-    agent.noLabel()
-    assert agent.state == 'ask_ier'
-
-    # source: execute_api
-    agent.state = 'execute_api'
-    agent.result()
-    assert agent.state == 'ask_ier'
+from iedsp.user import AgendaBasedUserSimulator
 
 
 def test_dialogue_flow_and_dialogue_act():
-    """ Here the agent interacts with user acts
+    """ Here the system parleys with user acts
     """
+    config = configparser.ConfigParser()
+    config.read('config.dev.ini')
 
-    agent = RuleBasedDialogueManager()
-    photoshop = SimplePhotoshopAPI()
-    agent.reset()
+    user = AgendaBasedUserSimulator(config["USER"])
+    system = RuleBasedDialogueManager(config["SYSTEM"])
+    photoshop = PhotoshopGateway(config["PHOTOSHOP"])
+    system.reset()
     photoshop.reset()
 
-    def interact(observation, agent, photoshop):
-        print("User", user_template_nlg(observation['user_acts']))
+    turn_idx = 0
+
+    def parley(observation, system, photoshop, turn_idx):
+        print("Turn", turn_idx)
+        print("User", user.template_nlg(observation['user_acts']))
 
         photoshop_act = photoshop.act()
 
-        agent.observe(photoshop_act)
-        agent.observe(observation)
-        agent_act = agent.act()
+        system.observe(photoshop_act)
+        system.observe(observation)
+        system_act = system.act()
 
-        print("Agent", agent_act['system_utterance'])
+        print("System", system_act['system_utterance'])
 
-        photoshop.observe(agent_act)
+        photoshop.observe(system_act)
         photoshop.act()
-        dialogue_acts = [a['dialogue_act'] for a in agent_act['system_acts']]
-        return dialogue_acts, agent.state
+        dialogue_acts = [a['dialogue_act']['value']
+                         for a in system_act['system_acts']]
+        return dialogue_acts
 
     # Turn 1
     observation = {
         'user_acts': [
-            {'dialogue_act': 'open',
+            {'dialogue_act': Hermes.build_slot_dict('dialogue_act', 'open', 1.),
              'slots': [
-                 {'slot': 'intent', 'value': 'open', 'conf': 1.0},
                  {'slot': 'image_path',
                   'value': '/Users/tzlin/Documents/code/SimplePhotoshop/images/3.jpg',
                   'conf': 1.0}
-             ]
-             }
-        ]
+            ]
+            }
+        ],
+        'episode_done': False,
     }
 
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['execute', 'greeting', 'ask']
-    assert agent_state == "ask_ier"
 
     # Turn 2
     observation = {
         'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': []}
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', 'undo', 0.5),
+                'slots': [],
+            }
+        ],
+        'episode_done': False,
+    }
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
+    assert dialogue_acts == ['confirm']
+
+    import pdb
+    pdb.set_trace()
+    # Turn 3
+    observation = {
+        'user_acts': [
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', UserAct.NEGATE, 0.9)
+            }
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
-    assert dialogue_acts == ['repeat']
-    assert agent_state == "ask_ier"
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
+    assert dialogue_acts == ['ask']
+
+    # Turn 2
+    observation = {
+        'user_acts': [
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', 'adjust', 0.5),
+                'slots': [
+                    Hermes.build_slot_dict('attribute', 'brightness', 1.0),
+                    Hermes.build_slot_dict('object', 'dog', 0.8)
+                ]
+            }
+        ],
+        'episode_done': False,
+    }
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
+    assert dialogue_acts == ['confirm']
 
     # Turn 3
     observation = {
         'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'intent', 'value': 'select_object', 'conf': 1.0},
-                 {'slot': 'object', 'value': 'dog', 'conf': 0.7},
-             ]
-             }
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', UserAct.AFFIRM, 0.9)
+            }
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
-    assert dialogue_acts == ['confirm']
-    assert agent_state == "confirm"
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
+    assert dialogue_acts == ['request']
+    import pdb
+    pdb.set_trace()
 
     # Turn 4
     observation = {
@@ -203,9 +118,8 @@ def test_dialogue_flow_and_dialogue_act():
             {'dialogue_act': 'affirm'}
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['request_label']
-    assert agent_state == "ask_user_label"
 
     # Turn 5
     observation = {
@@ -218,9 +132,9 @@ def test_dialogue_flow_and_dialogue_act():
              },
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['execute', 'ask']
-    assert agent_state == "ask_ier"
+    assert system_state == "ask_ier"
 
     # Turn 6
     observation = {
@@ -233,9 +147,9 @@ def test_dialogue_flow_and_dialogue_act():
              }
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['confirm']
-    assert agent_state == "confirm"
+    assert system_state == "confirm"
 
     # Turn 7
     observation = {
@@ -247,9 +161,9 @@ def test_dialogue_flow_and_dialogue_act():
              ]}
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['request']
-    assert agent_state == "request"
+    assert system_state == "request"
 
     # Turn 8
     observation = {
@@ -260,9 +174,9 @@ def test_dialogue_flow_and_dialogue_act():
              ]}
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['execute', 'ask']
-    assert agent_state == "ask_ier"
+    assert system_state == "ask_ier"
 
     # Turn 9
     observation = {
@@ -273,9 +187,9 @@ def test_dialogue_flow_and_dialogue_act():
              ]},
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['execute', 'ask']
-    assert agent_state == "ask_ier"
+    assert system_state == "ask_ier"
 
     # Turn 10
     observation = {
@@ -283,6 +197,6 @@ def test_dialogue_flow_and_dialogue_act():
             {'dialogue_act': 'bye'},
         ]
     }
-    dialogue_acts, agent_state = interact(observation, agent, photoshop)
+    dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['bye']
-    assert agent_state == "end_session"
+    assert system_state == "end_session"
