@@ -70,8 +70,6 @@ def test_dialogue_flow_and_dialogue_act():
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['confirm']
 
-    import pdb
-    pdb.set_trace()
     # Turn 3
     observation = {
         'user_acts': [
@@ -83,7 +81,7 @@ def test_dialogue_flow_and_dialogue_act():
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['ask']
 
-    # Turn 2
+    # Turn 4
     observation = {
         'user_acts': [
             {
@@ -99,7 +97,7 @@ def test_dialogue_flow_and_dialogue_act():
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['confirm']
 
-    # Turn 3
+    # Turn 5
     observation = {
         'user_acts': [
             {
@@ -109,94 +107,34 @@ def test_dialogue_flow_and_dialogue_act():
     }
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['request']
-    import pdb
-    pdb.set_trace()
-
-    # Turn 4
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'affirm'}
-        ]
-    }
-    dialogue_acts = parley(observation, system, photoshop, turn_idx)
-    assert dialogue_acts == ['request_label']
-
-    # Turn 5
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'intent', 'value': 'select_object_mask_id', 'conf': 1.0},
-                 {'slot': 'object_mask_id', 'value': "1", 'conf': 1.0}
-             ]
-             },
-        ]
-    }
-    dialogue_acts = parley(observation, system, photoshop, turn_idx)
-    assert dialogue_acts == ['execute', 'ask']
-    assert system_state == "ask_ier"
 
     # Turn 6
     observation = {
         'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'intent', 'value': 'adjust', 'conf': 0.9},
-                 {'slot': 'attribute', 'value': 'brightness', 'conf': 0.7},
-             ]
-             }
-        ]
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', 'adjust', 0.5),
+                'slots': [
+                    Hermes.build_slot_dict('attribute', 'brightness', 1.0),
+                    Hermes.build_slot_dict('object', 'dog', 0.8)
+                ]
+            }
+        ],
+        'episode_done': False,
     }
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
+
     assert dialogue_acts == ['confirm']
-    assert system_state == "confirm"
 
     # Turn 7
     observation = {
         'user_acts': [
-            {'dialogue_act': 'negate'},
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'attribute', 'value': 'contrast', 'conf': 0.8}
-             ]}
+            {
+                'dialogue_act': Hermes.build_slot_dict('dialogue_act', UserAct.AFFIRM, 0.9)
+            }
         ]
     }
     dialogue_acts = parley(observation, system, photoshop, turn_idx)
     assert dialogue_acts == ['request']
-    assert system_state == "request"
 
-    # Turn 8
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'adjustValue', 'value': '30', 'conf': 0.8}
-             ]}
-        ]
-    }
-    dialogue_acts = parley(observation, system, photoshop, turn_idx)
-    assert dialogue_acts == ['execute', 'ask']
-    assert system_state == "ask_ier"
-
-    # Turn 9
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'inform',
-             'slots': [
-                 {'slot': 'intent', 'value': 'undo', 'conf': 0.8}
-             ]},
-        ]
-    }
-    dialogue_acts = parley(observation, system, photoshop, turn_idx)
-    assert dialogue_acts == ['execute', 'ask']
-    assert system_state == "ask_ier"
-
-    # Turn 10
-    observation = {
-        'user_acts': [
-            {'dialogue_act': 'bye'},
-        ]
-    }
-    dialogue_acts = parley(observation, system, photoshop, turn_idx)
-    assert dialogue_acts == ['bye']
-    assert system_state == "end_session"
+    import pdb
+    pdb.set_trace()

@@ -110,7 +110,7 @@ class SimplePhotoshopClient(object):
         """Stores the api for connection
         """
         # Configuration
-        self.photoshop_uri = config["PHOTOSHOP_URI"]
+        self.photoshop_uri = config["SPS_URI"]
 
         self.edit_url = urljoin(self.photoshop_uri, "edit")
         self.control_url = urljoin(self.photoshop_uri, "/control")

@@ -79,12 +79,9 @@ class RuleBasedDialogueManager(object):
         """
         # Here we implement a rule-based policy
         system_acts = []
-
+        print("Policy")
         self.state.print_stack()
         self.state.print_goals()
-        print("Policy")
-        import pdb
-        pdb.set_trace()
         if len(self.state.confirm_slots) > 0:
             sys_act = Hermes.build_act(
                 SystemAct.CONFIRM, self.state.confirm_slots[:1])
@@ -119,8 +116,6 @@ class RuleBasedDialogueManager(object):
             # Execute intent, pop from domain
             self.state.clear_goals()
             self.state.domain_stack.pop()
-            import pdb
-            pdb.set_trace()
         else:
             sys_act = Hermes.build_act(SystemAct.ASK)
             system_acts += [sys_act]
@@ -186,7 +181,7 @@ class RuleBasedDialogueManager(object):
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
 
-                slot_list = [slot['slot'] + "=" + slot['value']
+                slot_list = [slot['slot'] + "=" + str(slot['value'])
                              for slot in execute_slots]
                 utt = "Execute: " + ', '.join(slot_list)
             elif sys_dialogue_act == SystemAct.BYE:
