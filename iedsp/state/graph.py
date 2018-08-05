@@ -82,6 +82,10 @@ class BeliefNode(object):
         if not isinstance(conf, float) or not 0 <= conf <= 1:
             return False
 
+        # A new value observed indicates that previous value should have lower confidence
+        for key in self.value_conf_map:
+            self.value_conf_map[key] -= 0.1
+
         # Simply assign confidence for now
         self.value_conf_map[value] = conf
         self.last_update_turn_id = turn_id
@@ -297,20 +301,7 @@ class ObjectMaskNode(BeliefNode):
         super(ObjectMaskNode, self).__init__(
             name, threshold, possible_values, validator)
 
-        # vision engine to query from
         self.cvengine = cvengine
-
-    def add_observation(self, value, conf, turn_id):
-        """
-        Confidence 1.0 values flush out non confidence 1.0 values
-        """
-        prev_value_conf_map = copy.deepcopy(self.value_conf_map)
-        self.value_conf_map = {}
-        result = super(ObjectMaskNode, self).add_observation(
-            value, conf, turn_id)
-        if not result:
-            self.value_conf_map = prev_value_conf_map
-        return True
 
     def pull(self):
         """
@@ -374,9 +365,7 @@ class ObjectMaskNode(BeliefNode):
             # object_mask_id needs to be confirmed.
             # It is requested by the label action
             object_mask_id_intent = object_mask_id_node.pull()
-            if not object_mask_id_intent.executable():
-                self.intent = self._build_slot_intent()  # Label again...
-            else:
+            if object_mask_id_intent.executable():
                 # Get the object_mask_id and update current mask_strs
                 object_mask_id = int(object_mask_id_node.get_max_value())
                 if object_mask_id < len(self.value_conf_map):
@@ -384,9 +373,11 @@ class ObjectMaskNode(BeliefNode):
                     mask_str, conf = candidates[object_mask_id]
 
                     self.value_conf_map.clear()
-                    self.add_observation(mask_str, 1.0, self.last_update_turn_id)
+                    self.add_observation(
+                        mask_str, 1.0, self.last_update_turn_id)
 
-                self.intent = self._build_slot_intent()
+            # Label or Execute, depend on the confidence of the mask strs
+            self.intent = self._build_slot_intent()
 
         return self.intent
 
@@ -400,11 +391,13 @@ class ObjectMaskNode(BeliefNode):
         if len(self.value_conf_map) == 0:
             mask_str_slot = build_slot_dict('mask_str')
             intent.label_slots.append(mask_str_slot)
-        else:
-            for mask_str, conf in self.value_conf_map.items():
-                mask_str_slot = build_slot_dict('mask_str', mask_str, conf)
-                if conf < self.threshold:
-                    intent.label_slots.append(mask_str_slot)
-                else:
-                    intent.execute_slots.append(mask_str_slot)
+            return intent
+
+        for mask_str, conf in self.value_conf_map.items():
+            mask_str_slot = build_slot_dict('mask_str', mask_str, conf)
+            if conf < self.threshold:
+                intent.label_slots.append(mask_str_slot)
+            else:
+                intent.execute_slots.append(mask_str_slot)
+
         return intent

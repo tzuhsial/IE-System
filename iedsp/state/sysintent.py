@@ -90,6 +90,9 @@ class SysIntent(object):
         print('execute', self.execute_slots)
 
     def executable(self):
+        """
+        Returns True iff all slots are executable
+        """
         if len(self.confirm_slots) != 0:
             return False
         if len(self.request_slots) != 0:

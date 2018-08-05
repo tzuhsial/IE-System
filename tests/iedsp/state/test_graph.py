@@ -12,7 +12,7 @@ def test_beliefnode():
     assert node.last_update_turn_id == 1
 
     node.add_observation('b', 0.3, 2)
-    assert node.get_max_conf_value() == ('a', 0.5)
+    assert node.get_max_conf_value() == ('a', 0.4)
     assert node.last_update_turn_id == 2
 
     node.add_observation('c', 1.0, 3)
@@ -91,6 +91,12 @@ def test_intent_pull():
     assert image_path.intent == SysIntent(
         execute_slots=[build_slot_dict('image_path', 'ip2', 1.0)])
 
+    # turn 3
+    turn_id = 3
+    open_intent = open.pull()
+    assert image_path.intent == SysIntent(
+        execute_slots=[build_slot_dict('image_path', 'ip2', 1.0)])
+
 
 def test_select_object_domain():
     # select_object_domain
@@ -162,9 +168,9 @@ def test_select_object_domain():
     assert len(select_intent.execute_slots) == 0
 
     # Turn 3:
+    # Photoshop: [0th dog] (only 1 dog is identified)
     # User: The 1st dog: label(object_mask_id=0)
-    # System: I cannot find what you want. Can you label it for me? request_label
-    # Only one mask is identified
+    # System: Can you label it for me? request_label
     turn_id = 3
     object_mask_id_slot.add_observation('1', 1.0, turn_id)
 
