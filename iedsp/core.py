@@ -10,17 +10,11 @@ class Agent:
 
 class UserAct:
     """
-    User dialogue acts, a.k.a User Intents
+    User Dialogue Acts 
     """
-    # Domain Acts
     OPEN = "open"
-    LOAD = "load"
-    ADJUST = "adjust"
-    REDO = "redo"
-    UNDO = "undo"
+    INFORM = "inform"
     CLOSE = "close"
-
-    # Confirm Acts
     AFFIRM = "affirm"
     NEGATE = "negate"
 
@@ -32,18 +26,18 @@ class UserAct:
         return [UserAct.AFFIRM, UserAct.NEGATE]
 
     @staticmethod
-    def domain_acts():
+    def intent_acts():
         """
         Actions that are in the image editing domain
         """
-        return [UserAct.OPEN, UserAct.LOAD, UserAct.ADJUST, UserAct.REDO, UserAct.UNDO, UserAct.CLOSE]
-    
+        return [UserAct.OPEN, UserAct.INFORM, UserAct.CLOSE]
+
     @staticmethod
     def photoshop_acts():
         """
         Actions that users directly interact with Photoshop
         """
-        return [UserAct.OPEN, UserAct.LOAD, UserAct.CLOSE]
+        return [UserAct.OPEN, UserAct.CLOSE]
 
 
 class SystemAct:
@@ -62,56 +56,3 @@ class SystemAct:
     REQUEST_CV = "request_cv"
     CONFIRM_CV = "confirm_cv"
     BYE = "bye"
-
-
-class Hermes:
-    """
-    Hermes, the emissary of Gods, is a utility class to help
-    - user build 1. action 2. goals
-    - system build 1. action
-
-    and provides build functions for
-    - 1. action
-    - 2. slot_dict
-
-    TODO: validate functions
-    """
-    @staticmethod
-    def build_act(dialogue_act, slots=None):
-        """
-        Act
-        {
-            'dialogue_act': {
-                'value': intent, 'conf': intent_conf,
-            },
-            'slots': [
-                { 'slot': s1, 'value': v1 },
-                { 'slot': s2, 'value': v2 }
-            ]
-            'speaker': speaker,
-        }
-        """
-        obj = {}
-        obj['dialogue_act'] = Hermes.build_slot_dict(
-            'dialogue_act', dialogue_act)
-        if slots is not None:
-            obj['slots'] = slots
-        return obj
-
-    @staticmethod
-    def build_slot_dict(slot, value=None, conf=None):
-        """
-        Slot dict format
-        {
-            'slot' : s1,
-            'value': v1,
-            'conf' : c1
-        }
-        """
-        obj = {}
-        obj['slot'] = slot
-        if value is not None:
-            obj['value'] = value
-        if conf is not None:
-            obj['conf'] = conf 
-        return obj

@@ -14,7 +14,7 @@ def is_uri(uri):
 def is_probability(number):
     try:
         number = float(number)
-        return number >= 0 and number <= 1
+        return 0. <= number <= 1.
     except ValueError:
         return False
 
@@ -25,3 +25,6 @@ def is_str(object):
 
 def is_int(object):
     return isinstance(object, int)
+
+def is_list(object):
+    return isinstance(object, list)
