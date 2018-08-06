@@ -1,31 +1,18 @@
-
-from ..ontology import OntologyPortal
-from .visionengine import VisionEnginePortal
+from ..core import SystemAct
+from .state import StatePortal
 from ..util import find_slot_with_key
-
-
-def SystemPortal(config):
-
-    visionengine = VisionEnginePortal(config['VISIONENGINE'])
-    ontology = OntologyPortal(config["ONTOLOGY"])
-    ontology.load_visionengine(visionengine)
-
-
-    pass
 
 
 class System(object):
     """
+    Mainly handles the interactions with the environment
+
     Attributes:
-        ontology (object)
-        observation (dict)
+        state 
     """
 
-    def __init__(self, config):
-
-        self.state = None
-        # Storing stuff
-        self.observation = {}
+    def __init__(self, global_config):
+        self.state = StatePortal(global_config)
 
     def reset(self):
         """ 
@@ -48,14 +35,16 @@ class System(object):
         Update dialogue state with user_acts
         """
         # State Update
-        user_acts = self.observation.get('user_acts')
+        user_acts = self.observation.get('user_acts', list())
         for user_act in user_acts:
             # Usually have only one user_act
-            user_dialogue_act = user_act['dialogue_act']
-            user_intent = user_act['intent']
-            user_slots = user_act.get('slots')
-            self.state.update(
-                user_dialogue_act, user_intent, user_slots, self.turn_id)
+            args = {
+                'dialogue_act': user_act['dialogue_act'],
+                'intent': user_act['intent'],
+                'slots': user_act['slots'],
+                'turn_id': self.turn_id
+            }
+            self.state.update(**args)
 
     def policy(self):
         """
@@ -64,7 +53,15 @@ class System(object):
             system_acts (list): list of sys_acts
         """
         # Here we implement a rule-based policy
-        pass
+        sysintent = self.state.pull()
+        if len(sysintent.label_slots):
+            pass
+        elif len(sysintent.confirm_slots):
+            pass
+        elif len(sysintent.request_slots):
+            pass
+        elif len(sysintent.execute_slots):
+            pass
 
     def act(self):
         """ 
@@ -72,9 +69,6 @@ class System(object):
         Returns:
             system_act (dict)
         """
-
-        #b64_img_str = self.observation.get('b64_img_str', None)
-
         # Update state
         self.state_update()
 
@@ -86,7 +80,6 @@ class System(object):
         system_act['system_acts'] = system_acts
         system_act['system_utterance'] = self.template_nlg(system_acts)
         system_act['episode_done'] = self.observation['episode_done']
-        system_act['speaker'] = self.SPEAKER
         return system_act
 
     ###########################
@@ -104,12 +97,6 @@ class System(object):
                 utt = "Hello! My name is PS. I am here to help you edit your image!"
             elif sys_dialogue_act == SystemAct.ASK:
                 utt = "What would you like to do?"
-            elif sys_dialogue_act == SystemAct.OOD_NL:
-                utt = "Sorry, Photoshop currently does not support this function."
-            elif sys_dialogue_act == SystemAct.OOD_CV:
-                utt = "Sorry, Photoshop's CV engine cannot find what you are looking for."
-            elif sys_dialogue_act == SystemAct.REPEAT:
-                utt = "Can you please repeat again?"
             elif sys_dialogue_act == SystemAct.REQUEST:
                 request_slots = [s['slot'] for s in sys_act['slots']]
                 utt = "What " + ', '.join(request_slots) + " do you want?"

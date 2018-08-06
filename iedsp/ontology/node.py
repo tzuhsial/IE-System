@@ -3,7 +3,7 @@ import copy
 import logging
 import sys
 
-from ..system import SysIntent
+from ..core import SysIntent
 from ..util import build_slot_dict, find_slot_with_key, slots_to_args
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class BeliefNode(object):
         validator (function): a function to validate the values
     """
 
-    def __init__(self, name, threshold=0.8, possible_values=None, validator=None, **kwargs):
+    def __init__(self, name, threshold=0.7, possible_values=None, validator=None, **kwargs):
         """
         Args:
             name (str): slot name

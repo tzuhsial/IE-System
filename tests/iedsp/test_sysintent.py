@@ -1,4 +1,4 @@
-from iedsp.state.sysintent import SysIntent
+from iedsp.core import SysIntent
 
 
 def test_systemintent():
@@ -6,7 +6,6 @@ def test_systemintent():
     # Define variables
     i1 = SysIntent([], [2], [], [4])
     i2 = SysIntent([1], [], [3], [])
-
 
     assert not i1.empty()
 

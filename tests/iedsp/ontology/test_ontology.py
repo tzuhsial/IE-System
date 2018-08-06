@@ -9,14 +9,11 @@ def test_ontology():
     """
 
     ontology_file = "imageedit.ontology.json"
-
-    ontology_config = {"ONTOLOGY_FILE": ontology_file}
-
+    ontology_json = util.load_from_json(ontology_file)
     visionengine = None
 
-    engine = OntologyEngine(visionengine, ontology_config)
+    engine = OntologyEngine(visionengine, ontology_json)
 
-    ontology_json = util.load_from_json(ontology_file)
     for intent_json in ontology_json["intents"]:
         assert intent_json["name"] in engine.intents
 

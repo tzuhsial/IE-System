@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import requests
 import urllib.parse
@@ -6,15 +7,10 @@ import urllib.parse
 logger = logging.getLogger(__name__)
 
 
-def VisionEnginePortal(config):
-    client = config['VISIONENGINE_CLIENT']
-    if client == "MingYang":
-        return MingYangClient(config)
-    elif client == "Mask_RCNN":
-        return MaskRCNNClient(config)
-    else:
-        raise ValueError
-
+def VisionEnginePortal(visionengine_config):
+    client = visionengine_config['VISIONENGINE_CLIENT']
+    uri = visionengine_config["VISIONENGINE_URI"]
+    return builder(client)(uri)
 
 class BaseVisionEngineClient(object):
     """
@@ -24,8 +20,8 @@ class BaseVisionEngineClient(object):
         self.uri (str): uri that needs to be queried
     """
 
-    def __init__(self, config):
-        self.visionengine_uri = config["VISIONENGINE_URI"]
+    def __init__(self, visionengine_uri):
+        self.visionengine_uri = visionengine_uri
 
     def select_object(self, b64_img_str, object, position=None, adjective=None, color=None):
         """ 
@@ -119,3 +115,10 @@ class MaskRCNNClient(BaseVisionEngineClient):
             mask_strs = []
 
         return mask_strs
+
+
+def builder(string):
+    """
+    Gets visionengine class with string
+    """
+    return getattr(sys.modules[__name__], string)
