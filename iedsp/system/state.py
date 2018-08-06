@@ -96,9 +96,9 @@ class State(object):
         # Update current intent
         if self.framestack.top().name == unknown_keyword:
             # Check confidence of current intent
-
+            pass
         else:  # Has some undone intent
-
+            pass
         pass
 
     def update_slots(self, slots, turn_id):

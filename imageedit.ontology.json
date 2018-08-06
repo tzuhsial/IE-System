@@ -1,0 +1,154 @@
+{
+    "intents": [
+        {
+            "name": "open",
+            "node": "IntentNode",
+            "children": [
+                {
+                    "name": "image_path",
+                    "optional": false
+                }
+            ]
+        },
+        {
+            "name": "load",
+            "node": "IntentNode",
+            "children": [
+                {
+                    "name": "b64_img_str",
+                    "optional": false
+                }
+            ]
+        },
+        {
+            "name": "select_object",
+            "node": "IntentNode",
+            "children": [
+                {
+                    "name": "object_mask",
+                    "optional": false
+                }
+            ]
+        },
+        {
+            "name": "adjust",
+            "node": "IntentNode",
+            "children": [
+                {
+                    "name": "object_mask",
+                    "optional": false
+                },
+                {
+                    "name": "attribute",
+                    "optional": false
+                },
+                {
+                    "name": "adjust_value",
+                    "optional": false
+                }
+            ]
+        },
+        {
+            "name": "undo",
+            "node": "IntentNode",
+            "children": []
+        },
+        {
+            "name": "redo",
+            "node": "IntentNode",
+            "children": []
+        },
+        {
+            "name": "close",
+            "node": "IntentNode",
+            "children": []
+        }
+    ],
+    "slots": [
+        {
+            "name": "image_path",
+            "node": "PSToolNode",
+            "threshold": 1.0,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "b64_img_str",
+            "node": "PSToolNode",
+            "threshold": 1.0,
+            "children": []
+        },
+        {
+            "name": "attribute",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "adjust_value",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "object",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": [
+                {
+                    "name": "position",
+                    "optional": true
+                },
+                {
+                    "name": "adjective",
+                    "optional": true
+                }
+            ]
+        },
+        {
+            "name": "object_mask",
+            "node": "ObjectMaskNode",
+            "threshold": 1.0,
+            "possible_values": null,
+            "use_visionengine": true,
+            "children": [
+                {
+                    "name": "b64_img_str",
+                    "optional": false
+                },
+                {
+                    "name": "object",
+                    "optional": false
+                },
+                {
+                    "name": "object_mask_id",
+                    "optional": false
+                }
+            ]
+        },
+        {
+            "name": "object_mask_id",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "position",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "adjective",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        }
+    ]
+}

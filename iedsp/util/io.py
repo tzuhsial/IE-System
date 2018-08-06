@@ -19,6 +19,15 @@ def load_from_pickle(filepath):
     return obj
 
 
+def save_to_json(obj, filepath):
+    with open(filepath, 'w') as fout:
+        json.dump(obj, fout)
+
+def load_from_json(filepath):
+    with open(filepath, 'r') as fin:
+        obj = json.loads(fin.read())
+    return obj
+
 def save_to_jsonlines(list_of_json, filepath):
     with open(filepath, 'w') as fout:
         for json_obj in list_of_json:

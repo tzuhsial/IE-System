@@ -1,13 +1,26 @@
 
-from iedsp.ontology import ImageEditOntology
+from iedsp.ontology import OntologyEngine
+from iedsp import util
 
 
-def test_create():
+def test_ontology():
     """
-    Test whether we can successfully create intent tree, for now.
+    Build ontology from slot dependencies
     """
-    ontology = ImageEditOntology({})
 
-    for intent in ["unknown", "open", "load", "close", "select_object", "adjust", "undo", "redo"]:
-        tree = ontology.create(intent)
-        assert tree.name == intent
+    ontology_file = "imageedit.ontology.json"
+
+    ontology_config = {"ONTOLOGY_FILE": ontology_file}
+
+    visionengine = None
+
+    engine = OntologyEngine(visionengine, ontology_config)
+
+    ontology_json = util.load_from_json(ontology_file)
+    for intent_json in ontology_json["intents"]:
+        assert intent_json["name"] in engine.intents
+
+    for slot_json in ontology_json["slots"]:
+        assert slot_json["name"] in engine.slots
+
+    # TODO: validate engine dependency graph, or validate ontology_file

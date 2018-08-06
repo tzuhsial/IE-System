@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import copy
 import logging
+import sys
 
 from ..system import SysIntent
 from ..util import build_slot_dict, find_slot_with_key, slots_to_args
@@ -25,7 +26,7 @@ class BeliefNode(object):
         validator (function): a function to validate the values
     """
 
-    def __init__(self, name, threshold=0.8, possible_values=None, validator=None):
+    def __init__(self, name, threshold=0.8, possible_values=None, validator=None, **kwargs):
         """
         Args:
             name (str): slot name
@@ -213,7 +214,7 @@ class IntentNode(BeliefNode):
         intent (SysIntent)
     """
 
-    def __init__(self, name):
+    def __init__(self, name, **kwargs):
         self.name = name
 
         self.children = {}
@@ -268,7 +269,7 @@ class PSToolNode(BeliefNode):
     A node that allows only one value with 100% confidence
     """
 
-    def __init__(self, name, threshold=1.0, possible_values=None, validator=None):
+    def __init__(self, name, threshold=1.0, possible_values=None, validator=None, **kwargs):
         """
         Threshold should always be 1.0, and no restriction on possible values
         """
@@ -312,11 +313,12 @@ class ObjectMaskNode(BeliefNode):
         visionengine (object): shared visionengine object to perform select_object queries
     """
 
-    def __init__(self, name="object_mask", threshold=0.8, possible_values=None, validator=None, visionengine=None):
+    def __init__(self, name="object_mask", threshold=0.8, possible_values=None, validator=None, visionengine=None, **kwargs):
         assert name == "object_mask", "name should be ObjectMaskNode"
         super(ObjectMaskNode, self).__init__(
             name, threshold, possible_values, validator)
-
+        if visionengine is None:
+            logger.warning("ObjectMaskNode.visionengine is not loaded!")
         self.visionengine = visionengine
 
     def pull(self):
@@ -418,3 +420,10 @@ class ObjectMaskNode(BeliefNode):
                 intent.execute_slots.append(mask_str_slot)
 
         return intent
+
+
+def builder(string):
+    """
+    Gets node class with string
+    """
+    return getattr(sys.modules[__name__], string)
