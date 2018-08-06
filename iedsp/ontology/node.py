@@ -2,17 +2,10 @@ from collections import OrderedDict
 import copy
 import logging
 
-from .sysintent import SysIntent
+from ..system import SysIntent
 from ..util import build_slot_dict, find_slot_with_key, slots_to_args
 
-
-def set_depth_with_dfs(node, depth=1):
-    """
-    Set depth of every node starting from root
-    """
-    node.depth = depth
-    for node_name, child_node in node.children.items():
-        set_depth_with_dfs(child_node, depth+1)
+logger = logging.getLogger(__name__)
 
 
 class BeliefNode(object):
@@ -21,7 +14,7 @@ class BeliefNode(object):
     When pulled, addes the intent of current node
     Example:
     ```
-    slot = BeliefNode("adjust_value", ["more", "less"], False)
+    adjust_value_node = BeliefNode("adjust_value", ["more", "less"], False)
     ```
     Attrbutes:
         name (str): name of the slot
@@ -53,14 +46,13 @@ class BeliefNode(object):
         # Dependency Graph Related
         self.children = {}
         self.optional = {}
-        self.depth = None
 
         # System Intents
         self.intent = SysIntent()
 
     def clear(self):
         """
-        Resets last_update_turn_id and value_conf_map
+        Set last_update_turn_id to 0 and clears value_conf_map
         """
         self.last_update_turn_id = 0
         self.value_conf_map = {v: 0. for v in self.possible_values}
@@ -93,8 +85,9 @@ class BeliefNode(object):
 
     def get_max_conf_value(self):
         """
+        Returns the value & confidence pair with max confidence
         Returns:
-            value (str):
+            value (obj):
             conf (float):
         """
         if len(self.value_conf_map) == 0:
@@ -129,7 +122,10 @@ class BeliefNode(object):
     #########################
     def add_child(self, node, optional=False):
         """
-        adds child to self's pull nodes
+        adds children 
+        Args:
+            node (obj): the child node to be added
+            optional (bool): whether this child is optional
         """
         if node.name not in self.children:
             self.children[node.name] = node
@@ -166,7 +162,7 @@ class BeliefNode(object):
 
     def _build_slot_intent(self):
         """
-        Construct intent with the value of the slot
+        Construct intent with the value of the slot node
         """
         intent = SysIntent()
         slot = self.to_json()
@@ -195,7 +191,7 @@ class BeliefNode(object):
                 child_intent = child.pull()
                 optional = self.optional[child_name]
                 if optional:
-                    child_intent.request_slots = []
+                    child_intent.request_slots = []  # Optional child node's request slots is empty!
                 children_intent += child_intent
 
             update_turn_id = max(child.last_update_turn_id, update_turn_id)
@@ -207,29 +203,51 @@ class IntentNode(BeliefNode):
     """
     Serves as root of a intent tree
     Does not store any sysintent values, only from children
+    Also provides convenient access to every slot node in the tree
     Attributes:
         name (str)
-        depth (int)
-        pull_nodes (dict)
-        intent (object)
+        children (dict)
+        optional (dict)
+        node_dict (dict)
+        last_update_turn_id (int)
+        intent (SysIntent)
     """
 
     def __init__(self, name):
         self.name = name
 
-        self.depth = None
-
         self.children = {}
         self.optional = {}
+
+        self.node_dict = {}
 
         self.last_update_turn_id = 0
 
         self.intent = SysIntent()
 
+    def build_node_dict(self):
+        """
+        Builds a dictionary with slot name as key and node as value
+        Returns:
+            node_dict (dict): slot name as key and node as value
+        """
+        node_dict = {}
+        queue = []
+        queue.append(self)
+        while len(queue):
+            node = queue.pop(0)
+            node_dict[node.name] = node
+            queue += list(node.children.values())
+        self.node_dict = node_dict
+        return self.node_dict
+
     def add_observation(self):
         raise NotImplementedError
 
     def clear(self):
+        """
+        Clear the values & intent of the tree
+        """
         raise NotImplementedError
 
     def get_max_conf_value(self):
@@ -264,7 +282,7 @@ class PSToolNode(BeliefNode):
         Only one value can be present at the time
         """
         if conf < 1.0:
-            logging.error(
+            logger.error(
                 "PSToolNode {} observed confidence less than 1.0!".format(self.name))
             return False
         prev_value_conf_map = copy.deepcopy(self.value_conf_map)
@@ -284,8 +302,6 @@ class ObjectMaskNode(BeliefNode):
     2. object
     3. object_mask_id
 
-    The value of object_mask is actually a list of b64_img_strs
-
     Attrbutes:
         name (str): name of the slot
         possible_values (list): list of valid values for this particular node
@@ -293,15 +309,15 @@ class ObjectMaskNode(BeliefNode):
         last_update_turn_id (int): the last turn this slot was modified
         permit_new (bool): whether this BeliefSlot permits new slots
         validator (function): a function to validate the values
-        cvengine (object): shared cvengine object to perform selection queries
+        visionengine (object): shared visionengine object to perform select_object queries
     """
 
-    def __init__(self, name="object_mask", threshold=0.8, possible_values=None, validator=None, cvengine=None):
+    def __init__(self, name="object_mask", threshold=0.8, possible_values=None, validator=None, visionengine=None):
         assert name == "object_mask", "name should be ObjectMaskNode"
         super(ObjectMaskNode, self).__init__(
             name, threshold, possible_values, validator)
 
-        self.cvengine = cvengine
+        self.visionengine = visionengine
 
     def pull(self):
         """
@@ -323,12 +339,12 @@ class ObjectMaskNode(BeliefNode):
         # Since object_mask is internal,
         # we first update its turn_id to the latest according to its child nodes
         self.last_update_turn_id = max(
-            object_node.last_update_turn_id, object_mask_id_node.last_update_turn_id)
+            self.last_update_turn_id, object_node.last_update_turn_id, object_mask_id_node.last_update_turn_id)
 
         # Special case, where both child nodes are updated
         if object_node.last_update_turn_id >= self.last_update_turn_id and \
            object_mask_id_node.last_update_turn_id >= self.last_update_turn_id:
-            logging.warning(
+            logger.warning(
                 "object and object_mask_id are both updated at the same turn!")
             # In fact, this case is handled by forcing object_mask_id_slot
             # to be cleared when we query the cv engine
@@ -353,7 +369,7 @@ class ObjectMaskNode(BeliefNode):
 
                 query_args = slots_to_args(object_intent.execute_slots)
                 query_args['b64_img_str'] = b64_img_str
-                mask_strs = self.cvengine.select_object(**query_args)
+                mask_strs = self.visionengine.select_object(**query_args)
 
                 for mask_str in mask_strs:
                     self.add_observation(
@@ -365,6 +381,7 @@ class ObjectMaskNode(BeliefNode):
             # object_mask_id needs to be confirmed.
             # It is requested by the label action
             object_mask_id_intent = object_mask_id_node.pull()
+
             if object_mask_id_intent.executable():
                 # Get the object_mask_id and update current mask_strs
                 object_mask_id = int(object_mask_id_node.get_max_value())

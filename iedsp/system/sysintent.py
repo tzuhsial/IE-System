@@ -2,6 +2,10 @@ from ..util import sort_slots_with_key
 
 
 class SysIntent(object):
+    """
+    A utility object for system intent slots
+    """
+
     def __init__(self, confirm_slots=None, request_slots=None, label_slots=None, execute_slots=None):
         """
         default argument cannot be list -> a bug that fucked me for 2 days...

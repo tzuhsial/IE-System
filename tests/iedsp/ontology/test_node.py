@@ -1,5 +1,5 @@
-from iedsp.cvengine import CVEngineClient
-from iedsp.state.graph import *
+from iedsp.system.visionengine import DummyClient
+from iedsp.ontology.node import *
 from iedsp.util import build_slot_dict, sort_slots_with_key
 from iedsp.util import imread, img_to_b64
 
@@ -62,11 +62,6 @@ def test_intent_pull():
     assert open.add_child(image_path) == True
     assert open.add_child(image_path) == False
 
-    # set_depth
-    set_depth_with_dfs(open)
-    assert open.depth == 1
-    assert image_path.depth == 2
-
     # turn 0
     open_intent = open.pull()
     assert open_intent == SysIntent(
@@ -98,13 +93,13 @@ def test_intent_pull():
         execute_slots=[build_slot_dict('image_path', 'ip2', 1.0)])
 
 
-def test_select_object_domain():
+def test_select_object_intent():
     # select_object_domain
     select = IntentNode('select_object')
 
     # object_mask_slot
-    cvengine = CVEngineClient('http://isupreme:5100')
-    object_mask_slot = ObjectMaskNode('object_mask', cvengine=cvengine)
+    visionengine = DummyClient({'VISIONENGINE_URI': 'http://isupreme:5100'})
+    object_mask_slot = ObjectMaskNode('object_mask', visionengine=visionengine)
 
     b64_img_str_slot = PSToolNode('b64_img_str')
     object_slot = BeliefNode('object')
@@ -184,6 +179,7 @@ def test_select_object_domain():
     # User: The 0th dog: label(object_mask_id=0)
     # System: Ok, what would you like to do? : ask(intent=?)
     turn_id = 4
+    object_mask_slot.add_observation(b64_img_str, 1.0, turn_id)
     object_mask_id_slot.add_observation('0', 1.0, turn_id)
 
     select_intent = select.pull()

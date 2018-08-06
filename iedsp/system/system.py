@@ -1,33 +1,29 @@
-from ..cvengine import CVEngineClient
-from ..core import Agent, SystemAct, UserAct, Hermes
-from ..dialoguestate import DialogueState
-from ..ontology import getOntologyWithName
+
+from ..ontology import OntologyPortal
+from .visionengine import VisionEnginePortal
 from ..util import find_slot_with_key
 
 
-class RuleBasedDialogueManager(object):
-    """
-    Rule based dialogue manager
+def SystemPortal(config):
 
+    visionengine = VisionEnginePortal(config['VISIONENGINE'])
+    ontology = OntologyPortal(config["ONTOLOGY"])
+    ontology.load_visionengine(visionengine)
+
+
+    pass
+
+
+class System(object):
+    """
     Attributes:
-        confirm_threshold (float): the confidence score that decides whether to confirm
-        cvengine (object): computer vision engine client
         ontology (object)
-        dialogueState (object)
         observation (dict)
     """
 
-    SPEAKER = Agent.SYSTEM
-
     def __init__(self, config):
-        super(RuleBasedDialogueManager, self).__init__()
 
-        # Configurations
-        self.cvengine = CVEngineClient(config['CVENGINE_URI'])
-
-        # Construct dialogue state based on Ontology
-        self.state = DialogueState(config)
-
+        self.state = None
         # Storing stuff
         self.observation = {}
 
@@ -56,20 +52,10 @@ class RuleBasedDialogueManager(object):
         for user_act in user_acts:
             # Usually have only one user_act
             user_dialogue_act = user_act['dialogue_act']
+            user_intent = user_act['intent']
             user_slots = user_act.get('slots')
             self.state.update(
-                user_dialogue_act, user_slots, self.turn_id)
-
-    def goals(self):
-        """
-        A simple getter from the dialogue state
-        """
-        goals = {}
-        goals['request'] = self.state.request_slots
-        goals['confirm'] = self.state.confirm_slots
-        goals['query'] = self.state.query_slots
-        goals['execute'] = self.state.execute_slots
-        return goals
+                user_dialogue_act, user_intent, user_slots, self.turn_id)
 
     def policy(self):
         """
@@ -78,48 +64,7 @@ class RuleBasedDialogueManager(object):
             system_acts (list): list of sys_acts
         """
         # Here we implement a rule-based policy
-        system_acts = []
-        print("Policy")
-        self.state.print_stack()
-        self.state.print_goals()
-        if len(self.state.confirm_slots) > 0:
-            sys_act = Hermes.build_act(
-                SystemAct.CONFIRM, self.state.confirm_slots[:1])
-            system_acts += [sys_act]
-        elif len(self.state.request_slots) > 0:
-            if find_slot_with_key('dialogue_act', self.state.request_slots)[0] >= 0:
-                sys_act = Hermes.build_act(SystemAct.ASK)
-            else:
-                sys_act = Hermes.build_act(
-                    SystemAct.REQUEST, self.state.request_slots)
-            system_acts += [sys_act]
-        elif len(self.state.query_slots) > 0:
-            print("QUERY")
-            raise NotImplementedError
-        elif len(self.state.execute_slots) > 0:
-            # Executable
-            domain_name = self.state.get_current_domain().name
-            if domain_name == self.state.ontology.Domains.OPEN:
-                sys_act = Hermes.build_act(
-                    SystemAct.EXECUTE, self.state.execute_slots)
-                sys_act2 = Hermes.build_act(SystemAct.GREETING)
-                sys_act3 = Hermes.build_act(SystemAct.ASK)
-                system_acts += [sys_act, sys_act2, sys_act3]
-            elif domain_name == self.state.ontology.Domains.CLOSE:
-                sys_act = Hermes.build_act(SystemAct.BYE)
-                system_acts += [sys_act]
-            else:
-                sys_act = Hermes.build_act(
-                    SystemAct.EXECUTE, self.state.execute_slots)
-                system_acts += [sys_act]
-
-            # Execute intent, pop from domain
-            self.state.clear_goals()
-            self.state.domain_stack.pop()
-        else:
-            sys_act = Hermes.build_act(SystemAct.ASK)
-            system_acts += [sys_act]
-        return system_acts
+        pass
 
     def act(self):
         """ 
