@@ -1,6 +1,16 @@
 from ..core import SystemAct
 from .state import StatePortal
-from ..util import find_slot_with_key
+from ..util import find_slot_with_key, build_slot_dict
+
+
+def build_sys_act(dialogue_act, intent=None, slots=None):
+    sys_act = {}
+    sys_act['dialogue_act'] = build_slot_dict("dialogue_act", dialogue_act)
+    if intent is not None:
+        sys_act['intent'] = build_slot_dict("intent", intent)
+    if slots is not None:
+        sys_act['slots'] = slots
+    return sys_act
 
 
 class System(object):
@@ -24,6 +34,7 @@ class System(object):
 
     def observe(self, observation):
         """
+        If has only utterance, send to tracker for dialogue_act & slots 
         Args:
             observation (dict): observation given by user passed through channel
         """
@@ -34,34 +45,66 @@ class System(object):
         """
         Update dialogue state with user_acts
         """
-        # State Update
+        # Update actions from user
         user_acts = self.observation.get('user_acts', list())
-        for user_act in user_acts:
+        photoshop_acts = self.observation.get('photoshop_acts', list())
+        observed_acts = user_acts + photoshop_acts
+        for act in observed_acts:
             # Usually have only one user_act
             args = {
-                'dialogue_act': user_act['dialogue_act'],
-                'intent': user_act['intent'],
-                'slots': user_act['slots'],
+                'dialogue_act': act.get('dialogue_act', None),
+                'intent': act.get('intent', None),
+                'slots': act.get('slots', list()),
                 'turn_id': self.turn_id
             }
             self.state.update(**args)
 
     def policy(self):
         """
-        A rule-based policy conditioned on dialogueState
+        A simple rule-based policy conditioned conditioned on the state
         Returns:
             system_acts (list): list of sys_acts
         """
-        # Here we implement a rule-based policy
+        system_acts = []
+
         sysintent = self.state.pull()
+
         if len(sysintent.label_slots):
-            pass
+            da = SystemAct.REQUEST_LABEL
+            intent = da
+            slots = sysintent.label_slots
         elif len(sysintent.confirm_slots):
-            pass
+            da = SystemAct.CONFIRM
+            intent = da
+            slots = sysintent.confirm_slots[:1]
         elif len(sysintent.request_slots):
-            pass
+            da = SystemAct.REQUEST
+            intent = da
+            slots = sysintent.request_slots
         elif len(sysintent.execute_slots):
-            pass
+            # Execute the intent
+            da = SystemAct.EXECUTE
+            intent = self.state.get_slot('intent').get_max_value()
+            slots = sysintent.execute_slots
+
+            # Stack the intent to history
+            self.state.stack_intent(intent)
+            # Clear intent, and the intent tree
+            self.state.clear_intent('intent')
+            if intent not in ["select_object"]:
+                self.state.clear_intent(intent)
+
+        # Label, Confirm, Request, Execute
+        system_acts += [build_sys_act(da, intent, slots)]
+
+        # Special cases
+        if intent == "open":
+            system_acts += [build_sys_act(SystemAct.GREETING)]
+        if intent == "close":
+            system_acts += [build_sys_act(SystemAct.BYE)]
+        elif da == SystemAct.EXECUTE:
+            system_acts += [build_sys_act(SystemAct.ASK)]
+        return system_acts
 
     def act(self):
         """ 
@@ -79,7 +122,8 @@ class System(object):
         system_act = {}
         system_act['system_acts'] = system_acts
         system_act['system_utterance'] = self.template_nlg(system_acts)
-        system_act['episode_done'] = self.observation['episode_done']
+        system_act['episode_done'] = self.observation.get(
+            'episode_done', False)
         return system_act
 
     ###########################

@@ -1,4 +1,3 @@
-from iedsp.system.visionengine import DummyClient
 from iedsp.ontology.node import *
 from iedsp.util import build_slot_dict, sort_slots_with_key
 from iedsp.util import imread, img_to_b64
@@ -31,7 +30,6 @@ def test_beliefnode():
     i1 = node.pull()
     i2 = node.pull()
     assert i1 == i2
-
 
 def test_intentnode():
     open = IntentNode('open')
@@ -92,13 +90,12 @@ def test_intent_pull():
     assert image_path.intent == SysIntent(
         execute_slots=[build_slot_dict('image_path', 'ip2', 1.0)])
 
-
 def test_select_object_intent():
     # select_object_domain
     select = IntentNode('select_object')
 
     # object_mask_slot
-    visionengine = DummyClient({'VISIONENGINE_URI': 'http://isupreme:5100'})
+    visionengine = None
     object_mask_slot = ObjectMaskNode('object_mask', visionengine=visionengine)
 
     b64_img_str_slot = PSToolNode('b64_img_str')

@@ -47,7 +47,6 @@ class SystemAct:
     REQUEST_LABEL = "request_label"
     BYE = "bye"
 
-
 class SysIntent(object):
     """
     A utility object for system intent slots

@@ -53,10 +53,11 @@ class BeliefNode(object):
 
     def clear(self):
         """
-        Set last_update_turn_id to 0 and clears value_conf_map
+        Reset last_update_turn_id, value_conf_map & intent
         """
         self.last_update_turn_id = 0
         self.value_conf_map = {v: 0. for v in self.possible_values}
+        self.intent.clear()
 
     def add_observation(self, value, conf, turn_id):
         """
@@ -202,7 +203,7 @@ class BeliefNode(object):
 
 class IntentNode(BeliefNode):
     """
-    Serves as root of a intent tree
+    Root of a intent tree
     Does not store any sysintent values, only from children
     Also provides convenient access to every slot node in the tree
     Attributes:
@@ -226,30 +227,35 @@ class IntentNode(BeliefNode):
 
         self.intent = SysIntent()
 
+    def add_observation(self):
+        raise NotImplementedError
+
     def build_node_dict(self):
         """
-        Builds a dictionary with slot name as key and node as value
-        Returns:
-            node_dict (dict): slot name as key and node as value
+        Clear the values & intent of the tree
         """
-        node_dict = {}
+        self.node_dict = {}
         queue = []
         queue.append(self)
         while len(queue):
             node = queue.pop(0)
-            node_dict[node.name] = node
+            self.node_dict[ node.name ] = node
             queue += list(node.children.values())
-        self.node_dict = node_dict
-        return self.node_dict
 
-    def add_observation(self):
-        raise NotImplementedError
+    def get_slot(self, slot_name):
+        return self.node_dict[slot_name]
 
     def clear(self):
         """
         Clear the values & intent of the tree
         """
-        raise NotImplementedError
+        self.intent.clear()
+        queue = []
+        queue += list(self.children.values())
+        while len(queue):
+            node = queue.pop(0)
+            node.clear()
+            queue += list(node.children.values())
 
     def get_max_conf_value(self):
         return self.name, 1.0
@@ -373,10 +379,7 @@ class ObjectMaskNode(BeliefNode):
                 query_args['b64_img_str'] = b64_img_str
                 mask_strs = self.visionengine.select_object(**query_args)
 
-                for mask_str in mask_strs:
-                    self.add_observation(
-                        mask_str, 0.5, self.last_update_turn_id)
-
+                self.value_conf_map = {mask_str: 0.5 for mask_str in mask_strs}
                 self.intent = self._build_slot_intent()
 
         elif object_mask_id_node.last_update_turn_id >= self.last_update_turn_id:
@@ -395,8 +398,10 @@ class ObjectMaskNode(BeliefNode):
                     self.add_observation(
                         mask_str, 1.0, self.last_update_turn_id)
 
-            # Label or Execute, depend on the confidence of the mask strs
-            self.intent = self._build_slot_intent()
+                # Label or Execute, depend on the confidence of the mask strs
+                self.intent = self._build_slot_intent()
+            else:
+                self.intent = object_mask_id_intent
 
         return self.intent
 

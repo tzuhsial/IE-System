@@ -103,6 +103,8 @@ class OntologyEngine(object):
                 child_node = self.slots[child_name]
                 self.intents[name].add_child(child_node, optional)
 
+            self.intents[name].build_node_dict()
+
         logger.info("Done.")
         return self.intents, self.slots
 
@@ -117,3 +119,7 @@ class OntologyEngine(object):
             logger.error("Unknown slot: {}".format(name))
             return None
         return self.slots[name]
+
+    def clear(self):
+        for intent_tree in self.intents.values():
+            intent_tree.clear()

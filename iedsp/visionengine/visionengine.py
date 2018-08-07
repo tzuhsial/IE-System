@@ -12,16 +12,17 @@ def VisionEnginePortal(visionengine_config):
     uri = visionengine_config["VISIONENGINE_URI"]
     return builder(client)(uri)
 
+
 class BaseVisionEngineClient(object):
     """
     Base class for vision engine clients
     Defines methods that needs to be overridden
     Attributes:
-        self.uri (str): uri that needs to be queried
+        self.visionengine_uri (str): uri that needs to be queried
     """
 
-    def __init__(self, visionengine_uri):
-        self.visionengine_uri = visionengine_uri
+    def __init__(self, uri):
+        self.uri = uri
 
     def select_object(self, b64_img_str, object, position=None, adjective=None, color=None):
         """ 
@@ -95,9 +96,9 @@ class MaskRCNNClient(BaseVisionEngineClient):
     Supports object class detection
     """
 
-    def select_object(self, b64_img_str, object, position=None, adjective=None, color=None):
+    def select_object(self, b64_img_str, object, **kwargs):
 
-        select_uri = urllib.parse.urljoin(self.uri, 'selection')
+        select_uri = urllib.parse.urljoin(self.visionengine_uri, 'selection')
 
         # Unlike MingYan's engine, does not allow referring expressions
         data = {

@@ -1,6 +1,16 @@
 {
     "intents": [
         {
+            "name": "intent",
+            "node": "IntentNode",
+            "children": [
+                {
+                    "name": "intent",
+                    "optional": false
+                }
+            ]
+        },
+        {
             "name": "open",
             "node": "IntentNode",
             "children": [
@@ -65,6 +75,13 @@
         }
     ],
     "slots": [
+        {
+            "name": "intent",
+            "node": "BeliefNode",
+            "threshold": 0.7,
+            "possible_values": null,
+            "children": []
+        },
         {
             "name": "image_path",
             "node": "PSToolNode",

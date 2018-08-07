@@ -65,3 +65,18 @@ def test_state():
     slots = [{'slot': 'image_path', 'value': 'some_value', 'conf': 1.0}]
     state.update(dialogue_act, intent, slots, turn_id)
     assert state.pull().executable()
+
+    # Test frame stacking
+    state.stack_intent("open")
+
+    open_tree = state.get_intent("open")
+    stacked_open_tree = state.framestack.top()
+
+    assert open_tree.name == stacked_open_tree.name
+    assert open_tree.intent == stacked_open_tree.intent
+
+    open_tree.clear()
+
+    assert open_tree.pull() != stacked_open_tree.pull()
+    assert open_tree.children["image_path"].get_max_value() != \
+        stacked_open_tree.children["image_path"].get_max_value()

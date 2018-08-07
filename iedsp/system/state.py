@@ -127,6 +127,14 @@ class State(object):
             obsrv = slot_to_observation(slot, turn_id)
             self.ontology.get_slot(slot_name).add_observation(**obsrv)
 
+    def stack_intent(self, intent_name):
+        """
+        Pushes the intent with previous values into the intent stack
+        """
+        intent_tree = self.get_intent(intent_name)
+        copied_tree = copy.deepcopy(intent_tree)  # Copy the intent tree
+        self.framestack.push(copied_tree)
+
     def get_slot(self, slot_name):
         return self.ontology.get_slot(slot_name)
 
@@ -136,6 +144,7 @@ class State(object):
     def pull(self):
         """
         Returns the current sysintent of the state
+        Checks intent tree first
         """
         sysintent = self.get_intent('intent').pull()
         if sysintent.executable():
