@@ -15,3 +15,8 @@ span {
     height: 100px;
     border: 1px black solid;
 }
+
+.column {
+    float: left;
+    width: 50%;
+}

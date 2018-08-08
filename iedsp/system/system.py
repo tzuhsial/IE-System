@@ -39,7 +39,8 @@ class System(object):
             observation (dict): observation given by user passed through channel
         """
         self.observation.update(observation)
-        self.turn_id += 1
+        if 'user_acts' in observation:
+            self.turn_id += 1
 
     def state_update(self):
         """
@@ -76,11 +77,11 @@ class System(object):
         elif len(sysintent.confirm_slots):
             da = SystemAct.CONFIRM
             intent = da
-            slots = sysintent.confirm_slots[:1]
+            slots = sysintent.confirm_slots[:1]  # confirm 1 at a time
         elif len(sysintent.request_slots):
             da = SystemAct.REQUEST
             intent = da
-            slots = sysintent.request_slots
+            slots = sysintent.request_slots[:1]  # request 1 at a time
         elif len(sysintent.execute_slots):
             # Execute the intent
             da = SystemAct.EXECUTE
@@ -89,10 +90,9 @@ class System(object):
 
             # Stack the intent to history
             self.state.stack_intent(intent)
+
             # Clear intent, and the intent tree
-            self.state.clear_intent('intent')
-            if intent not in ["select_object"]:
-                self.state.clear_intent(intent)
+            #self.state.clear_intent('intent')
 
         # Label, Confirm, Request, Execute
         system_acts += [build_sys_act(da, intent, slots)]

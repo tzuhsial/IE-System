@@ -73,7 +73,8 @@ class BeliefNode(object):
             return False
         if len(self.possible_values) and value not in self.value_conf_map:
             return False
-        if not isinstance(conf, float) or not 0 <= conf <= 1:
+        if (not isinstance(conf, float) and not isinstance(conf, int)) or \
+                (not 0 <= conf <= 1):
             return False
 
         # A new value observed indicates that previous value should have lower confidence
@@ -155,6 +156,7 @@ class BeliefNode(object):
 
         # Else not leaf, build intent from children
         children_intent, update_turn_id = self._build_children_intent()
+
         # Current node does not need to be updated
         if not children_intent.empty():
             self.last_update_turn_id = update_turn_id
@@ -189,7 +191,8 @@ class BeliefNode(object):
 
         # Loop through children
         for child_name, child in self.children.items():
-            if child.last_update_turn_id >= self.last_update_turn_id:
+            if self.__class__ == IntentNode or \
+                    child.last_update_turn_id >= self.last_update_turn_id:
                 child_intent = child.pull()
                 optional = self.optional[child_name]
                 if optional:
@@ -223,9 +226,17 @@ class IntentNode(BeliefNode):
 
         self.node_dict = {}
 
-        self.last_update_turn_id = 0
+        self.last_update_turn_id = -1
 
         self.intent = SysIntent()
+
+    def pull(self):
+        """
+        Always pull from children, so set last_update_turn_id to -1
+        """
+        sysintent = super(IntentNode, self).pull()
+        self.last_update_turn_id = -1
+        return sysintent
 
     def add_observation(self):
         raise NotImplementedError
@@ -239,7 +250,7 @@ class IntentNode(BeliefNode):
         queue.append(self)
         while len(queue):
             node = queue.pop(0)
-            self.node_dict[ node.name ] = node
+            self.node_dict[node.name] = node
             queue += list(node.children.values())
 
     def get_slot(self, slot_name):
@@ -247,7 +258,7 @@ class IntentNode(BeliefNode):
 
     def clear(self):
         """
-        Clear the values & intent of the tree
+        Clear the values & intent of itself and all the children
         """
         self.intent.clear()
         queue = []
@@ -407,7 +418,7 @@ class ObjectMaskNode(BeliefNode):
 
     def _build_slot_intent(self):
         """
-        The intent after obtaining mask_str from the cv engine
+        The intent after obtaining mask_str from the vision engine
         There should only be two types 1. label 2. execute
         """
         intent = SysIntent()

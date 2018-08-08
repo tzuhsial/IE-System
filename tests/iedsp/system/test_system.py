@@ -186,6 +186,3 @@ def test_system():
     system_act = system.act()
 
     assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]
-
-
-

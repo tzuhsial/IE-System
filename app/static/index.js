@@ -3,6 +3,24 @@
  */
 var ierUrl = location.origin + "/ier";
 
+var build_slot_dict = function (slot, value = null, conf = null) {
+    var slot_dict = {};
+    slot_dict['slot'] = slot;
+    if (value != null) slot_dict['value'] = value;
+    if (conf != null) slot_dict['conf'] = conf;
+    return slot_dict;
+}
+
+var find_slot_with_key = function (key, slots) {
+    for (var i = 0; i < slots.length; ++i) {
+        var slot = slots[i];
+        if (slot['slot'] == key) {
+            return slot;
+        }
+    }
+    return null;
+}
+
 var previewFile = function () {
     var preview = document.querySelector('img');
     var file = document.querySelector('input[type=file]').files[0];
@@ -15,10 +33,10 @@ var previewFile = function () {
         var observation = {
             'user_acts': [
                 {
-                    'dialogue_act': 'load',
+                    'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
+                    'intent': build_slot_dict('intent', 'load', 1.0),
                     'slots': [
-                        { 'slot': 'intent', 'value': 'load', 'conf': 1.0 },
-                        { 'slot': 'b64_img_str', 'value': b64_img_str, 'conf': 1.0 }
+                        build_slot_dict('b64_img_str', b64_img_str, 1.0)
                     ]
                 }
             ]
@@ -34,26 +52,27 @@ var previewFile = function () {
 var getObservation = function () {
     // Parse slot values here
     var dialogue_act = $("#dialogueact").val();
+    var intent = $('#intent').val();
 
     var slots = [];
-    for (var i = 1; i <= 4; ++i) {
+    for (var i = 1; i <= 3; ++i) {
         var slot_id = "#slot" + i.toString();
         var value_id = "#value" + i.toString();
         var conf_id = "#conf" + i.toString();
         if ($(slot_id).val().trim() != "" && $(value_id).val().trim() != "" && $(conf_id).val().trim() != "") {
-            var slot_dict = {
-                'slot': $(slot_id).val(),
-                'value': $(value_id).val(),
-                'conf': parseFloat($(conf_id).val())
-            };
-            slots.push(slot_dict)
+            var slot = $(slot_id).val();
+            var value = $(value_id).val();
+            var conf = parseFloat($(conf_id).val());
+            var slot_dict = build_slot_dict(slot, value, conf);
+            slots.push(slot_dict);
         }
     }
 
     var observation = {
         'user_acts': [
             {
-                'dialogue_act': dialogue_act,
+                'dialogue_act': build_slot_dict('dialogue_act', dialogue_act, 1.0),
+                'intent': build_slot_dict('intent', intent, 1.0),
                 'slots': slots
             }
         ]
@@ -63,7 +82,6 @@ var getObservation = function () {
 }
 
 var submitRequest = function (observation) {
-    if (observation['user_acts'][0]['slots'].length == 0) return;
 
     var data = {
         'observation': JSON.stringify(observation)
@@ -71,18 +89,24 @@ var submitRequest = function (observation) {
 
     console.log('submit', data);
 
-
     toggleLoading(true);
     $.post(ierUrl, data, function (response) {
         console.log(response);
-        // parse b64_img_str from action
-        var system_acts = response['system_acts']
-
-        if ('b64_img_str' in response) {
-            loadImage(response['b64_img_str']);
-        }
-
+        // Load system utterance
         loadUtterance(response['system_utterance']);
+
+        // There should only be 1 act
+        var ps_act = response['photoshop_acts'][0];
+        var ps_slots = ps_act['slots']
+
+        var b64_img_str_slot = find_slot_with_key('b64_img_str', ps_slots);
+        var masked_b64_img_str_slot = find_slot_with_key('masked_b64_img_str', ps_slots);
+
+        var obj = {}
+        if (b64_img_str_slot != null) obj['b64_img_str'] = b64_img_str_slot['value'];
+        if (masked_b64_img_str_slot != null) obj['masked_b64_img_str'] = masked_b64_img_str_slot['value'];
+
+        loadImage(obj);
     }).always(function () {
         toggleLoading(false);
     })
@@ -96,10 +120,17 @@ var toggleLoading = function (show) {
     }
 }
 
-var loadImage = function (b64_img_str) {
-    var display_string = "data:image/png;base64," + b64_img_str;
-    $("#image").attr('src', display_string);
-    console.log("Image loaded!");
+var loadImage = function (obj) {
+    var image_names = ["masked_b64_img_str", "b64_img_str"];
+    var image_ids = ["masked-image", "image"]
+    for (var i = 0; i < image_names.length; ++i) {
+        var image_name = image_names[i];
+        var image_id = image_ids[i];
+        if (image_name in obj) {
+            var img_str = obj[image_name];
+            $("#" + image_id).attr('src', "data:image/png;base64," + img_str);
+        }
+    }
 }
 
 var loadUtterance = function (utterance) {

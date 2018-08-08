@@ -47,6 +47,7 @@ class SystemAct:
     REQUEST_LABEL = "request_label"
     BYE = "bye"
 
+
 class SysIntent(object):
     """
     A utility object for system intent slots
@@ -152,6 +153,34 @@ class SysIntent(object):
         if len(self.execute_slots) != 0:
             return True
         return False
+
+
+class PhotoshopAct:
+    """
+    Defines actions that are supported by photoshop
+    """
+    OPEN = "open"
+    LOAD = "load"
+    CLOSE = "close"
+    REDO = "redo"
+    UNDO = "undo"
+    LOAD_MASK_STRS = "load_mask_strs"
+    SELECT_OBJECT = "select_object"
+    SELECT_OBJECT_MASK_ID = "select_object_mask_id"
+    DESELECT = "deselect"
+
+    ADJUST = "adjust"
+    ADJUST_COLOR = "adjust_color"
+
+    @staticmethod
+    def control_acts():
+        return [PhotoshopAct.OPEN, PhotoshopAct.LOAD, PhotoshopAct.CLOSE, PhotoshopAct.UNDO,
+                PhotoshopAct.REDO, PhotoshopAct.LOAD_MASK_STRS,
+                PhotoshopAct.SELECT_OBJECT, PhotoshopAct.SELECT_OBJECT_MASK_ID, PhotoshopAct.DESELECT]
+
+    @staticmethod
+    def edit_acts():
+        return [PhotoshopAct.ADJUST, PhotoshopAct.ADJUST_COLOR]
 
 
 class Slot(object):

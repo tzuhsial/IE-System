@@ -112,7 +112,6 @@ class State(object):
         """
         if intent_slot is None or len(intent_slot) == 0:
             return
-
         obsrv = slot_to_observation(intent_slot, turn_id)
         self.ontology.get_slot("intent").add_observation(**obsrv)
 
@@ -125,7 +124,9 @@ class State(object):
         for slot in slots:
             slot_name = slot['slot']
             obsrv = slot_to_observation(slot, turn_id)
-            self.ontology.get_slot(slot_name).add_observation(**obsrv)
+            slot_node = self.ontology.get_slot(slot_name)
+            if slot_node is not None:
+                slot_node.add_observation(**obsrv)
 
     def stack_intent(self, intent_name):
         """

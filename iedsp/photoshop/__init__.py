@@ -1,1 +1,1 @@
-from .photoshop import PhotoshopGateway
+from .photoshop import *
