@@ -1,11 +1,21 @@
 import copy
+import logging
 import random
+import sys
 
 import numpy as np
 
-from ..core import Agent, UserAct, SystemAct, Hermes
-from ..ontology import ImageEditOntology
-from ..util import find_slot_with_key, b64_to_img
+from ..core import UserAct, SystemAct
+from ..util import find_slot_with_key, b64_to_img, build_slot_dict
+
+logger = logging.getLogger(__name__)
+
+
+def UserPortal(user_config):
+    user_type = user_config["USER"]
+    dice_threshold = float(user_config["DICE_THRESHOLD"])
+    select_prob = float(user_config["SELECT_PROB"])
+    return builder(user_type)(select_prob, dice_threshold)
 
 
 class AgendaBasedUserSimulator(object):
@@ -14,14 +24,12 @@ class AgendaBasedUserSimulator(object):
     for image editing requests.
     """
 
-    SPEAKER = Agent.USER
-
-    def __init__(self, config):
+    def __init__(self, select_prob, dice_threshold):
         """
         Initialize user simulator with configuration
         """
-        self.dice_threshold = float(config['DICE_THRESHOLD'])
-        self.negate_inform_prob = float(config['NEGATE_INFORM_PROB'])
+        self.select_prob = select_prob
+        self.dice_threshold = dice_threshold
 
     def load_agenda(self, agenda):
         """
@@ -30,6 +38,9 @@ class AgendaBasedUserSimulator(object):
         """
         self.agenda = agenda
 
+    def process_agenda(self, agenda):
+        raise NotImplementedError
+
     def print_agenda(self):
         """
         Displays current agenda in human readable format
@@ -37,19 +48,17 @@ class AgendaBasedUserSimulator(object):
         for agenda in self.agenda:
             print('intent', agenda['intent'])
 
-    def curr_agenda(self):
+    def get_current_goal(self):
         """
+        Gets the top goal of the agenda
         Returns:
-            agenda (dict)
+            goal (dict)
         """
-        if self.agenda is None:
+        if self.agenda is None or len(self.agenda) == 0:
             return None
         return self.agenda[0]
 
     def reset(self):
-        """
-        Reset user simulator
-        """
         self.agenda = None
         self.observation = {}
 
@@ -66,8 +75,12 @@ class AgendaBasedUserSimulator(object):
         assert self.agenda is None or len(self.agenda) > 0
 
         user_acts = []
+
         # The default action for the user is to inform the agenda
-        default_system_acts = [Hermes.build_act(SystemAct.ASK)]
+        default_system_acts = [
+            {'dialogue_act': build_slot_dict('dialogue_act', SystemAct.ASK)}]
+
+        # We needs system_acts
         system_acts = self.observation.get('system_acts', default_system_acts)
         for sys_act in system_acts:
             # We can do a for loop here of the system acts
@@ -75,107 +88,180 @@ class AgendaBasedUserSimulator(object):
             # requires a response from the user
             sys_dialogue_act = sys_act['dialogue_act']['value']
             if sys_dialogue_act == SystemAct.ASK:
-                user_act = self.act_inform_agenda()
-                user_acts += [user_act]
+                user_act = self.act_inform()
+                user_acts.append(user_act)
+
             elif sys_dialogue_act == SystemAct.REQUEST:
-                request_slots = sys_act['slots']
-                user_act = self.act_inform_agenda(request_slots)
+                request_slot = sys_act["slots"][0]
+                raise NotImplementedError
+
             elif sys_dialogue_act == SystemAct.CONFIRM:
-                assert len(sys_act['slots']) == 1
-                confirm_slot = sys_act['slots'][0]
-                confirm_name = confirm_slot['slot']
-                confirm_value = confirm_slot['value']
+                raise NotImplementedError
 
-                # Confirm intent or normal slot values
-                if confirm_name == ImageEditOntology.DIALOGUE_ACT:
-                    slots = [self.agenda[0]['dialogue_act']]
-                else:
-                    slots = self.agenda[0]['slots']
-
-                _, target_slot = find_slot_with_key(confirm_name, slots)
-
-                # Special case: object
-                target_name = target_slot['slot']
-                if target_name == ImageEditOntology.Slots.OBJECT:
-                    target_value = target_slot['value']['name']
-                else:
-                    target_value = target_slot['value']
-
-                # Decide Affirm or Negate
-                if confirm_value == target_value:
-                    user_dialogue_act = UserAct.AFFIRM
-                else:
-                    user_dialogue_act = UserAct.NEGATE
-
-                # Build user_act
-                user_act = Hermes.build_act(user_dialogue_act)
-                user_acts += [user_act]
-                # TODO: Probability of additional inform
             elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
-                print("SystemAct.REQUEST_LABEL")
-                import pdb
-                pdb.set_trace()
+                label_slots = sys_act["slots"]
+                user_act = self.act_label(label_slots)
+                user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.EXECUTE:
-                # Previous agenda has been executed
-                self.agenda.pop(0)
+                exec_intent = sys_act["intent"]
+                exec_slots = sys_act["slots"]
+                success = self.check_execution_result(exec_intent, exec_slots)
+
+                print("Execution result", success)
+                if not success:
+                    user_act = {}
+                    user_act["dialogue_act"] = build_slot_dict(
+                        'dialogue_act', 'inform')
+                    user_act["intent"] = build_slot_dict("intent", "undo")
+                    user_acts.append(user_act)
+                else:
+                    self.agenda.pop(0)
+
+        # Check episode_done based on goal
+        curr_goal = self.get_current_goal()
+        episode_done = curr_goal["intent"]["value"] == "close"
 
         # Build return object
         user_act = {}
         user_act['user_acts'] = user_acts
         user_act['user_utterance'] = self.template_nlg(user_acts)
-        user_act['episode_done'] = self.agenda[0]['dialogue_act']['value'] == UserAct.CLOSE
-        user_act['speaker'] = self.SPEAKER
+        user_act['episode_done'] = episode_done
         return user_act
 
-    def act_inform_agenda(self, request_slots=None):
+    def act_inform(self, slots=None):
         """
-        Informs according to agenda, if request_slots are provided, 
-        then inform only slots in request
+        Informs the current goal, which is the top of the agenda
+        Args:
+            slots (list): slots that needs to be informed
         Returns:
             user_act (dict): user act object
         """
-        agenda = self.agenda[0]
-        user_act = copy.deepcopy(agenda)
-        user_dialogue_act = user_act['dialogue_act']['value']
-        user_act['speaker'] = Agent.USER
-        if request_slots is not None:
-            # Filter only the slots requested
-            slots = []
-            for request_slot in request_slots:
-                _, inform_slot = find_slot_with_key(
-                    request_slot['slot'], user_act['slots'])
-                slots.append(inform_slot)
-            user_act['slots'] = slots
+        # Get current goal
+        goal = self.get_current_goal()
 
-        # Special case: object
-        if user_dialogue_act == UserAct.ADJUST:
-            # Set object value from { "mask_str": mask_str, "name": name } to name
-            _, object_slot = find_slot_with_key('object', user_act['slots'])
-            object_slot['value'] = object_slot['value']['name']
+        # user_act
+        user_act = copy.deepcopy(goal)
+        user_act["dialogue_act"] = build_slot_dict(
+            "dialogue_act", UserAct.INFORM)
+
+        user_slots = user_act.get("slots", list())
+        user_slots = filter(
+            lambda slot: slot['slot'] != 'object_mask_str', user_slots)
+        user_act["slots"] = list(user_slots)
+        if slots is not None:
+            user_act["slots"] = slots
+
         return user_act
 
-    def compute_dice(self, mask_str, target_mask_str=None):
+    def act_label(self, label_slots):
         """
+        Response to System.REQUEST_LABEL
+        """
+        goal = self.get_current_goal()
+        goal_slots = goal.get("slots", list())
+        goal_mask_str_slot = find_slot_with_key('object_mask_str', goal_slots)
+
+        if goal_mask_str_slot is None:
+            # User wants to edit the whole image
+            # but the system asks the user to label...
+            object_slot = find_slot_with_key('object', goal_slots)
+            user_act = self.act_inform([object_slot])
+            return user_act
+
+        if len(label_slots) and all(slot.get('value') for slot in label_slots):
+            # Compute dice score and select the one with the highest
+
+            goal_mask_str = goal_mask_str_slot["value"]
+
+            scores = []
+            for idx, mask_str_slot in enumerate(label_slots):
+                mask_str = mask_str_slot["value"]
+                dice_score = self.compute_dice(mask_str, goal_mask_str)
+                scores.append((idx, dice_score))
+
+            # Sort scores with descending order
+            sorted_scores = sorted(
+                scores, key=lambda tup: tup[1], reverse=True)
+
+            # Check score
+            max_idx, max_score = sorted_scores[0]
+
+            if max_score >= self.dice_threshold:
+                object_mask_id_slot = build_slot_dict(
+                    'object_mask_id', max_idx)
+                user_act = self.act_inform([object_mask_id_slot])
+
+                goal_object_mask_id_slot = find_slot_with_key(
+                    'object_mask_id', goal_slots)
+
+                if goal_object_mask_id_slot is None:
+                    goal_slots.append(object_mask_id_slot)
+                else:
+                    goal_object_mask_id_slot["value"] = max_idx
+
+            else:
+                # Directly label it
+                user_act = self.act_inform([goal_mask_str_slot])
+        else:
+            user_act = self.act_inform([goal_mask_str_slot])
+
+        return user_act
+
+    def check_execution_result(self, execute_intent, execute_slots):
+        """
+        Check if system execution result matches current goal
+        Returns:
+            success (bool): True if success else False
+        """
+        success = True
+        goal = self.get_current_goal()
+
+        # Check intents
+        if execute_intent['value'] != goal['intent']['value']:
+            success == False
+        elif len(execute_slots) != len(goal['slots']):
+            success == False
+        else:
+            for target_slot in goal["slots"]:
+                slot_name = target_slot['slot']
+                slot = find_slot_with_key(slot_name, execute_slots)
+
+                if slot is None:
+                    logger.debug("Missing slot: {}".format(slot_name))
+                    success = False
+                    break
+
+                if slot_name == "mask_str":
+                    # Compute the dice score between mask_str & target_mask_str
+                    mask_str = slot['value']
+                    target_mask_str = target_slot["value"]
+                    dice_score = self.compute_dice(mask_str, target_mask_str)
+                    if dice_score < self.dice_threshold:
+                        success = False
+                        break
+
+                if slot["value"] != target_slot["value"]:
+                    success = False
+                    break
+
+        return success
+
+    def compute_dice(self, mask_str, goal_mask_str):
+        """
+        The eyes of the user
         Computes the dice metric between the mask_str and the target_mask_str
-        If target_mask_str is not provided, will extract it from current agenda
         Args:
             mask_str (str): b64 image string
             target_mask_str (str): b64 image string
         Returns:
             dice (float): dice metric
         """
-        if target_mask_str is None:
-            _, object_slot = find_slot_with_key("object", self.agenda[0])
-            target_mask_str = object_slot['value']['mask_str']
-
         mask = b64_to_img(mask_str)
-        target_mask = b64_to_img(target_mask_str)
-        assert mask.shape == target_mask.shape, "Weird shape"
-
-        dice = 2 * (mask & target_mask).sum() / (mask | target_mask).sum()
-
-        return dice >= self.dice_threshold
+        goal_mask = b64_to_img(goal_mask_str)
+        assert mask.shape == goal_mask.shape, "Weird shape"
+        dice = 2 * (mask & goal_mask).sum() / (mask | goal_mask).sum()
+        return dice
 
     def template_nlg(self, user_acts):
         """
@@ -188,25 +274,18 @@ class AgendaBasedUserSimulator(object):
         utt_list = []
         for user_act in user_acts:
             user_dialogue_act = user_act['dialogue_act']['value']
-            if user_dialogue_act == UserAct.OPEN:
-                utt = "(Open an image)"
-            elif user_dialogue_act == UserAct.LOAD:
-                utt = "(Loads an image)"
-            elif user_dialogue_act == UserAct.ADJUST:
-                slots = user_act['slots']
-                slot_list = ["dialogue_act to be " + user_dialogue_act]
+            if user_dialogue_act == UserAct.INFORM:
+                # Template based NLG based on intent
+                intent_slot = user_act['intent']
+                slots = [intent_slot] + user_act["slots"]
+                slot_list = []
                 for slot in slots:
-                    slot_list.append(
-                        slot['slot'] + " to be " + str(slot['value']))
+                    slot_list.append(slot['slot'] + "=" + str(slot['value']))
                 utt = "I want " + ', '.join(slot_list) + "."
             elif user_dialogue_act == UserAct.AFFIRM:
                 utt = "Yes."
             elif user_dialogue_act == UserAct.NEGATE:
                 utt = "No."
-            elif user_dialogue_act == UserAct.CLOSE:
-                utt = "(Closes the image)"
-            elif user_dialogue_act == UserAct.UNDO:
-                utt = "I want to undo my previous edit."
             else:
                 raise ValueError(
                     "Unknown user_dialogue_act: {}".format(user_dialogue_act))
@@ -216,10 +295,8 @@ class AgendaBasedUserSimulator(object):
         return utterance
 
 
-class DemoUser(object):
+def builder(string):
     """
-        This user acts as the interface to the server
+    Gets node class with string
     """
-
-    def __init__(self):
-        raise NotImplementedError
+    return getattr(sys.modules[__name__], string)

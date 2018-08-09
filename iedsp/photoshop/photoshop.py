@@ -99,7 +99,7 @@ class SimplePhotoshopClient(object):
                     # is not a request
                     if slot['slot'] == "mask_str" and slot.get('value'):
                         mask_str_slots.append(slot)
-                        
+
                 # Process mask_str_slot to SimplePhotoshop arg format
                 mask_strs = []
                 for idx, mask_slot in enumerate(mask_str_slots):

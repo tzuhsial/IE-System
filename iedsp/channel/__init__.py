@@ -1,1 +1,1 @@
-from .channel import ConfChannel
+from .channel import ChannelPortal

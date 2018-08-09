@@ -311,7 +311,7 @@ class PSToolNode(BeliefNode):
         return True
 
 
-class ObjectMaskNode(BeliefNode):
+class ObjectMaskStrNode(BeliefNode):
     """
     Customized node for object_mask
     object_mask has the ability to query cv engine
@@ -330,12 +330,12 @@ class ObjectMaskNode(BeliefNode):
         visionengine (object): shared visionengine object to perform select_object queries
     """
 
-    def __init__(self, name="object_mask", threshold=0.8, possible_values=None, validator=None, visionengine=None, **kwargs):
-        assert name == "object_mask", "name should be ObjectMaskNode"
-        super(ObjectMaskNode, self).__init__(
+    def __init__(self, name="object_mask_str", threshold=0.8, possible_values=None, validator=None, visionengine=None, **kwargs):
+        assert name == "object_mask_str", "name should be ObjectMaskStrNode"
+        super(ObjectMaskStrNode, self).__init__(
             name, threshold, possible_values, validator)
         if visionengine is None:
-            logger.warning("ObjectMaskNode.visionengine is not loaded!")
+            logger.warning("ObjectMaskStrNode.visionengine is not loaded!")
         self.visionengine = visionengine
 
     def pull(self):
@@ -357,8 +357,13 @@ class ObjectMaskNode(BeliefNode):
 
         # Since object_mask is internal,
         # we first update its turn_id to the latest according to its child nodes
+        object_mask_str_turn_id = self.last_update_turn_id
+        b64_img_str_turn_id = b64_img_str_node.last_update_turn_id
+        object_turn_id = object_node.last_update_turn_id
+        object_mask_id_turn_id = object_mask_id_node.last_update_turn_id
+
         self.last_update_turn_id = max(
-            self.last_update_turn_id, object_node.last_update_turn_id, object_mask_id_node.last_update_turn_id)
+            object_mask_str_turn_id, object_turn_id, object_mask_id_turn_id)
 
         # Special case, where both child nodes are updated
         if object_node.last_update_turn_id >= self.last_update_turn_id and \
@@ -383,27 +388,33 @@ class ObjectMaskNode(BeliefNode):
                 # It should be updated at every turn, though
                 object_mask_id_node.clear()
 
-                b64_img_str = b64_img_str_node.get_max_value()
-                assert b64_img_str is not None, "Where is the image?! QQQQQ"
+                # Special case: image, we don't need object_mask_str
+                if object_node.get_max_value() == "image":
+                    self.intent = SysIntent()
+                else:
+                    b64_img_str = b64_img_str_node.get_max_value()
+                    assert b64_img_str is not None, "Where is the image?! QQQQQ"
 
-                query_args = slots_to_args(object_intent.execute_slots)
-                query_args['b64_img_str'] = b64_img_str
-                mask_strs = self.visionengine.select_object(**query_args)
+                    query_args = slots_to_args(object_intent.execute_slots)
+                    query_args['b64_img_str'] = b64_img_str
+                    mask_strs = self.visionengine.select_object(**query_args)
 
-                self.value_conf_map = {mask_str: 0.5 for mask_str in mask_strs}
-                self.intent = self._build_slot_intent()
+                    self.value_conf_map = {
+                        mask_str: 0.5 for mask_str in mask_strs}
+                    self.intent = self._build_slot_intent()
 
         elif object_mask_id_node.last_update_turn_id >= self.last_update_turn_id:
             # object_mask_id needs to be confirmed.
             # It is requested by the label action
             object_mask_id_intent = object_mask_id_node.pull()
 
+            # If we have object_mask_id
             if object_mask_id_intent.executable():
                 # Get the object_mask_id and update current mask_strs
                 object_mask_id = int(object_mask_id_node.get_max_value())
                 if object_mask_id < len(self.value_conf_map):
                     candidates = list(self.value_conf_map.items())
-                    mask_str, conf = candidates[object_mask_id]
+                    mask_str, _ = candidates[object_mask_id]
 
                     self.value_conf_map.clear()
                     self.add_observation(
@@ -413,7 +424,9 @@ class ObjectMaskNode(BeliefNode):
                 self.intent = self._build_slot_intent()
             else:
                 self.intent = object_mask_id_intent
-
+        else:
+            # object_mask_dir is directly provided.
+            self.intent = self._build_slot_intent()
         return self.intent
 
     def _build_slot_intent(self):

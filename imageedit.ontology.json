@@ -13,6 +13,7 @@
         {
             "name": "open",
             "node": "IntentNode",
+            "speech": false,
             "children": [
                 {
                     "name": "image_path",
@@ -23,6 +24,7 @@
         {
             "name": "load",
             "node": "IntentNode",
+            "speech": false,
             "children": [
                 {
                     "name": "b64_img_str",
@@ -33,9 +35,10 @@
         {
             "name": "select_object",
             "node": "IntentNode",
+            "speech": true,
             "children": [
                 {
-                    "name": "object_mask",
+                    "name": "object_mask_str",
                     "optional": false
                 }
             ]
@@ -43,9 +46,10 @@
         {
             "name": "adjust",
             "node": "IntentNode",
+            "speech": true,
             "children": [
                 {
-                    "name": "object_mask",
+                    "name": "object_mask_str",
                     "optional": false
                 },
                 {
@@ -61,16 +65,19 @@
         {
             "name": "undo",
             "node": "IntentNode",
+            "speech": true,
             "children": []
         },
         {
             "name": "redo",
             "node": "IntentNode",
+            "speech": true,
             "children": []
         },
         {
             "name": "close",
             "node": "IntentNode",
+            "speech": true,
             "children": []
         }
     ],
@@ -79,7 +86,15 @@
             "name": "intent",
             "node": "BeliefNode",
             "threshold": 0.7,
-            "possible_values": null,
+            "possible_values": [
+                "open",
+                "load",
+                "close",
+                "select_object",
+                "adjust",
+                "undo",
+                "redo"
+            ],
             "children": []
         },
         {
@@ -93,13 +108,20 @@
             "name": "b64_img_str",
             "node": "PSToolNode",
             "threshold": 1.0,
+            "possible_values": null,
             "children": []
         },
         {
             "name": "attribute",
             "node": "BeliefNode",
             "threshold": 0.7,
-            "possible_values": null,
+            "possible_values": [
+                "brightness",
+                "contrast",
+                "hue",
+                "saturation",
+                "lightness"
+            ],
             "children": []
         },
         {
@@ -126,8 +148,8 @@
             ]
         },
         {
-            "name": "object_mask",
-            "node": "ObjectMaskNode",
+            "name": "object_mask_str",
+            "node": "ObjectMaskStrNode",
             "threshold": 1.0,
             "possible_values": null,
             "use_visionengine": true,

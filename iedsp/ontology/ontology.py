@@ -12,8 +12,8 @@ def OntologyPortal(global_config):
     visionengine_config = global_config["VISIONENGINE"]
     visionengine = VisionEnginePortal(visionengine_config)
 
-    ontology_config = global_config["ONTOLOGY"]
-    ontology_json = util.load_from_json(ontology_config["ONTOLOGY_FILE"])
+    ontology_file = global_config["DEFAULT"]["ONTOLOGY_FILE"]
+    ontology_json = util.load_from_json(ontology_file)
 
     ontology = OntologyEngine(visionengine, ontology_json)
     return ontology

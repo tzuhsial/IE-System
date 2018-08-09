@@ -1,32 +1,68 @@
-"""
-    Class to simulate speech recognition errors
-"""
 import copy
+import sys
 
 import numpy as np
 
 from ..core import UserAct
+from ..util import load_from_json
 
 
-class ConfChannel(object):
+def ChannelPortal(config):
+    ontology_file = config["DEFAULT"]["ONTOLOGY_FILE"]
+
+    channel_config = config["CHANNEL"]
+    channel_type = channel_config["CHANNEL"]
+    speech_conf_mean = float(channel_config["SPEECH_CONF_MEAN"])
+    speech_conf_std = float(channel_config["SPEECH_CONF_STD"])
+    return builder(channel_type)(ontology_file, speech_conf_mean, speech_conf_std)
+
+
+class MultimodalChannel(object):
     """
-    A channel that simulates the errors of speech recognition 
-    and Photoshop interaction by assigning confidence scores.
-    Currently assigns confidence scores for now.
-    TODO:
-    1. Error accordiing to confidence
+    A channel that simulates the photohsop interface & speech recognition input
+    Assign confidence scores based on the slots provided.
+
     """
 
-    def __init__(self, config):
+    def __init__(self, ontology_file, speech_conf_mean, speech_conf_std):
         """
         Loads configurations
         """
-        self.conf_mean = float(config['CONF_MEAN'])
-        self.conf_std = float(config['CONF_STD'])
+        self.ontology_json = load_from_json(ontology_file)
+        self.speech_conf_mean = speech_conf_mean
+        self.speech_conf_std = speech_conf_std
+
+        # Process
+        self._process_ontology()
+
+    def _process_ontology(self):
+
+        intents = self.ontology_json["intents"]
+
+        self.speech_intents = []
+        self.photoshop_intents = []
+        for intent in intents:
+            intent_name = intent["name"]
+            if intent.get("speech", False):
+                self.speech_intents.append(intent_name)
+            else:
+                self.photoshop_intents.append(intent_name)
+
+        slots = self.ontology_json["slots"]
+
+        self.speech_slots = []
+        self.photoshop_slots = []
+
+        for slot in slots:
+            slot_name = slot["name"]
+            if slot["node"] == "BeliefNode":
+                self.speech_slots.append(slot_name)
+            else:
+                self.photoshop_slots.append(slot_name)
 
     def reset(self):
         """ 
-        Resets
+        We don't need to do anything
         """
         pass
 
@@ -38,50 +74,54 @@ class ConfChannel(object):
 
     def act(self):
         """
-        Receives observation from the user and assign confidence scores
+        Iterate through confidence scores from the user and assign confidence scores
         Returns:
             channel_act (dict): user_act with channel confidence scores
         """
-
         channel_act = copy.deepcopy(self.observation)
         for user_act in channel_act['user_acts']:
-            # Sample a confidence for dialogue_act
-            user_dialogue_act = user_act['dialogue_act']['value']
-            # Sample or not depends on user_dialogue_act
-            sample = not user_dialogue_act in UserAct.photoshop_acts()
-            user_act['dialogue_act']['conf'] = self.generate_confidence(sample)
-            #user_act['dialogue_act']['conf'] = 1.
+            # Assign confidence scores
+            user_act["dialogue_act"]["conf"] = self.generate_confidence()
+
+            intent_name = user_act["intent"]["value"]
+            if intent_name in self.photoshop_intents:
+                user_act["intent"]["conf"] = 1.
+            else:
+                user_act["intent"]["conf"] = self.generate_confidence()
+
             for slot_dict in user_act.get('slots', list()):
-                slot_dict['conf'] = self.generate_confidence(sample)
+                slot_name = slot_dict["slot"]
+                if slot_name in self.photoshop_slots:
+                    slot_dict["conf"] = 1.
+                else:
+                    slot_dict['conf'] = self.generate_confidence()
 
         return channel_act
 
-    def corrupt(self, slot_dict, channel_conf):
+    def corrupt(self, slot_dict):
         """
-        Corrupts the slot_dict by assigning weird values
+        Modify the slot values according to the assigned confidence
         """
         pass
 
-    def generate_confidence(self, sample=True):
+    def generate_confidence(self):
         """
-        if sample: 
-            Samples a confidence scores with mean and std and to 2 floating points
-        else:
-            returns a confidence score of 1.
+        Samples a confidence scores with mean and std and to 2 floating points
         Args:
             sample (bool): 
         Returns:
             conf_score (float)
         """
-        if sample:
-            conf_score = np.random.normal(self.conf_mean, self.conf_std)
-            conf_score = round(conf_score, 2)
-            conf_score = max(conf_score, 0.0)  # >= 0.
-            conf_score = min(conf_score, 1.0)  # <= 1.
-        else:
-            conf_score = 1.0
+        conf_score = np.random.normal(
+            self.speech_conf_mean, self.speech_conf_std)
+        conf_score = round(conf_score, 2)
+        conf_score = max(conf_score, 0.0)  # >= 0.
+        conf_score = min(conf_score, 1.0)  # <= 1.
         return conf_score
 
 
-if __name__ == "__main__":
-    pass
+def builder(string):
+    """
+    Gets node class with string
+    """
+    return getattr(sys.modules[__name__], string)

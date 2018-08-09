@@ -1,1 +1,1 @@
-from .user import AgendaBasedUserSimulator
+from .user import UserPortal

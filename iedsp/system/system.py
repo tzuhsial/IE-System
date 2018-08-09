@@ -82,7 +82,8 @@ class System(object):
             da = SystemAct.REQUEST
             intent = da
             slots = sysintent.request_slots[:1]  # request 1 at a time
-        elif len(sysintent.execute_slots):
+        else:
+            # Execute slots can be empty! e.g. redo, undo, close
             # Execute the intent
             da = SystemAct.EXECUTE
             intent = self.state.get_slot('intent').get_max_value()
@@ -92,7 +93,7 @@ class System(object):
             self.state.stack_intent(intent)
 
             # Clear intent, and the intent tree
-            #self.state.clear_intent('intent')
+            # self.state.clear_intent('intent')
 
         # Label, Confirm, Request, Execute
         system_acts += [build_sys_act(da, intent, slots)]

@@ -159,8 +159,6 @@ def test_system_demo():
     system.observe(user_act)
     system_act = system.act()
 
-
-
     assert extract_das(system_act) == [SystemAct.REQUEST]
 
     # Turn 6: +30

@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import random
 import sys
@@ -9,9 +10,6 @@ import numpy as np
 from pycocotools import mask as maskUtils
 from tqdm import tqdm
 
-from iedsp.core import Agent, UserAct, Hermes
-from iedsp.ontology import ImageEditOntology
-from iedsp.helpers import ActionHelper
 from iedsp import util
 
 
@@ -38,14 +36,30 @@ def annToMask(img, ann):
     return m
 
 
-class ImageEditAgendaGenerator(object):
+def build_goal(intent, slots=None):
+    goal = {
+        'intent': util.build_slot_dict('intent', intent),
+    }
+    if slots is not None:
+        goal['slots'] = slots
+    return goal
+
+
+def find_ont_with_name(name, ont_slots):
+    for ont in ont_slots:
+        if ont['name'] == name:
+            return ont
+    return None
+
+
+class AdjustAgendaGenerator(object):
     """
     Generator that randomly generates agenda
     An agenda is defined as N goals that a user wants to complete in a dialogue session
     ```
     Goal Format
     {
-        'dialogue_act': {'slot': 'dialogue_act': 'value': d1 }, 
+        'intent': {'slot': 'intent': 'value': d1 },
         'slots': [
             { 'slot': s1, 'value': v1 },
             { 'slot': s2, 'value': v2 }
@@ -54,22 +68,15 @@ class ImageEditAgendaGenerator(object):
     ```
     """
 
-    # Set configurations here for now... Kinda stupid
-    ADJUST_PROB = 0.8
-    UNDO_PROB = 0.1
-    REDO_PROB = 0.1
-
-    # OBJECT
-    IMAGE_PROB = 0.2  # Probability of adjusting the whole image
-
-    def __init__(self, dir, num_iers, seed):
+    def __init__(self, ontology_file, num_objects, dir, num_iers, seed):
+        with open(ontology_file, 'r') as fin:
+            self.ontology_json = json.loads(fin.read())
+        self.num_objects = num_objects
         self.dir = dir
         self.num_iers = num_iers
         self.seed = seed
 
         self._read_from_dir()
-
-        self.ont = ImageEditOntology()
 
     def _read_from_dir(self):
         """
@@ -84,7 +91,8 @@ class ImageEditAgendaGenerator(object):
             os.path.join(self.dir, 'category.jsonl'))
 
         # Map category id to name
-        self.category2name_dict = {}
+        # Set 0 to the whole image for convenience
+        self.category2name_dict = {0: 'image'}
         for cat in self.categories:
             cat_id = cat['id']
             cat_name = cat['name']
@@ -103,89 +111,116 @@ class ImageEditAgendaGenerator(object):
         np.random.seed(self.seed)
 
         # Return object
+        print("Generating agendas")
         agendas = []
-
-        print("Generating agendas...")
         for img, anns in tqdm(zip(self.imgs, self.annotations)):
-            agenda = []
-
-            # IER: open
-            image_path = os.path.join(self.dir, 'image', img['file_name'])
-            open_slots = [Hermes.build_slot_dict(
-                self.ont.Slots.IMAGE_PATH, image_path)]
-            open_goal = Hermes.build_act(self.ont.Domains.OPEN, open_slots)
-            agenda.append(open_goal)
-
-            # IER: adjust, undo, redo
-            domains = [self.ont.Domains.ADJUST,
-                       self.ont.Domains.REDO, self.ont.Domains.UNDO]
-            domain_probs = [self.ADJUST_PROB, self.REDO_PROB, self.UNDO_PROB]
-
-            for n_ier in range(self.num_iers-2):  # Exclude open & close
-
-                domain_name = np.random.choice(domains, p=domain_probs)
-                slot_names = self.ont.getDomainWithName(
-                    domain_name).get_slot_names()
-                slots = []
-                for slot_name in slot_names:
-                    if slot_name == "object":
-                        """
-                        value : {
-                            'name': n1,
-                            'mask_str': mask_str,
-                        }
-                        """
-                        object_dict = {}
-                        object_dict['name'] = 'image'
-
-                        # Add whole image as another option
-                        objects = [{}] + anns
-                        object_probs = [self.IMAGE_PROB] + \
-                            [(1-self.IMAGE_PROB) / len(anns) for _ in anns]
-                        object_probs = np.array(object_probs)
-                        object_probs /= object_probs.sum()
-
-                        ann = np.random.choice(objects, p=object_probs)
-                        if len(ann) > 0:
-                            object_name = self.category2name_dict[ann['category_id']]
-                            object_mask = annToMask(img, ann)
-                            object_mask_str = util.img_to_b64(object_mask)
-
-                            object_dict['name'] = object_name
-                            object_dict['mask_str'] = object_mask_str
-
-                        value = object_dict
-
-                    else:
-                        """
-                        value: v1
-                        """
-                        possible_values = self.ont.getSlotWithName(
-                            slot_name).get_default_values()
-                        value = random.choice(possible_values)
-
-                    slots.append(Hermes.build_slot_dict(slot_name, value))
-
-                ier_goal = Hermes.build_act(domain_name, slots)
-                agenda.append(ier_goal)
-            # IER: close
-            close_goal = Hermes.build_act(self.ont.Domains.CLOSE)
-            agenda.append(close_goal)
+            agenda = self.generate_agenda(img, anns)
             agendas.append(agenda)
-        print("Done.")
         return agendas
+
+    def generate_agenda(self, img, anns):
+        agenda = []
+
+        # IER: open
+        image_path = os.path.join(self.dir, 'image', img['file_name'])
+        image_path_slot = util.build_slot_dict('image_path', image_path)
+        open_goal = build_goal('open', [image_path_slot])
+        agenda.append(open_goal)
+
+        # Get adjust ontology
+        ont_slots = self.ontology_json['slots']
+        attribute_ont = find_ont_with_name('attribute', ont_slots)
+        adjust_value_ont = find_ont_with_name('adjust_value', ont_slots)
+        object_ont = find_ont_with_name('object', ont_slots)
+
+        assert attribute_ont is not None
+        assert adjust_value_ont is not None
+        assert object_ont is not None
+
+        # IER: adjust
+        # add the whole image to pool and sample
+        # Example:
+        # [ dog, cat, mice ]
+        # [ 0, 2 ]
+        # => [ 0, 0, 1, 2, 2 ]
+        # => [ dog, dog, cat, mice, mice ]
+        ann_pool = [{'category_id': 0}] + anns
+        sampled_anns = np.random.choice(ann_pool, self.num_objects)
+
+        num_duplicates = self.num_iers - self.num_objects
+        sampled_duplicates = np.random.choice(
+            len(sampled_anns), num_duplicates)
+        sampled_duplicates = sorted(sampled_duplicates)
+        ann_order = sorted(sampled_duplicates + list(range(len(sampled_anns))))
+
+        final_anns = [sampled_anns[idx] for idx in ann_order]
+
+        assert len(final_anns) == self.num_iers
+
+        for n_ier in range(self.num_iers):
+
+            # Adjust goal has 4 slots
+            # 1. attribute
+            # Randomly sample an attribute
+            attribute_possible_values = attribute_ont['possible_values']
+
+            sampled_attribute = random.choice(attribute_possible_values)
+
+            attribute_slot = util.build_slot_dict(
+                'attribute', sampled_attribute)
+
+            # 2. adjust_value
+            sampled_adjust_value = random.randint(-50, 50)
+            adjust_value_slot = util.build_slot_dict(
+                'adjust_value', sampled_adjust_value)
+
+            # 3. object
+            object_ann = final_anns[n_ier]
+            object_category_id = object_ann['category_id']
+            object_name = self.category2name_dict[object_category_id]
+
+            object_slot = util.build_slot_dict('object', object_name)
+
+            # 4. mask_str
+            if object_name != "image":
+                object_mask = annToMask(img, object_ann)
+                mask_str = util.img_to_b64(object_mask)
+                mask_str_slot = util.build_slot_dict(
+                    'object_mask_str', mask_str)
+
+                slots = [attribute_slot, adjust_value_slot,
+                         object_slot, mask_str_slot]
+            else:
+                # Without the mask_str_slot
+                slots = [attribute_slot, adjust_value_slot, object_slot]
+
+            # Build goal and push to agenda
+            adjust_goal = build_goal('adjust', slots)
+            agenda.append(adjust_goal)
+
+        # IER: close
+        close_goal = build_goal("close")
+        agenda.append(close_goal)
+
+        return agenda
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_iers', type=int, default=5,
-                        help="Number of image edit requests including open & close")
+    parser.add_argument('--ontology_file', type=str,
+                        default='imageedit.ontology.json')
+    parser.add_argument('--num_objects', type=int, default=3)
+    parser.add_argument('--num_iers', type=int, default=5)
     parser.add_argument('--dir', type=str, default='./sampled')
     parser.add_argument('--seed', type=int, default=521)
     parser.add_argument('--save', type=str, default='./sampled/agenda.pickle')
     args = parser.parse_args()
 
-    generator = ImageEditAgendaGenerator(args.dir, args.num_iers, args.seed)
+    assert args.num_iers >= args.num_objects
+
+    generator = AdjustAgendaGenerator(
+        args.ontology_file, args.num_objects, args.dir, args.num_iers, args.seed)
     agendas = generator.generate()
 
+    print("Generated {} agendas".format(len(agendas)))
     util.save_to_pickle(agendas, args.save)

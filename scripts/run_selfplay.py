@@ -8,10 +8,10 @@ sys.path.insert(0, root_dir)
 from tqdm import tqdm
 
 from iedsp import util
-from iedsp.channel import ConfChannel as Channel
-from iedsp.photoshop import PhotoshopGateway
-from iedsp.system import RuleBasedDialogueManager as System
-from iedsp.user import AgendaBasedUserSimulator as User
+from iedsp.channel import ChannelPortal
+from iedsp.photoshop import PhotoshopPortal
+from iedsp.system import System
+from iedsp.user import UserPortal
 from iedsp.world import SelfPlayWorld
 
 
@@ -26,10 +26,10 @@ def main(argv):
     agendas = util.load_from_pickle(config['DEFAULT']['AGENDA_PICKLE'])
 
     # Build Interaction World
-    user = User(config['USER'])
-    channel = Channel(config['CHANNEL'])
-    system = System(config['SYSTEM'])
-    photoshop = PhotoshopGateway(config['PHOTOSHOP'])
+    user = UserPortal(config['USER'])
+    channel = ChannelPortal(config)
+    system = System(config)  # system needs global_config
+    photoshop = PhotoshopPortal(config['PHOTOSHOP'])
 
     agents = [user, channel, system, photoshop]
 
@@ -45,8 +45,6 @@ def main(argv):
 
             if world.episode_done():
                 break
-
-        pass
 
 
 if __name__ == "__main__":
