@@ -1,9 +1,14 @@
 import configparser
+import logging
 
 from iedsp.core import SystemAct
 from iedsp.photoshop import PhotoshopPortal
 from iedsp.system import System
 from iedsp.util import build_slot_dict, imread, img_to_b64
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.DEBUG)
 
 
 def extract_das(system_act):
@@ -45,6 +50,7 @@ def test_system_demo():
 
     system.observe(ps_act)
     system.observe(user_act)
+
     system_act = system.act()
 
     assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]
@@ -93,7 +99,8 @@ def test_system_demo():
     system.observe(user_act)
     system_act = system.act()
 
-    assert extract_das(system_act) == [SystemAct.REQUEST_LABEL]
+    assert extract_das(system_act) == [
+        SystemAct.REQUEST]  # request object_mask_id
 
     # Turn 4: object_mask_id 1
     photoshop.observe(system_act)
@@ -104,7 +111,7 @@ def test_system_demo():
             {
                 'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
                 'intent': build_slot_dict('intent', 'select_object', 1.0),
-                'slots': [build_slot_dict('object_mask_id', '1', 1.0)]
+                'slots': [build_slot_dict('object_mask_id', 1, 1.0)]
             }
         ]
     }
@@ -117,7 +124,7 @@ def test_system_demo():
 
     assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]
     assert system.state.get_slot('object').get_max_value() == "dog"
-    assert system.state.get_slot('object_mask_id').get_max_value() == "1"
+    assert system.state.get_slot('object_mask_id').get_max_value() == 1
 
     # Turn 5: adjust brightness
     photoshop.observe(system_act)

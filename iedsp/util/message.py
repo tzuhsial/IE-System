@@ -65,4 +65,3 @@ def slot_to_observation(slot_dict, turn_id):
     obsrv.pop('slot')
     obsrv['turn_id'] = turn_id
     return obsrv
-

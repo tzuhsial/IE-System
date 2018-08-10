@@ -2,6 +2,7 @@ import json
 import logging
 
 from .node import builder as nodelib
+from .validator import builder as vallib
 from ..visionengine import VisionEnginePortal
 from .. import util
 
@@ -61,10 +62,19 @@ class OntologyEngine(object):
             threshold = slot_json["threshold"]
             possible_values = slot_json.get("possible_values", None)
 
+            # Instantiate object
+            val_name = slot_json.get("validator", "")
+            val_cls = vallib(val_name)
+            if val_cls is not None:
+                validator = val_cls()
+            else:
+                validator = None
+
             args = {
                 "name": name,
                 "threshold": threshold,
                 "possible_values": possible_values,
+                "validator": validator,
             }
 
             use_visionengine = slot_json.get("use_visionengine", False)
@@ -103,6 +113,7 @@ class OntologyEngine(object):
                 child_node = self.slots[child_name]
                 self.intents[name].add_child(child_node, optional)
 
+            # intent nodes store their children
             self.intents[name].build_node_dict()
 
         logger.info("Done.")

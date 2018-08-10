@@ -123,10 +123,16 @@ class State(object):
         """
         for slot in slots:
             slot_name = slot['slot']
+            if slot_name not in self.ontology.slots:
+                logger.info("Unknown slot: {}".format(slot_name))
+                continue
+
             obsrv = slot_to_observation(slot, turn_id)
-            slot_node = self.ontology.get_slot(slot_name)
-            if slot_node is not None:
-                slot_node.add_observation(**obsrv)
+            slot_node = self.get_slot(slot_name)
+            result = slot_node.add_observation(**obsrv)
+            if not result:
+                logger.info(
+                    "Failed to add observation {} to slot {}".format(obsrv, slot_name))
 
     def stack_intent(self, intent_name):
         """
@@ -147,7 +153,7 @@ class State(object):
         Returns the current sysintent of the state
         Checks intent tree first
         """
-        sysintent = self.get_intent('intent').pull()
+        sysintent = self.get_intent('intent').pull() 
         if sysintent.executable():
             execute_intent = sysintent.execute_slots[0]['value']
             sysintent = self.get_intent(execute_intent).pull()

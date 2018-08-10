@@ -86,6 +86,7 @@
             "name": "intent",
             "node": "BeliefNode",
             "threshold": 0.7,
+            "validator": "StringValidator",
             "possible_values": [
                 "open",
                 "load",
@@ -100,6 +101,7 @@
         {
             "name": "image_path",
             "node": "PSToolNode",
+            "validator": "PathValidator",
             "threshold": 1.0,
             "possible_values": null,
             "children": []
@@ -114,6 +116,7 @@
         {
             "name": "attribute",
             "node": "BeliefNode",
+            "validator": "StringValidator",
             "threshold": 0.7,
             "possible_values": [
                 "brightness",
@@ -127,6 +130,7 @@
         {
             "name": "adjust_value",
             "node": "BeliefNode",
+            "validator": "IntegerValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": []
@@ -134,6 +138,7 @@
         {
             "name": "object",
             "node": "BeliefNode",
+            "validator": "StringValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": [
@@ -171,6 +176,7 @@
         {
             "name": "object_mask_id",
             "node": "BeliefNode",
+            "validator": "IntegerValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": []
@@ -178,6 +184,7 @@
         {
             "name": "position",
             "node": "BeliefNode",
+            "validator": "StringValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": []
@@ -185,6 +192,7 @@
         {
             "name": "adjective",
             "node": "BeliefNode",
+            "validator": "StringValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": []

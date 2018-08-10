@@ -53,7 +53,7 @@ class MingYangClient(BaseVisionEngineClient):
     Github here: https://git.corp.adobe.com/mling/vision-engine
     """
 
-    def select_object(self, b64_img_str, object, position=None, adjective=None, color=None):
+    def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None):
 
         select_uri = urllib.parse.urljoin(self.uri, 'selection')
 

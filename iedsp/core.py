@@ -43,9 +43,43 @@ class SystemAct:
     REQUEST = "request"
     CONFIRM = "confirm"
     EXECUTE = "execute"
-    REPEAT = "repeat"
-    REQUEST_LABEL = "request_label"
     BYE = "bye"
+
+    @staticmethod
+    def photoshop_acts():
+        """
+        Actions that photoshop needs to load mask strs
+        """
+        return [ SystemAct.REQUEST, SystemAct.CONFIRM, SystemAct.EXECUTE]
+
+
+class Slot(object):
+    """
+    Basic class for slot
+    """
+
+    def __init__(self, slot, value=None, conf=None):
+        self.slot = slot
+        self.value = value
+        self.conf = conf
+
+    def __lt__(self, other):
+        return self.slot < other.slot
+
+    def __gt__(self, other):
+        return self.slot > other.slot
+
+    def __eq__(self, other):
+        return self.slot == other.slot
+
+    def __ge__(self, other):
+        return self.slot >= other.slot
+
+    def __le__(self, other):
+        return self.slot <= other.slot
+
+    def to_json(self):
+        return self.__dict__
 
 
 class SysIntent(object):
@@ -53,7 +87,7 @@ class SysIntent(object):
     A utility object for system intent slots
     """
 
-    def __init__(self, confirm_slots=None, request_slots=None, label_slots=None, execute_slots=None):
+    def __init__(self, confirm_slots=None, request_slots=None, execute_slots=None):
         """
         default argument cannot be list -> a bug that fucked me for 2 days...
         """
@@ -61,28 +95,23 @@ class SysIntent(object):
             confirm_slots = []
         if request_slots is None:
             request_slots = []
-        if label_slots is None:
-            label_slots = []
         if execute_slots is None:
             execute_slots = []
         self.confirm_slots = confirm_slots
         self.request_slots = request_slots
-        self.label_slots = label_slots
         self.execute_slots = execute_slots
 
     def __iadd__(self, other_intent):
         self.confirm_slots += other_intent.confirm_slots
         self.request_slots += other_intent.request_slots
-        self.label_slots += other_intent.label_slots
         self.execute_slots += other_intent.execute_slots
         return self
 
     def __add__(self, other_intent):
         confirm_slots = self.confirm_slots + other_intent.confirm_slots
         request_slots = self.request_slots + other_intent.request_slots
-        label_slots = self.label_slots + other_intent.label_slots
         execute_slots = self.execute_slots + other_intent.execute_slots
-        return SysIntent(confirm_slots, request_slots, label_slots, execute_slots)
+        return SysIntent(confirm_slots, request_slots, execute_slots)
 
     def __radd__(self, other_intent):
         return other_intent.__add__(self)
@@ -97,9 +126,6 @@ class SysIntent(object):
         if sort_slots_with_key('slot', self.request_slots) != \
            sort_slots_with_key('slot', other_intent.request_slots):
             return False
-        if sort_slots_with_key('slot', self.label_slots) != \
-           sort_slots_with_key('slot', other_intent.label_slots):
-            return False
         if sort_slots_with_key('slot', self.execute_slots) != \
            sort_slots_with_key('slot', other_intent.execute_slots):
             return False
@@ -110,8 +136,6 @@ class SysIntent(object):
             return False
         elif len(self.request_slots) != 0:
             return False
-        elif len(self.label_slots) != 0:
-            return False
         elif len(self.execute_slots) != 0:
             return False
         return True
@@ -119,17 +143,15 @@ class SysIntent(object):
     def clear(self):
         self.confirm_slots.clear()
         self.request_slots.clear()
-        self.label_slots.clear()
         self.execute_slots.clear()
 
     def copy(self):
-        return SysIntent(self.confirm_slots, self.request_slots, self.label_slots, self.execute_slots)
+        return SysIntent(self.confirm_slots, self.request_slots, self.execute_slots)
 
     def to_json(self):
         obj = {
             'confirm': self.confirm_slots,
             'request': self.request_slots,
-            'label': self.label_slots,
             'execute': self.execute_slots
         }
         return obj
@@ -137,7 +159,6 @@ class SysIntent(object):
     def pprint(self):
         print('confirm', self.confirm_slots)
         print('request', self.request_slots)
-        print('label', self.label_slots)
         print('execute', self.execute_slots)
 
     def executable(self):
@@ -147,8 +168,6 @@ class SysIntent(object):
         if len(self.confirm_slots) != 0:
             return False
         if len(self.request_slots) != 0:
-            return False
-        if len(self.label_slots) != 0:
             return False
         if len(self.execute_slots) != 0:
             return True
@@ -181,10 +200,3 @@ class PhotoshopAct:
     @staticmethod
     def edit_acts():
         return [PhotoshopAct.ADJUST, PhotoshopAct.ADJUST_COLOR]
-
-
-class Slot(object):
-    def __init__(self, slot, value=None, conf=None):
-        self.slot = slot
-        self.value = value
-        self.conf = conf

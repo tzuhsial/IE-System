@@ -21,3 +21,5 @@ def test_ontology():
         assert slot_json["name"] in engine.slots
 
     # TODO: validate engine dependency graph, or validate ontology_file
+
+    assert engine.slots['position'].add_observation(123, 1.0, 1) == False

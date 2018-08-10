@@ -50,8 +50,6 @@ class SelfPlayWorld(object):
 
         self.turn_count += 1
         print("[World] Turn", self.turn_count)
-        import pdb
-        pdb.set_trace()
 
     def episode_done(self):
         """

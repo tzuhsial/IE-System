@@ -1,6 +1,7 @@
 from iedsp.ontology.node import *
 from iedsp.util import build_slot_dict, sort_slots_with_key
 from iedsp.util import imread, img_to_b64
+from iedsp.visionengine import DummyClient
 
 
 def test_beliefnode():
@@ -30,6 +31,7 @@ def test_beliefnode():
     i1 = node.pull()
     i2 = node.pull()
     assert i1 == i2
+
 
 def test_intentnode():
     open = IntentNode('open')
@@ -74,7 +76,7 @@ def test_intent_pull():
         execute_slots=[build_slot_dict('image_path', 'ip1', 1.0)])
 
     assert image_path.last_update_turn_id == turn_id
-    assert open.last_update_turn_id == turn_id
+    assert open.last_update_turn_id == -1
 
     # turn 2
     turn_id = 2
@@ -90,13 +92,15 @@ def test_intent_pull():
     assert image_path.intent == SysIntent(
         execute_slots=[build_slot_dict('image_path', 'ip2', 1.0)])
 
+
 def test_select_object_intent():
     # select_object_domain
     select = IntentNode('select_object')
 
     # object_mask_slot
-    visionengine = None
-    object_mask_slot = ObjectMaskNode('object_mask', visionengine=visionengine)
+    visionengine = DummyClient("fake")
+    object_mask_slot = ObjectMaskStrNode(
+        'object_mask_str', visionengine=visionengine)
 
     b64_img_str_slot = PSToolNode('b64_img_str')
     object_slot = BeliefNode('object')
@@ -141,43 +145,30 @@ def test_select_object_intent():
 
     b64_img_str_slot.add_observation(b64_img_str, 1.0, turn_id)
     object_slot.add_observation('dog', 1.0, turn_id)
-    position_slot.add_observation('right', 0.7, turn_id)
+    position_slot.add_observation('right', 0.6, turn_id)
 
     select_intent = select.pull()
-    assert select_intent == SysIntent(confirm_slots=[build_slot_dict('position', 'right', 0.7)],
+    assert select_intent == SysIntent(confirm_slots=[build_slot_dict('position', 'right', 0.6)],
                                       execute_slots=[build_slot_dict('object', 'dog', 1.0)])
 
     # Turn 2:
     # User: Yes: confirm(position=right)
-    # System: I cannot find what you want. Can you label it for me?: request_label
+    # System: I cannot find what you want. Can you label it for me?: request
     turn_id = 2
     position_slot.add_observation('right', 0.9, turn_id)
 
     select_intent = select.pull()
-    assert len(select_intent.confirm_slots) == 0
-    assert len(select_intent.request_slots) == 0
-    assert len(select_intent.label_slots) != 0
-    assert len(select_intent.execute_slots) == 0
+    assert select_intent == SysIntent(
+        request_slots=[build_slot_dict('object_mask_str')]
+    )
 
     # Turn 3:
-    # Photoshop: [0th dog] (only 1 dog is identified)
-    # User: The 1st dog: label(object_mask_id=0)
-    # System: Can you label it for me? request_label
+    # User: (Selects with Photoshop)
+    # System: Executes
     turn_id = 3
-    object_mask_id_slot.add_observation('1', 1.0, turn_id)
-
+    object_mask_slot.add_observation("test_mask_str", 1.0, turn_id)
     select_intent = select.pull()
-    assert len(select_intent.confirm_slots) == 0
-    assert len(select_intent.request_slots) == 0
-    assert len(select_intent.label_slots) != 0
-    assert len(select_intent.execute_slots) == 0
-
-    # Turn 4:
-    # User: The 0th dog: label(object_mask_id=0)
-    # System: Ok, what would you like to do? : ask(intent=?)
-    turn_id = 4
-    object_mask_slot.add_observation(b64_img_str, 1.0, turn_id)
-    object_mask_id_slot.add_observation('0', 1.0, turn_id)
-
-    select_intent = select.pull()
-    assert select_intent.executable()
+    assert select_intent == SysIntent(
+        execute_slots=[build_slot_dict(
+            'object_mask_str', 'test_mask_str', 1.0)]
+    )

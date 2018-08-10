@@ -47,9 +47,10 @@ class System(object):
         Update dialogue state with user_acts
         """
         # Update actions from user
-        user_acts = self.observation.get('user_acts', list())
         photoshop_acts = self.observation.get('photoshop_acts', list())
-        observed_acts = user_acts + photoshop_acts
+        user_acts = self.observation.get('user_acts', list())
+        observed_acts =  photoshop_acts + user_acts
+
         for act in observed_acts:
             # Usually have only one user_act
             args = {
@@ -70,11 +71,7 @@ class System(object):
 
         sysintent = self.state.pull()
 
-        if len(sysintent.label_slots):
-            da = SystemAct.REQUEST_LABEL
-            intent = da
-            slots = sysintent.label_slots
-        elif len(sysintent.confirm_slots):
+        if len(sysintent.confirm_slots):
             da = SystemAct.CONFIRM
             intent = da
             slots = sysintent.confirm_slots[:1]  # confirm 1 at a time
@@ -153,8 +150,6 @@ class System(object):
                     sv = slot_dict['slot'] + " is " + str(slot_dict['value'])
                     confirm_list.append(sv)
                 utt += ','.join(confirm_list) + "?"
-            elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
-                utt = "I can not identify the object. Can you label it for me?"
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
 

@@ -92,7 +92,8 @@ class SimplePhotoshopClient(object):
             sys_dialogue_act = sys_act['dialogue_act']['value']
 
             # Load mask_strs
-            if sys_dialogue_act in [SystemAct.REQUEST_LABEL, SystemAct.EXECUTE]:
+            if sys_dialogue_act in SystemAct.photoshop_acts():
+
                 # Get all mask_str slots from mask, or could be empty
                 mask_str_slots = []
                 for slot in sys_act['slots']:
@@ -160,6 +161,7 @@ class SimplePhotoshopClient(object):
 
         b64_img_str = check_obj.get("b64_img_str", "")
         masked_b64_img_str = check_obj.get("masked_b64_img_str", "")
+
         # Build return object
         photoshop_act = {}
         ps_act = {
