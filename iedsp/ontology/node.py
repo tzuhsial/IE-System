@@ -176,7 +176,7 @@ class BeliefNode(object):
         intent = SysIntent()
         slot = self.to_json()
         max_conf = slot.get('conf', 0.0)
-        if max_conf <= 0.0:
+        if max_conf < 0.5:
             intent.request_slots.append(slot)
         elif max_conf < self.threshold:
             intent.confirm_slots.append(slot)
@@ -405,7 +405,6 @@ class ObjectMaskStrNode(BeliefNode):
         object_mask_str_turn_id = self.last_update_turn_id
         object_turn_id = object_node.last_update_turn_id
         object_mask_id_turn_id = object_mask_id_node.last_update_turn_id
-        #b64_img_str_turn_id = b64_img_str_node.last_update_turn_id
 
         self.last_update_turn_id = max(
             object_mask_str_turn_id, object_turn_id, object_mask_id_turn_id)
@@ -426,7 +425,11 @@ class ObjectMaskStrNode(BeliefNode):
                 self.intent = object_intent
                 return self.intent
 
-            # Query CV engine
+            if object_node.get_max_value() == "image":  # Special case: image
+                self.intent = SysIntent()
+                return self.intent
+
+            # Query CV engine: a lazy update
             object_mask_id_node.clear()  # This prevents pulling from object_mask_id
 
             mask_strs = self.query()
@@ -447,7 +450,11 @@ class ObjectMaskStrNode(BeliefNode):
                 return self.intent
 
             object_mask_id = object_mask_id_node.get_max_value()
-            if object_mask_id < len(self.value_conf_map):
+
+            if object_mask_id == -1:
+                for value in self.value_conf_map:
+                    self.value_conf_map[ value ] = 0.0 
+            elif object_mask_id < len(self.value_conf_map):
                 candidates = list(self.value_conf_map.items())
                 mask_str, _ = candidates[object_mask_id]
 
@@ -455,32 +462,42 @@ class ObjectMaskStrNode(BeliefNode):
                 self.add_observation(mask_str, 1.0, self.last_update_turn_id)
             else:
                 object_mask_id_node.clear()
+
         # Building self intent, which includes requesting object_mask_id
         self.intent = self._build_slot_intent()
         return self.intent
 
     def _build_slot_intent(self):
         """
+        Build intent depending on the values
         The intent after obtaining mask_str from the vision engine
-        There should only be two types 1. label 2. execute
+        There should only be 3 types: 1.request 2 confirm 3. execute
         """
         intent = SysIntent()
 
-        if len(self.value_conf_map) == 0:
+        if self.get_max_conf() >= self.threshold:
+            mask_str, conf = self.get_max_conf_value()
+            mask_str_slot = build_slot_dict('object_mask_str', mask_str, conf)
+            intent.execute_slots.append(mask_str_slot)
+            return intent
+
+        if self.get_max_conf() < 0.5:
+            # Request object_mask_str directly
             mask_str_slot = build_slot_dict('object_mask_str')
             intent.request_slots.append(mask_str_slot)
             return intent
-        elif len(self.value_conf_map) == 1:
-            mask_str, conf = self.get_max_conf_value()
-            mask_str_slot = build_slot_dict('object_mask_str', mask_str, conf)
-            if conf < self.threshold:
-                intent.confirm_slots.append(mask_str_slot)
-            else:
-                intent.execute_slots.append(mask_str_slot)
-        else:
-            # request_object_mask_id
-            object_mask_id_slot = build_slot_dict('object_mask_id')
+
+        # Filter out values that are between threshold and 0.5
+        mask_strs = list(self.value_conf_map.keys())
+
+        if len(mask_strs) == 1:  # Confirm, since there is only 1 result
+            mask_str = mask_strs[0]
+            mask_str_slot = build_slot_dict('object_mask_str', mask_str)
+            intent.confirm_slots.append(mask_str_slot)
+        else:  # > 1, request object_mask_id
+            object_mask_id_slot = build_slot_dict('object_mask_id', mask_strs)
             intent.request_slots.append(object_mask_id_slot)
+
         return intent
 
 
@@ -490,7 +507,6 @@ def builder(string):
     """
     try:
         return getattr(sys.modules[__name__], string)
-    except AttributeError as e:
-        print(e)
-        logger.debug("Unknown node: {}".format(string))
+    except AttributeError:
+        logger.error("Unknown node: {}".format(string))
         return None

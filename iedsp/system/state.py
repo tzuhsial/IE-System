@@ -121,6 +121,9 @@ class State(object):
             slots (list): list of slot dicts
             turn_id (int)
         """
+        if slots is None or len(slots) == 0:
+            return
+
         for slot in slots:
             slot_name = slot['slot']
             if slot_name not in self.ontology.slots:
@@ -134,6 +137,18 @@ class State(object):
                 logger.info(
                     "Failed to add observation {} to slot {}".format(obsrv, slot_name))
 
+    def pull(self):
+        """
+        Returns the current sysintent of the state
+        Checks intent tree first
+        """
+        sysintent = self.get_intent('intent').pull()
+        if sysintent.executable():
+            execute_intent = sysintent.execute_slots[0]['value']
+            sysintent = self.get_intent(execute_intent).pull()
+        self.sysintent = sysintent
+        return self.sysintent
+
     def stack_intent(self, intent_name):
         """
         Pushes the intent with previous values into the intent stack
@@ -142,23 +157,21 @@ class State(object):
         copied_tree = copy.deepcopy(intent_tree)  # Copy the intent tree
         self.framestack.push(copied_tree)
 
+    def query_history(self, object_name=None):
+        """
+        Search the frame stack with object_name if 
+        Args:
+            object_name (str): the desired object
+        Returns:
+            mask_strs (list): the desired object
+        """
+        raise NotImplementedError
+
     def get_slot(self, slot_name):
         return self.ontology.get_slot(slot_name)
 
     def get_intent(self, intent_name):
         return self.ontology.get_intent(intent_name)
-
-    def pull(self):
-        """
-        Returns the current sysintent of the state
-        Checks intent tree first
-        """
-        sysintent = self.get_intent('intent').pull() 
-        if sysintent.executable():
-            execute_intent = sysintent.execute_slots[0]['value']
-            sysintent = self.get_intent(execute_intent).pull()
-        self.sysintent = sysintent
-        return self.sysintent
 
     def clear_intent(self, intent_name):
         self.ontology.get_intent(intent_name).clear()
@@ -166,13 +179,19 @@ class State(object):
     def clear_slot(self, slot_name):
         self.ontology.get_slot(slot_name).clear()
 
+    def clear_graph(self):
+        self.ontology.clear()
+
+    def clear_history(self):
+        self.framestack.clear()
+
     def clear(self):
         self.ontology.clear()
         self.framestack.clear()
 
     def to_json(self):
         """
-        Format to json object to save as history
+        Format to json to save as history
         """
         raise NotImplementedError
 

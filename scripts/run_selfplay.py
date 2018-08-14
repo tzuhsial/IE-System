@@ -46,6 +46,9 @@ def main(argv):
             if world.episode_done():
                 break
 
+        import pdb
+        pdb.set_trace()
+
 
 if __name__ == "__main__":
     main(sys.argv)

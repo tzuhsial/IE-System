@@ -6,8 +6,12 @@ SELECT_URL = "http://isupreme:5100/selection"
 
 
 def select(img, noun):
-    """ Calls Server and returns mask array
+    """ 
+    Calls Server and returns mask array
+    Returns:
+        masks (list): list of mask strings
     """
+    print('noun', noun)
     # Convert to base64 str
     b64_img_str = img_to_b64(img)
 
@@ -16,14 +20,16 @@ def select(img, noun):
         'imgstr': b64_img_str,
         'text': noun
     }
+
     try:
         response = requests.post(SELECT_URL, data=data)
         response.raise_for_status()
         results = response.json()
-    except:
+    except Exception as e:
+        print(e)
         results = []
 
-    print('results', results)
+    print('selection:', len(results))
     # Get mask array
     masks = []
     for mask_str in results:

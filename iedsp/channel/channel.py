@@ -83,11 +83,12 @@ class MultimodalChannel(object):
             # Assign confidence scores
             user_act["dialogue_act"]["conf"] = self.generate_confidence()
 
-            intent_name = user_act["intent"]["value"]
-            if intent_name in self.photoshop_intents:
-                user_act["intent"]["conf"] = 1.
-            else:
-                user_act["intent"]["conf"] = self.generate_confidence()
+            if "intent" in user_act:
+                intent_name = user_act["intent"]["value"]
+                if intent_name in self.photoshop_intents:
+                    user_act["intent"]["conf"] = 1.
+                else:
+                    user_act["intent"]["conf"] = self.generate_confidence()
 
             for slot_dict in user_act.get('slots', list()):
                 slot_name = slot_dict["slot"]

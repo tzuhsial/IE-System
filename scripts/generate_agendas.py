@@ -123,6 +123,7 @@ class AdjustAgendaGenerator(object):
 
         # IER: open
         image_path = os.path.join(self.dir, 'image', img['file_name'])
+        image_path = os.path.abspath(image_path)
         image_path_slot = util.build_slot_dict('image_path', image_path)
         open_goal = build_goal('open', [image_path_slot])
         agenda.append(open_goal)

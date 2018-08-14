@@ -18,7 +18,8 @@ class System(object):
     Mainly handles the interactions with the environment
 
     Attributes:
-        state 
+        state
+        framestack
     """
 
     def __init__(self, global_config):
@@ -49,14 +50,14 @@ class System(object):
         # Update actions from user
         photoshop_acts = self.observation.get('photoshop_acts', list())
         user_acts = self.observation.get('user_acts', list())
-        observed_acts =  photoshop_acts + user_acts
+        observed_acts = photoshop_acts + user_acts
 
         for act in observed_acts:
             # Usually have only one user_act
             args = {
                 'dialogue_act': act.get('dialogue_act', None),
                 'intent': act.get('intent', None),
-                'slots': act.get('slots', list()),
+                'slots': act.get('slots', None),
                 'turn_id': self.turn_id
             }
             self.state.update(**args)
@@ -80,26 +81,27 @@ class System(object):
             intent = da
             slots = sysintent.request_slots[:1]  # request 1 at a time
         else:
-            # Execute slots can be empty! e.g. redo, undo, close
             # Execute the intent
             da = SystemAct.EXECUTE
             intent = self.state.get_slot('intent').get_max_value()
             slots = sysintent.execute_slots
 
-            # Stack the intent to history
+            # Stack the intent to history and clear intent slot
             self.state.stack_intent(intent)
+            self.state.clear_slot('intent')
 
-            # Clear intent, and the intent tree
-            # self.state.clear_intent('intent')
+            # Clear graph if Undo or Redo
+            if intent == "undo":
+                self.state.clear_graph()
 
-        # Label, Confirm, Request, Execute
+        # Request, Confirm, Label, Execute
         system_acts += [build_sys_act(da, intent, slots)]
 
         # Special cases
         if intent == "open":
             system_acts += [build_sys_act(SystemAct.GREETING)]
         if intent == "close":
-            system_acts += [build_sys_act(SystemAct.BYE)]
+            system_acts = [build_sys_act(SystemAct.BYE)]
         elif da == SystemAct.EXECUTE:
             system_acts += [build_sys_act(SystemAct.ASK)]
         return system_acts
@@ -110,11 +112,14 @@ class System(object):
         Returns:
             system_act (dict)
         """
-        # Update state
+        # Update state with observation
         self.state_update()
 
         # Policy
         system_acts = self.policy()
+
+        # Update turn_id
+        self.turn_id += 1
 
         # Build Return object
         system_act = {}
@@ -122,6 +127,7 @@ class System(object):
         system_act['system_utterance'] = self.template_nlg(system_acts)
         system_act['episode_done'] = self.observation.get(
             'episode_done', False)
+
         return system_act
 
     ###########################
@@ -152,10 +158,10 @@ class System(object):
                 utt += ','.join(confirm_list) + "?"
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
-
+                
                 slot_list = [slot['slot'] + "=" + str(slot['value'])
                              for slot in execute_slots]
-                utt = "Execute: " + ', '.join(slot_list)
+                utt = "Execute: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:

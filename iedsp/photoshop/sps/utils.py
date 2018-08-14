@@ -9,6 +9,7 @@ if not 'matplotlib' in sys.modules:
     matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import numpy as np
+from skimage.measure import find_contours
 
 
 def imread(image_path):
@@ -40,9 +41,11 @@ def b64_to_img(b64_img_str):
 #   Plotting Functions   #
 ##########################
 """
-    Mask plotting functions mostly borrowed from 
-    https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py
+Mask plotting functions mostly borrowed from 
+https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py
 """
+
+
 def random_colors(N, bright=True):
     """
     Generate random colors.
@@ -52,12 +55,14 @@ def random_colors(N, bright=True):
     brightness = 1.0 if bright else 0.7
     hsv = [(i / N, 1, brightness) for i in range(N)]
     colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
-    random.shuffle(colors)
+    for idx, tup in enumerate(colors):
+        colors[idx] = list(map(lambda c : c * 255, tup))
     return colors
 
 
 def apply_mask(image, mask, color=None, alpha=0.5):
-    """Apply the given mask to the image.
+    """
+    Apply the given mask to the image.
     """
     if color is None:
         color = random_colors(1)[0]  # We have only 1 mask at this moment
@@ -87,6 +92,11 @@ def plot_diff(img1, img2, cmap=None, figname='diff.png'):
     plt.imshow(img2)
     if figname is not None:
         plt.savefig(figname)
+
+def plot_figure(img, figname="test.png"):
+    plt.figure()
+    plt.imshow(img)
+    plt.savefig(figname)
 
 
 if __name__ == "__main__":

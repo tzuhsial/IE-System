@@ -6,7 +6,7 @@ import sys
 import numpy as np
 
 from ..core import UserAct, SystemAct
-from ..util import find_slot_with_key, b64_to_img, build_slot_dict
+from ..util import find_slot_with_key, b64_to_img, build_slot_dict, sort_slots_with_key
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +40,6 @@ class AgendaBasedUserSimulator(object):
 
     def process_agenda(self, agenda):
         raise NotImplementedError
-
-    def print_agenda(self):
-        """
-        Displays current agenda in human readable format
-        """
-        for agenda in self.agenda:
-            print('intent', agenda['intent'])
 
     def get_current_goal(self):
         """
@@ -88,25 +81,30 @@ class AgendaBasedUserSimulator(object):
             # requires a response from the user
             sys_dialogue_act = sys_act['dialogue_act']['value']
             if sys_dialogue_act == SystemAct.ASK:
-                user_act = self.act_inform()
+                user_act = self.act_inform_goal()
                 user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.REQUEST:
-                request_slot = sys_act["slots"][0]
-                raise NotImplementedError
+                request_slots = sys_act["slots"]
+                user_act = self.act_inform_request(request_slots)
+                user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.CONFIRM:
-                raise NotImplementedError
+                confirm_slots = sys_act["slots"]
+                user_act = self.act_confirm(confirm_slots)
+                user_acts.append(user_act)
 
-            elif sys_dialogue_act == SystemAct.REQUEST_LABEL:
-                label_slots = sys_act["slots"]
-                user_act = self.act_label(label_slots)
+            elif sys_dialogue_act in SystemAct.query_acts():
+                user_act = {}
+                user_act['dialogue_act'] = build_slot_dict(
+                    "dialogue_act", UserAct.WAIT)
                 user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 exec_intent = sys_act["intent"]
                 exec_slots = sys_act["slots"]
-                success = self.check_execution_result(exec_intent, exec_slots)
+
+                success = self.check_execution(exec_intent, exec_slots)
 
                 print("Execution result", success)
                 if not success:
@@ -129,11 +127,11 @@ class AgendaBasedUserSimulator(object):
         user_act['episode_done'] = episode_done
         return user_act
 
-    def act_inform(self, slots=None):
+    def act_inform_goal(self):
         """
         Informs the current goal, which is the top of the agenda
         Args:
-            slots (list): slots that needs to be informed
+            slots (list): list of slot names(string) that needs to be informed
         Returns:
             user_act (dict): user act object
         """
@@ -144,108 +142,123 @@ class AgendaBasedUserSimulator(object):
         user_act = copy.deepcopy(goal)
         user_act["dialogue_act"] = build_slot_dict(
             "dialogue_act", UserAct.INFORM)
-
-        user_slots = user_act.get("slots", list())
+        goal_slots = user_act.get("slots", list())  # Could be empty
         user_slots = filter(
-            lambda slot: slot['slot'] != 'object_mask_str', user_slots)
-        user_act["slots"] = list(user_slots)
-        if slots is not None:
-            user_act["slots"] = slots
-
+            lambda slot: slot['slot'] != 'object_mask_str', goal_slots)
+        user_slots = list(user_slots)
+        user_act["slots"] = user_slots
         return user_act
 
-    def act_label(self, label_slots):
+    def act_inform_request(self, request_slots):
         """
-        Response to System.REQUEST_LABEL
+        Inform respond to system request
+        Args:
+            request_slots (list): list of slot dict 
+        Returns:
+            user_act (dict)
         """
-        goal = self.get_current_goal()
-        goal_slots = goal.get("slots", list())
-        goal_mask_str_slot = find_slot_with_key('object_mask_str', goal_slots)
+        req_slot = request_slots[0]
+        req_name = req_slot['slot']
+        goal_slots = self.get_current_goal()['slots']
 
-        if goal_mask_str_slot is None:
-            # User wants to edit the whole image
-            # but the system asks the user to label...
-            object_slot = find_slot_with_key('object', goal_slots)
-            user_act = self.act_inform([object_slot])
-            return user_act
+        if req_name == "object_mask_id":
+            # Compare with all the provided
+            print("requesting object_mask_id")
 
-        if len(label_slots) and all(slot.get('value') for slot in label_slots):
-            # Compute dice score and select the one with the highest
+            mask_strs = req_slot['value']
+            goal_mask_str = find_slot_with_key(
+                'object_mask_str', goal_slots)['value']
 
-            goal_mask_str = goal_mask_str_slot["value"]
+            dice_scores = [self.compute_dice(
+                mask_str, goal_mask_str) for mask_str in mask_strs]
 
-            scores = []
-            for idx, mask_str_slot in enumerate(label_slots):
-                mask_str = mask_str_slot["value"]
-                dice_score = self.compute_dice(mask_str, goal_mask_str)
-                scores.append((idx, dice_score))
+            max_score = max(dice_scores)
+            max_index = dice_scores.index(max_score)
 
-            # Sort scores with descending order
-            sorted_scores = sorted(
-                scores, key=lambda tup: tup[1], reverse=True)
-
-            # Check score
-            max_idx, max_score = sorted_scores[0]
-
+            inform_slot = build_slot_dict('object_mask_id')
             if max_score >= self.dice_threshold:
-                object_mask_id_slot = build_slot_dict(
-                    'object_mask_id', max_idx)
-                user_act = self.act_inform([object_mask_id_slot])
-
-                goal_object_mask_id_slot = find_slot_with_key(
-                    'object_mask_id', goal_slots)
-
-                if goal_object_mask_id_slot is None:
-                    goal_slots.append(object_mask_id_slot)
-                else:
-                    goal_object_mask_id_slot["value"] = max_idx
-
+                inform_slot['value'] = max_index
             else:
-                # Directly label it
-                user_act = self.act_inform([goal_mask_str_slot])
+                inform_slot['value'] = -1
         else:
-            user_act = self.act_inform([goal_mask_str_slot])
+            inform_slot = find_slot_with_key(req_name, goal_slots)
 
+        if inform_slot is None:
+            # Inform goal by default
+            return self.act_inform_goal()
+
+        user_act = {}
+        user_act['dialogue_act'] = build_slot_dict(
+            'dialogue_act', UserAct.INFORM)
+        user_act['slots'] = [inform_slot]
         return user_act
 
-    def check_execution_result(self, execute_intent, execute_slots):
+    def act_confirm(self, confirm_slots):
+        assert len(confirm_slots) == 1
+        confirm_slot = confirm_slots[0]
+        goal_slots = self.get_current_goal()["slots"]
+        target_slot = find_slot_with_key(confirm_slot['slot'], goal_slots)
+
+        if target_slot is None:
+            # Is adjust_value 50?
+            # Select the dog
+            return self.act_inform_goal()
+
+        # Check value
+        if confirm_slot['slot'] == "object_mask_str":
+            # Calculate dice_score
+            mask_str = confirm_slot['value']
+            goal_mask_str_slot = find_slot_with_key(
+                'object_mask_str', goal_slots)
+            goal_mask_str = goal_mask_str_slot['value']
+            dice_score = self.compute_dice(mask_str, goal_mask_str)
+            same = dice_score >= self.dice_threshold
+        else:
+            same = confirm_slot['value'] == target_slot['value']
+
+        if same:
+            da = UserAct.AFFIRM
+        else:
+            da = UserAct.NEGATE
+
+        user_act = {}
+        user_act['dialogue_act'] = build_slot_dict('dialogue_act', da)
+        return user_act
+
+    def check_execution(self, execute_intent, execute_slots):
         """
         Check if system execution result matches current goal
         Returns:
             success (bool): True if success else False
         """
-        success = True
         goal = self.get_current_goal()
 
         # Check intents
         if execute_intent['value'] != goal['intent']['value']:
-            success == False
-        elif len(execute_slots) != len(goal['slots']):
-            success == False
-        else:
-            for target_slot in goal["slots"]:
-                slot_name = target_slot['slot']
-                slot = find_slot_with_key(slot_name, execute_slots)
+            return False
 
-                if slot is None:
-                    logger.debug("Missing slot: {}".format(slot_name))
-                    success = False
-                    break
+        # Check value of goal_slots
+        for target_slot in goal['slots']:
+            slot_name = target_slot['slot']
+            target_value = target_slot['value']
 
-                if slot_name == "mask_str":
-                    # Compute the dice score between mask_str & target_mask_str
-                    mask_str = slot['value']
-                    target_mask_str = target_slot["value"]
-                    dice_score = self.compute_dice(mask_str, target_mask_str)
-                    if dice_score < self.dice_threshold:
-                        success = False
-                        break
+            if slot_name == "object":  # Skip this slot in object_goal
+                continue
 
-                if slot["value"] != target_slot["value"]:
-                    success = False
-                    break
+            slot = find_slot_with_key(slot_name, execute_slots)
+            if slot is None:
+                return False
+            slot_value = slot['value']
 
-        return success
+            if slot_name == "object_mask_str":
+                dice_score = self.compute_dice(slot_value, target_value)
+                if dice_score < self.dice_threshold:
+                    return False
+            else:
+                if slot['value'] != target_value:
+                    return False
+
+        return True
 
     def compute_dice(self, mask_str, goal_mask_str):
         """
@@ -260,7 +273,7 @@ class AgendaBasedUserSimulator(object):
         mask = b64_to_img(mask_str)
         goal_mask = b64_to_img(goal_mask_str)
         assert mask.shape == goal_mask.shape, "Weird shape"
-        dice = 2 * (mask & goal_mask).sum() / (mask | goal_mask).sum()
+        dice = 2 * (mask & goal_mask).sum() / (mask.sum() + goal_mask.sum())
         return dice
 
     def template_nlg(self, user_acts):
@@ -276,8 +289,9 @@ class AgendaBasedUserSimulator(object):
             user_dialogue_act = user_act['dialogue_act']['value']
             if user_dialogue_act == UserAct.INFORM:
                 # Template based NLG based on intent
-                intent_slot = user_act['intent']
-                slots = [intent_slot] + user_act["slots"]
+                intent_slot = user_act.get('intent', None)
+                slots = [intent_slot] if intent_slot is not None else []
+                slots += user_act.get("slots", list())
                 slot_list = []
                 for slot in slots:
                     slot_list.append(slot['slot'] + "=" + str(slot['value']))

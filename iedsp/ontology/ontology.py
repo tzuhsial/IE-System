@@ -113,7 +113,7 @@ class OntologyEngine(object):
                 child_node = self.slots[child_name]
                 self.intents[name].add_child(child_node, optional)
 
-            # intent nodes store their children
+            # intent nodes store their children and descendants
             self.intents[name].build_node_dict()
 
         logger.info("Done.")

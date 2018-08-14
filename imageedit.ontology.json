@@ -155,7 +155,7 @@
         {
             "name": "object_mask_str",
             "node": "ObjectMaskStrNode",
-            "threshold": 1.0,
+            "threshold": 0.7,
             "possible_values": null,
             "use_visionengine": true,
             "children": [

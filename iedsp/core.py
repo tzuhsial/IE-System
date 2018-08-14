@@ -1,3 +1,4 @@
+import json
 from .util import sort_slots_with_key
 
 
@@ -13,11 +14,12 @@ class Agent:
 
 class UserAct:
     """
-    User Dialogue Acts 
+    User Dialogue Acts
     """
     INFORM = "inform"
     AFFIRM = "affirm"
     NEGATE = "negate"
+    WAIT = "wait"
 
     @staticmethod
     def confirm_acts():
@@ -33,6 +35,13 @@ class UserAct:
         """
         return [UserAct.INFORM]
 
+    @staticmethod
+    def wait_acts():
+        """
+        Wait for the system to query...
+        """
+        return[UserAct.WAIT]
+
 
 class SystemAct:
     """
@@ -42,44 +51,25 @@ class SystemAct:
     ASK = "ask"
     REQUEST = "request"
     CONFIRM = "confirm"
+    QUERY = "query"
+    QUERY_VISIONENGINE = "query_visionengine"
+    QUERY_HISTORY = "query_history"
     EXECUTE = "execute"
     BYE = "bye"
 
     @staticmethod
-    def photoshop_acts():
+    def load_mask_strs_acts():
         """
         Actions that photoshop needs to load mask strs
         """
-        return [ SystemAct.REQUEST, SystemAct.CONFIRM, SystemAct.EXECUTE]
+        return [SystemAct.REQUEST, SystemAct.CONFIRM, SystemAct.EXECUTE]
 
-
-class Slot(object):
-    """
-    Basic class for slot
-    """
-
-    def __init__(self, slot, value=None, conf=None):
-        self.slot = slot
-        self.value = value
-        self.conf = conf
-
-    def __lt__(self, other):
-        return self.slot < other.slot
-
-    def __gt__(self, other):
-        return self.slot > other.slot
-
-    def __eq__(self, other):
-        return self.slot == other.slot
-
-    def __ge__(self, other):
-        return self.slot >= other.slot
-
-    def __le__(self, other):
-        return self.slot <= other.slot
-
-    def to_json(self):
-        return self.__dict__
+    @staticmethod
+    def query_acts():
+        """
+        Actions that requires the user to wait
+        """
+        return [SystemAct.QUERY, SystemAct.QUERY_VISIONENGINE, SystemAct.QUERY_HISTORY]
 
 
 class SysIntent(object):
@@ -120,14 +110,11 @@ class SysIntent(object):
         """
         Compare slots, regardless of order
         """
-        if sort_slots_with_key('slot', self.confirm_slots) != \
-           sort_slots_with_key('slot', other_intent.confirm_slots):
+        if sort_slots_with_key('slot', self.confirm_slots) != sort_slots_with_key('slot', other_intent.confirm_slots):
             return False
-        if sort_slots_with_key('slot', self.request_slots) != \
-           sort_slots_with_key('slot', other_intent.request_slots):
+        if sort_slots_with_key('slot', self.request_slots) != sort_slots_with_key('slot', other_intent.request_slots):
             return False
-        if sort_slots_with_key('slot', self.execute_slots) != \
-           sort_slots_with_key('slot', other_intent.execute_slots):
+        if sort_slots_with_key('slot', self.execute_slots) != sort_slots_with_key('slot', other_intent.execute_slots):
             return False
         return True
 

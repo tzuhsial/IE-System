@@ -1,5 +1,6 @@
 import logging
 import sys
+import time 
 
 import requests
 import urllib.parse
@@ -97,8 +98,9 @@ class MaskRCNNClient(BaseVisionEngineClient):
     """
 
     def select_object(self, b64_img_str, object, **kwargs):
+        start_time = time.time()
 
-        select_uri = urllib.parse.urljoin(self.visionengine_uri, 'selection')
+        select_uri = urllib.parse.urljoin(self.uri, 'selection')
 
         # Unlike MingYan's engine, does not allow referring expressions
         data = {
@@ -115,6 +117,9 @@ class MaskRCNNClient(BaseVisionEngineClient):
             logger.info(e)
             mask_strs = []
 
+        end_time = time.time()
+
+        print("Time taken: {} seconds".format(end_time-start_time))
         return mask_strs
 
 
