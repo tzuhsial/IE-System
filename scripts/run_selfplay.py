@@ -1,4 +1,5 @@
 from configparser import ConfigParser
+import logging
 import json
 import os
 import sys
@@ -13,6 +14,10 @@ from iedsp.photoshop import PhotoshopPortal
 from iedsp.system import System
 from iedsp.user import UserPortal
 from iedsp.world import SelfPlayWorld
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
 
 
 def main(argv):

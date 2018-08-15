@@ -55,7 +55,7 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         """
         # Get all system actions
         system_acts = self.observation.get('system_acts', list())
-
+        
         for sys_act in system_acts:
             sys_dialogue_act = sys_act['dialogue_act']['value']
 

@@ -357,32 +357,16 @@ class ObjectMaskStrNode(BeliefNode):
         last_update_turn_id (int): the last turn this slot was modified
         permit_new (bool): whether this BeliefSlot permits new slots
         validator (function): a function to validate the values
-        visionengine (object): shared visionengine object to perform select_object queries
     """
 
-    def __init__(self, name="object_mask_str", threshold=0.8, possible_values=None, validator=None, visionengine=None, **kwargs):
+    def __init__(self, name="object_mask_str", threshold=0.8, possible_values=None, validator=None, **kwargs):
         assert name == "object_mask_str", "name should be ObjectMaskStrNode"
         super(ObjectMaskStrNode, self).__init__(
             name, threshold, possible_values, validator)
-        if visionengine is None:
-            logger.warning("ObjectMaskStrNode.visionengine is not loaded!")
-        self.visionengine = visionengine
-
-    def query(self):
-        b64_img_str = self.children["b64_img_str"].get_max_value()
-        object_intent = self.children['object'].intent
-        args = slots_to_args(object_intent.execute_slots)
-        args['b64_img_str'] = b64_img_str
-
-        if args.get("object") is None or args.get('b64_img_str') is None:
-            logger.error("Missing object or b64_img_str")
-            mask_strs = []
-        else:
-            mask_strs = self.visionengine.select_object(**args)
-        return mask_strs
 
     def pull(self):
         """
+        TODO: reimplement the rules 
         ObjectMaskNode should have 3 children
         1. object
         2. b64_img_str
@@ -420,6 +404,7 @@ class ObjectMaskStrNode(BeliefNode):
         # Pull from object_node
         object_intent = object_node.pull()
         if object_turn_id >= self.last_update_turn_id:
+
             # Pull from object_intent
             if not object_intent.executable():
                 self.intent = object_intent
@@ -429,15 +414,9 @@ class ObjectMaskStrNode(BeliefNode):
                 self.intent = SysIntent()
                 return self.intent
 
-            # Query CV engine: a lazy update
-            object_mask_id_node.clear()  # This prevents pulling from object_mask_id
-
-            mask_strs = self.query()
-            for mask_str in mask_strs:
-                # Directly modify value_conf_map
-                # Since add_observation will decay previous observations
-                self.value_conf_map = {
-                    mask_str: 0.5 for mask_str in mask_strs}
+            # Move object_intent executable slots to query
+            self.intent = SysIntent(query_slots=object_intent.execute_slots)
+            return self.intent
 
         # Pull from object_mask_id_node
         object_mask_id_intent = object_mask_id_node.pull()
@@ -453,7 +432,7 @@ class ObjectMaskStrNode(BeliefNode):
 
             if object_mask_id == -1:
                 for value in self.value_conf_map:
-                    self.value_conf_map[ value ] = 0.0 
+                    self.value_conf_map[value] = 0.0
             elif object_mask_id < len(self.value_conf_map):
                 candidates = list(self.value_conf_map.items())
                 mask_str, _ = candidates[object_mask_id]
@@ -463,6 +442,7 @@ class ObjectMaskStrNode(BeliefNode):
             else:
                 object_mask_id_node.clear()
 
+        # Handle query results
         # Building self intent, which includes requesting object_mask_id
         self.intent = self._build_slot_intent()
         return self.intent

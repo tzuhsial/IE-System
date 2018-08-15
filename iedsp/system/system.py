@@ -1,6 +1,7 @@
 from ..core import SystemAct
 from .state import StatePortal
-from ..util import find_slot_with_key, build_slot_dict
+from ..visionengine import VisionEnginePortal
+from ..util import find_slot_with_key, build_slot_dict, slots_to_args
 
 
 def build_sys_act(dialogue_act, intent=None, slots=None):
@@ -24,6 +25,7 @@ class System(object):
 
     def __init__(self, global_config):
         self.state = StatePortal(global_config)
+        self.visionengine = VisionEnginePortal(global_config["VISIONENGINE"])
 
     def reset(self):
         """ 
@@ -64,46 +66,29 @@ class System(object):
 
     def policy(self):
         """
-        A simple rule-based policy conditioned conditioned on the state
+        A simple rule-based policy conditioned conditioned on state
         Returns:
             system_acts (list): list of sys_acts
         """
         system_acts = []
 
+        # Pull the current intent slots =>
+        # Rules are defined in the nodes
         sysintent = self.state.pull()
 
         if len(sysintent.confirm_slots):
-            da = SystemAct.CONFIRM
-            intent = da
-            slots = sysintent.confirm_slots[:1]  # confirm 1 at a time
+            sys_act = self.act_confirm(sysintent.confirm_slots)
         elif len(sysintent.request_slots):
-            da = SystemAct.REQUEST
-            intent = da
-            slots = sysintent.request_slots[:1]  # request 1 at a time
+            sys_act = self.act_request(sysintent.request_slots)
+        elif len(sysintent.query_slots):
+            sys_act = self.act_query(sysintent.query_slots)
         else:
-            # Execute the intent
-            da = SystemAct.EXECUTE
-            intent = self.state.get_slot('intent').get_max_value()
-            slots = sysintent.execute_slots
-
-            # Stack the intent to history and clear intent slot
-            self.state.stack_intent(intent)
-            self.state.clear_slot('intent')
-
-            # Clear graph if Undo or Redo
-            if intent == "undo":
-                self.state.clear_graph()
+            sys_act = self.act_execute(sysintent.execute_slots)
 
         # Request, Confirm, Label, Execute
-        system_acts += [build_sys_act(da, intent, slots)]
 
-        # Special cases
-        if intent == "open":
-            system_acts += [build_sys_act(SystemAct.GREETING)]
-        if intent == "close":
-            system_acts = [build_sys_act(SystemAct.BYE)]
-        elif da == SystemAct.EXECUTE:
-            system_acts += [build_sys_act(SystemAct.ASK)]
+        system_acts += [sys_act]
+
         return system_acts
 
     def act(self):
@@ -130,6 +115,63 @@ class System(object):
 
         return system_act
 
+    def act_confirm(self, confirm_slots):
+        da = SystemAct.CONFIRM
+        intent = da
+        slots = confirm_slots[:1]  # confirm 1 at a time
+        sys_act = build_sys_act(da, intent, slots)
+        return sys_act
+
+    def act_request(self, request_slots):
+        da = SystemAct.REQUEST
+        intent = da
+        slots = request_slots[:1]  # request 1 at a time
+        sys_act = build_sys_act(da, intent, slots)
+        return sys_act
+
+    def act_query(self, query_slots):
+
+        da = SystemAct.QUERY
+        intent = da
+        slots = query_slots
+        sys_act = build_sys_act(da, intent, slots)
+
+        #########################
+        #  Query Vision Engine  #
+        #########################
+        args = slots_to_args(query_slots)
+        b64_img_str = self.state.get_slot('b64_img_str').get_max_value()
+        args['b64_img_str'] = b64_img_str
+
+        mask_strs = self.visionengine.select_object(**args)
+        object_mask_str_node = self.state.get_slot('object_mask_str')
+
+        # Clear object_mask_results & object_mask_id
+        object_mask_str_node.value_conf_map.clear()
+        self.state.get_slot('object_mask_id').clear()
+        if len(mask_strs) > 0:
+            object_mask_str_node.value_conf_map = \
+                {mask_str: 0.5 for mask_str in mask_strs}
+
+        print("query results: ", len(mask_strs))
+        object_mask_str_node.last_update_turn_id += 1
+
+        return sys_act
+
+    def act_execute(self, execute_slots):
+        # Build execute sys_act
+        da = SystemAct.EXECUTE
+        intent = self.state.get_slot('intent').get_max_value()
+        slots = execute_slots.copy()  # Make a copy, since clearing will remove this copy
+
+        sys_act = build_sys_act(da, intent, slots)
+
+        # Stack the intent to history and clear intent slot
+        self.state.stack_intent(intent)
+        self.state.clear_graph()
+
+        return sys_act
+
     ###########################
     #   Simple Template NLG   #
     ###########################
@@ -153,14 +195,29 @@ class System(object):
                 utt = "Let me confirm. "
                 confirm_list = []
                 for slot_dict in confirm_slots:
-                    sv = slot_dict['slot'] + " is " + str(slot_dict['value'])
+                    if slot_dict['slot'] == "object_mask_str":
+                        sv = slot_dict['slot'] + " is " + \
+                            str(slot_dict['value'][:5])
+                    else:
+                        sv = slot_dict['slot'] + " is " + \
+                            str(slot_dict['value'])
                     confirm_list.append(sv)
                 utt += ','.join(confirm_list) + "?"
+            elif sys_dialogue_act == SystemAct.QUERY:
+                query_slots = sys_act['slots']
+                slot_list = [slot['slot'] + "=" + str(slot['value'])
+                             for slot in query_slots]
+                utt = "Query: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
-                
-                slot_list = [slot['slot'] + "=" + str(slot['value'])
-                             for slot in execute_slots]
+
+                slot_list = []
+                for slot in execute_slots:
+                    if slot["slot"] == "object_mask_str":
+                        sv = slot['slot'] + "=" + str(slot['value'][:5])
+                    else:
+                        sv = slot['slot'] + "=" + str(slot['value'])
+                    slot_list.append(sv)
                 utt = "Execute: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"

@@ -1,20 +1,27 @@
 import logging
 import sys
-import time 
+import time
 
 import requests
 import urllib.parse
+
+from ..util import load_from_pickle
 
 logger = logging.getLogger(__name__)
 
 
 def VisionEnginePortal(visionengine_config):
-    client = visionengine_config['VISIONENGINE_CLIENT']
+    visionengine_name = visionengine_config['VISIONENGINE']
     uri = visionengine_config["VISIONENGINE_URI"]
-    return builder(client)(uri)
+    db_path = visionengine_config["DATABASE_PATH"]
+    args = {
+        'uri': uri,
+        'db_path': db_path
+    }
+    return builder(visionengine_name)(**args)
 
 
-class BaseVisionEngineClient(object):
+class BaseVisionEngine(object):
     """
     Base class for vision engine clients
     Defines methods that needs to be overridden
@@ -22,8 +29,8 @@ class BaseVisionEngineClient(object):
         self.visionengine_uri (str): uri that needs to be queried
     """
 
-    def __init__(self, uri):
-        self.uri = uri
+    def __init__(self):
+        raise NotImplementedError
 
     def select_object(self, b64_img_str, object, position=None, adjective=None, color=None):
         """ 
@@ -39,7 +46,7 @@ class BaseVisionEngineClient(object):
         raise NotImplementedError
 
 
-class DummyClient(BaseVisionEngineClient):
+class DummyClient(BaseVisionEngine):
     """
     A dummy vision engine client for testing purposes
     """
@@ -48,11 +55,14 @@ class DummyClient(BaseVisionEngineClient):
         return []
 
 
-class MingYangClient(BaseVisionEngineClient):
+class MingYangClient(BaseVisionEngine):
     """
     Client to MingYang's vision engine
     Github here: https://git.corp.adobe.com/mling/vision-engine
     """
+
+    def __init__(self, **kwargs):
+        self.uri = kwargs['uri']
 
     def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None):
 
@@ -89,13 +99,16 @@ class MingYangClient(BaseVisionEngineClient):
         return mask_strs
 
 
-class MaskRCNNClient(BaseVisionEngineClient):
+class MaskRCNNClient(BaseVisionEngine):
     """
     Client to self-hosted Mask-RCNN server
     https://git.corp.adobe.com/tzlin/Mask_RCNN
 
     Supports object class detection
     """
+
+    def __init__(self, **kwargs):
+        self.uri = kwargs['uri']
 
     def select_object(self, b64_img_str, object, **kwargs):
         start_time = time.time()
@@ -121,6 +134,24 @@ class MaskRCNNClient(BaseVisionEngineClient):
 
         print("Time taken: {} seconds".format(end_time-start_time))
         return mask_strs
+
+
+class VisionEngineDatabase(BaseVisionEngine):
+    """
+    Inferenced results from VisionEngine
+
+    Attributes:
+        db (dict): db is a dict of dicts
+    """
+
+    def __init__(self, **kwargs):
+        self.db = load_from_pickle(kwargs['db_path'])
+
+    def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None):
+        if b64_img_str not in self.db:
+            logger.debug("{} not in db".format(b64_img_str))
+            return []
+        return self.db.get(b64_img_str).get(object)
 
 
 def builder(string):

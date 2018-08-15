@@ -15,7 +15,18 @@ def UserPortal(user_config):
     user_type = user_config["USER"]
     dice_threshold = float(user_config["DICE_THRESHOLD"])
     select_prob = float(user_config["SELECT_PROB"])
-    return builder(user_type)(select_prob, dice_threshold)
+    patience = int(user_config["PATIENCE"])
+    return builder(user_type)(select_prob, dice_threshold, patience)
+
+
+def build_user_act(da, intent=None, slots=None):
+    user_act = {}
+    user_act['dialogue_act'] = build_slot_dict('dialogue_act', da)
+    if intent is not None:
+        user_act['intent'] = build_slot_dict("intent", intent)
+    if slots is not None:
+        user_act['slots'] = slots
+    return user_act
 
 
 class AgendaBasedUserSimulator(object):
@@ -24,12 +35,13 @@ class AgendaBasedUserSimulator(object):
     for image editing requests.
     """
 
-    def __init__(self, select_prob, dice_threshold):
+    def __init__(self, select_prob, dice_threshold, patience):
         """
         Initialize user simulator with configuration
         """
         self.select_prob = select_prob
         self.dice_threshold = dice_threshold
+        self.patience = patience
 
     def load_agenda(self, agenda):
         """
@@ -54,6 +66,7 @@ class AgendaBasedUserSimulator(object):
     def reset(self):
         self.agenda = None
         self.observation = {}
+        self.turn_id = 0
 
     def observe(self, observation):
         """
@@ -71,7 +84,7 @@ class AgendaBasedUserSimulator(object):
 
         # The default action for the user is to inform the agenda
         default_system_acts = [
-            {'dialogue_act': build_slot_dict('dialogue_act', SystemAct.ASK)}]
+            {'dialogue_act': build_slot_dict('dialogue_act', SystemAct.GREETING)}]
 
         # We needs system_acts
         system_acts = self.observation.get('system_acts', default_system_acts)
@@ -80,45 +93,42 @@ class AgendaBasedUserSimulator(object):
             # because there can only be one system act that
             # requires a response from the user
             sys_dialogue_act = sys_act['dialogue_act']['value']
-            if sys_dialogue_act == SystemAct.ASK:
+            if sys_dialogue_act == SystemAct.GREETING:
                 user_act = self.act_inform_goal()
-                user_acts.append(user_act)
-
             elif sys_dialogue_act == SystemAct.REQUEST:
                 request_slots = sys_act["slots"]
                 user_act = self.act_inform_request(request_slots)
-                user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act["slots"]
                 user_act = self.act_confirm(confirm_slots)
-                user_acts.append(user_act)
 
             elif sys_dialogue_act in SystemAct.query_acts():
                 user_act = {}
                 user_act['dialogue_act'] = build_slot_dict(
                     "dialogue_act", UserAct.WAIT)
-                user_acts.append(user_act)
 
             elif sys_dialogue_act == SystemAct.EXECUTE:
-                exec_intent = sys_act["intent"]
-                exec_slots = sys_act["slots"]
-
+                exec_intent = sys_act.get("intent", None)
+                exec_slots = sys_act.get("slots", list())
                 success = self.check_execution(exec_intent, exec_slots)
-
                 print("Execution result", success)
                 if not success:
                     user_act = {}
                     user_act["dialogue_act"] = build_slot_dict(
                         'dialogue_act', 'inform')
                     user_act["intent"] = build_slot_dict("intent", "undo")
-                    user_acts.append(user_act)
                 else:
                     self.agenda.pop(0)
+                    user_act = self.act_inform_goal()
+            user_acts.append(user_act)
+
+        # Update turn_id
+        self.turn_id += 1
 
         # Check episode_done based on goal
         curr_goal = self.get_current_goal()
-        episode_done = curr_goal["intent"]["value"] == "close"
+        episode_done = curr_goal["intent"]["value"] == "close" or self.turn_id >= self.patience
 
         # Build return object
         user_act = {}
@@ -294,12 +304,18 @@ class AgendaBasedUserSimulator(object):
                 slots += user_act.get("slots", list())
                 slot_list = []
                 for slot in slots:
-                    slot_list.append(slot['slot'] + "=" + str(slot['value']))
+                    if slot["slot"] == "object_mask_str":
+                        slot_msg = slot["slot"] + "=" + slot["value"][:5]
+                    else:
+                        slot_msg = slot["slot"] + "=" + str(slot["value"])
+                    slot_list.append(slot_msg)
                 utt = "I want " + ', '.join(slot_list) + "."
             elif user_dialogue_act == UserAct.AFFIRM:
                 utt = "Yes."
             elif user_dialogue_act == UserAct.NEGATE:
                 utt = "No."
+            elif user_dialogue_act == UserAct.WAIT:
+                utt = "(Waiting...)"
             else:
                 raise ValueError(
                     "Unknown user_dialogue_act: {}".format(user_dialogue_act))

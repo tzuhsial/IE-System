@@ -20,7 +20,6 @@ class Selector(object):
         def wrapper(ps, edit_type, arguments):
             # Get inverse masked image
             has_selection = len(ps.masks) > 0
-            print("has_selection", has_selection)
             if has_selection:  # May contain multiple objects
                 mask = np.zeros_like(ps.img)
                 for object_name, object_mask in ps.masks:

@@ -184,7 +184,10 @@ class AdjustAgendaGenerator(object):
 
             # 4. mask_str
             if object_name != "image":
+                # From boolean to image
                 object_mask = annToMask(img, object_ann)
+                indices = object_mask == 1
+                object_mask[indices] = 255
                 mask_str = util.img_to_b64(object_mask)
                 mask_str_slot = util.build_slot_dict(
                     'object_mask_str', mask_str)
