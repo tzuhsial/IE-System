@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import json
 import logging
 
@@ -10,13 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def OntologyPortal(global_config):
-    visionengine_config = global_config["VISIONENGINE"]
-    visionengine = VisionEnginePortal(visionengine_config)
-
     ontology_file = global_config["DEFAULT"]["ONTOLOGY_FILE"]
     ontology_json = util.load_from_json(ontology_file)
 
-    ontology = OntologyEngine(visionengine, ontology_json)
+    ontology = OntologyEngine(ontology_json)
     return ontology
 
 
@@ -28,23 +26,16 @@ class OntologyEngine(object):
     intent
     |- intent
     Attributes:
-        visionengine (object):
         intents (dict)
         slots (dict)
     """
 
     INTENT = "intent"
 
-    def __init__(self, visionengine, ontology_json):
+    def __init__(self, ontology_json):
 
-        # Load visionengine
-        if visionengine is None:
-            logger.warning(
-                "Vision Engine is not initialized in OntologyEngine!")
-        self.visionengine = visionengine
-
-        self.intents = {}
-        self.slots = {}
+        self.intents = OrderedDict()
+        self.slots = OrderedDict()
 
         self.build_from_json(ontology_json)
 
@@ -63,12 +54,10 @@ class OntologyEngine(object):
             possible_values = slot_json.get("possible_values", None)
 
             # Instantiate object
-            val_name = slot_json.get("validator", "")
-            val_cls = vallib(val_name)
-            if val_cls is not None:
-                validator = val_cls()
-            else:
-                validator = None
+            validator = None
+            if slot_json.get("validator") is not None:
+                val_name = slot_json.get("validator")
+                validator = vallib(val_name)()
 
             args = {
                 "name": name,
@@ -76,10 +65,6 @@ class OntologyEngine(object):
                 "possible_values": possible_values,
                 "validator": validator,
             }
-
-            use_visionengine = slot_json.get("use_visionengine", False)
-            if use_visionengine:
-                args['visionengine'] = self.visionengine
 
             node_name = slot_json["node"]
 

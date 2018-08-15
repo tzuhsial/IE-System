@@ -17,9 +17,10 @@ def StatePortal(global_config):
     return state
 
 
-class FrameStack(object):
+class ExecutionHistory(object):
     """
     A C++ like stack to store current intent slots
+    Also provides search functions like visionengine
     """
 
     def __init__(self):
@@ -45,6 +46,27 @@ class FrameStack(object):
     def clear(self):
         return self._stack.clear()
 
+    def select_object(self, object, **kwargs):
+        """
+        Args
+            object (str): name of object
+        Returns:
+            mask_strs (list): list of mask strings
+        """
+        if object == "image":
+            return []
+
+        mask_strs = []
+        for intent_tree in self._stack:
+            node_dict = intent_tree.node_dict
+            if object == node_dict['object'].get_max_value():
+                object_mask_str = node_dict['object_mask_str'].get_max_value()
+                mask_strs.append(object_mask_str)
+
+        # Remove duplicates
+        mask_strs = list(set(mask_strs))
+        return mask_strs
+
 
 class State(object):
     """
@@ -59,7 +81,7 @@ class State(object):
     def __init__(self, ontology):
 
         self.ontology = ontology
-        self.framestack = FrameStack()
+        self.executionhistory = ExecutionHistory()
 
         self.sysintent = SysIntent()
 
@@ -155,17 +177,7 @@ class State(object):
         """
         intent_tree = self.get_intent(intent_name)
         copied_tree = copy.deepcopy(intent_tree)  # Copy the intent tree
-        self.framestack.push(copied_tree)
-
-    def query_history(self, object_name=None):
-        """
-        Search the frame stack with object_name if 
-        Args:
-            object_name (str): the desired object
-        Returns:
-            mask_strs (list): the desired object
-        """
-        raise NotImplementedError
+        self.executionhistory.push(copied_tree)
 
     def get_slot(self, slot_name):
         return self.ontology.get_slot(slot_name)
@@ -179,15 +191,15 @@ class State(object):
     def clear_slot(self, slot_name):
         self.ontology.get_slot(slot_name).clear()
 
-    def clear_graph(self):
+    def clear_ontology(self):
         self.ontology.clear()
 
     def clear_history(self):
-        self.framestack.clear()
+        self.executionhistory.clear()
 
     def clear(self):
         self.ontology.clear()
-        self.framestack.clear()
+        self.executionhistory.clear()
 
     def to_json(self):
         """
@@ -195,8 +207,12 @@ class State(object):
         """
         raise NotImplementedError
 
-    def to_vector(self):
+    def to_list(self):
         """
-        State as vector for RL observation space
+        State as list for RL agent observation space
         """
-        raise NotImplementedError
+        # Slots
+        l = []
+        for slot in self.ontology.slots.values():
+            l += slot.to_list()
+        return l

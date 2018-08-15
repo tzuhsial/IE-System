@@ -124,9 +124,28 @@ class BeliefNode(object):
         else:
             return build_slot_dict(self.name, max_value, max_conf)
 
+    def to_list(self):
+        """
+        Convert the status of the slot node to list
+        If has possible values, return list of conf corresponding to each value => imitates prediction
+        Else: return the number of entries in the map & maximum confidence score
+        """
+        l = []
+        if len(self.possible_values) > 0:
+            # has possible values
+            l = [self.value_conf_map.get(value, 0.0)
+                 for value in self.possible_values]
+        else:
+            # Return number of values in map & max confidence score
+            nvalues = len(self.value_conf_map)
+            max_conf = self.get_max_conf()
+            l = [nvalues, max_conf]
+        return l
+
     #########################
     #     Graph Related     #
     #########################
+
     def add_child(self, node, optional=False):
         """
         adds children 
@@ -336,7 +355,7 @@ class PSToolNode(BeliefNode):
         result = super(PSToolNode, self).add_observation(value, conf, turn_id)
         if not result:
             self.value_conf_map = prev_value_conf_map
-        return True
+        return result
 
 
 class ObjectMaskStrNode(BeliefNode):

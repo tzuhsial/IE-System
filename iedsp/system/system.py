@@ -1,31 +1,34 @@
 from ..core import SystemAct
+from .policy import builder as policylib
 from .state import StatePortal
 from ..visionengine import VisionEnginePortal
-from ..util import find_slot_with_key, build_slot_dict, slots_to_args
-
-
-def build_sys_act(dialogue_act, intent=None, slots=None):
-    sys_act = {}
-    sys_act['dialogue_act'] = build_slot_dict("dialogue_act", dialogue_act)
-    if intent is not None:
-        sys_act['intent'] = build_slot_dict("intent", intent)
-    if slots is not None:
-        sys_act['slots'] = slots
-    return sys_act
+from ..util import find_slot_with_key, build_slot_dict, slots_to_args, load_from_json
 
 
 class System(object):
     """
     Mainly handles the interactions with the environment
+    Also provides a rule-based policy
 
     Attributes:
-        state
-        framestack
+        state (object)
+        visionengine (object)
+        policy (object)
+        action_map (dict)
     """
 
     def __init__(self, global_config):
+        # Components
         self.state = StatePortal(global_config)
         self.visionengine = VisionEnginePortal(global_config["VISIONENGINE"])
+
+        # Build policy
+        ontology_json = load_from_json(
+            global_config["DEFAULT"]["ONTOLOGY_FILE"])
+        policy_name = global_config["SYSTEM"]["POLICY"]
+        state_size = len(self.state.to_list())
+
+        self.policy = policylib(policy_name)(state_size, ontology_json)
 
     def reset(self):
         """ 
@@ -42,8 +45,6 @@ class System(object):
             observation (dict): observation given by user passed through channel
         """
         self.observation.update(observation)
-        if 'user_acts' in observation:
-            self.turn_id += 1
 
     def state_update(self):
         """
@@ -64,16 +65,14 @@ class System(object):
             }
             self.state.update(**args)
 
-    def policy(self):
+    def rule_policy(self):
         """
-        A simple rule-based policy conditioned conditioned on state
+        A simple rule-based policy 
         Returns:
             system_acts (list): list of sys_acts
         """
         system_acts = []
 
-        # Pull the current intent slots =>
-        # Rules are defined in the nodes
         sysintent = self.state.pull()
 
         if len(sysintent.confirm_slots):
@@ -86,7 +85,6 @@ class System(object):
             sys_act = self.act_execute(sysintent.execute_slots)
 
         # Request, Confirm, Label, Execute
-
         system_acts += [sys_act]
 
         return system_acts
@@ -100,8 +98,20 @@ class System(object):
         # Update state with observation
         self.state_update()
 
-        # Policy
-        system_acts = self.policy()
+        # Policy, use agent is is provided
+        sys_act = self.policy.next_action(self.state)
+        system_acts = [sys_act]
+
+        # Query at the same turn...
+        sys_dialogue_act = sys_act['dialogue_act']['value']
+        if sys_dialogue_act == SystemAct.QUERY:
+            query_slots = sys_act['slots']
+            self.query_visionengine(query_slots)
+        elif sys_dialogue_act == SystemAct.EXECUTE:
+            # Stack the intent to history and clear slots
+            intent = sys_act['intent']['value']
+            self.state.stack_intent(intent)
+            self.state.clear_ontology()
 
         # Update turn_id
         self.turn_id += 1
@@ -115,30 +125,10 @@ class System(object):
 
         return system_act
 
-    def act_confirm(self, confirm_slots):
-        da = SystemAct.CONFIRM
-        intent = da
-        slots = confirm_slots[:1]  # confirm 1 at a time
-        sys_act = build_sys_act(da, intent, slots)
-        return sys_act
-
-    def act_request(self, request_slots):
-        da = SystemAct.REQUEST
-        intent = da
-        slots = request_slots[:1]  # request 1 at a time
-        sys_act = build_sys_act(da, intent, slots)
-        return sys_act
-
-    def act_query(self, query_slots):
-
-        da = SystemAct.QUERY
-        intent = da
-        slots = query_slots
-        sys_act = build_sys_act(da, intent, slots)
-
-        #########################
-        #  Query Vision Engine  #
-        #########################
+    def query_visionengine(self, query_slots):
+        """
+        Query visionengine with query_slots
+        """
         args = slots_to_args(query_slots)
         b64_img_str = self.state.get_slot('b64_img_str').get_max_value()
         args['b64_img_str'] = b64_img_str
@@ -153,24 +143,7 @@ class System(object):
             object_mask_str_node.value_conf_map = \
                 {mask_str: 0.5 for mask_str in mask_strs}
 
-        print("query results: ", len(mask_strs))
         object_mask_str_node.last_update_turn_id += 1
-
-        return sys_act
-
-    def act_execute(self, execute_slots):
-        # Build execute sys_act
-        da = SystemAct.EXECUTE
-        intent = self.state.get_slot('intent').get_max_value()
-        slots = execute_slots.copy()  # Make a copy, since clearing will remove this copy
-
-        sys_act = build_sys_act(da, intent, slots)
-
-        # Stack the intent to history and clear intent slot
-        self.state.stack_intent(intent)
-        self.state.clear_graph()
-
-        return sys_act
 
     ###########################
     #   Simple Template NLG   #
@@ -203,11 +176,11 @@ class System(object):
                             str(slot_dict['value'])
                     confirm_list.append(sv)
                 utt += ','.join(confirm_list) + "?"
-            elif sys_dialogue_act == SystemAct.QUERY:
+            elif sys_dialogue_act == SystemAct.QUERY_VISIONENGINE:
                 query_slots = sys_act['slots']
                 slot_list = [slot['slot'] + "=" + str(slot['value'])
                              for slot in query_slots]
-                utt = "Query: " + ', '.join(slot_list) + "."
+                utt = "Query Vision Engine: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots']
 

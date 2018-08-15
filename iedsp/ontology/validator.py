@@ -40,6 +40,8 @@ class IntegerValidator(BaseValidator):
 
 class PathValidator(BaseValidator):
     def __call__(self, obj):
+        if not isinstance(obj, str):
+            return False
         return os.path.exists(obj)
 
 
