@@ -143,12 +143,14 @@ class SimplePhotoshop(object):
 
     def control_redo(self, arguments={}):
         if not self.history.hasNextHistory():
+            print("[photoshop] execution failure: no next history")
             return False, "failure"
         (action_type, arguments), self.img = self.history.redo()
         return True, "success"
 
     def control_undo(self, arguments={}):
         if not self.history.hasPreviousHistory():
+            print("[photoshop] execution failure: no previous history")
             return False, "failure"
         (action_type, arguments), self.img = self.history.undo()
         return True, "success"

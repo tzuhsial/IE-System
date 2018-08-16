@@ -31,7 +31,8 @@ class SelfPlayWorld(object):
         user.observe(self.acts[photoshop_idx])
         self.acts[user_idx] = user.act()
 
-        print("[User]", self.acts[user_idx]['user_utterance'])
+        print("[User]", self.acts[user_idx]['user_utterance'], \
+             'reward', self.acts[user_idx]['reward'])
 
         # Channel observes User
         channel.observe(self.acts[user_idx])
@@ -41,7 +42,6 @@ class SelfPlayWorld(object):
         system.observe(self.acts[channel_idx])
         system.observe(self.acts[photoshop_idx])
         self.acts[system_idx] = system.act()
-
         print("[System]", self.acts[system_idx]['system_utterance'])
 
         # Photoshop observes agent action

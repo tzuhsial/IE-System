@@ -36,6 +36,7 @@ class UserReward(object):
     """
     Defines the reward observed by the agent
     """
+
     def __init__(self):
         """
         """
@@ -97,6 +98,16 @@ class AgendaBasedUserSimulator(object):
         """
         self.observation.update(observation)
 
+    def get_photoshop_slot(self, slot_name):
+        """
+        Find desired slot from photoshop
+        """
+        ps_acts = self.observation.get('photoshop_acts', [{}])
+        ps_act = ps_acts[0]
+        ps_slots = ps_act.get('slots', list())
+        target_slot = find_slot_with_key(slot_name, ps_slots)
+        return target_slot
+
     def act(self):
         """
         Perform actions according to the current agenda
@@ -112,23 +123,22 @@ class AgendaBasedUserSimulator(object):
 
         # We needs system_acts
         system_acts = self.observation.get('system_acts', default_system_acts)
-        assert len(
-            system_acts) == 1, "System should perform only one action at a time!"
+        assert len(system_acts) == 1
 
         sys_act = system_acts[0]
 
         sys_dialogue_act = sys_act['dialogue_act']['value']
+
         if sys_dialogue_act == SystemAct.GREETING:
             user_act = self.act_inform_goal()
-
-            reward = -1
+            reward = 0
 
         elif sys_dialogue_act == SystemAct.REQUEST:
             request_slots = sys_act["slots"]
             user_act = self.act_inform_request(request_slots)
 
-            if request_slots[0]['slot'] == "object_mask_str":
-                reward = -3
+            if user_act is not None and request_slots[0]['slot'] == "object_mask_str":
+                reward = -5
             else:
                 reward = -1
 
@@ -139,28 +149,37 @@ class AgendaBasedUserSimulator(object):
             reward = -1
 
         elif sys_dialogue_act in SystemAct.query_acts():
-            user_act = {}
-            user_act['dialogue_act'] = build_slot_dict(
-                "dialogue_act", UserAct.WAIT)
-
+            user_act = self.act_wait()
             reward = -1
 
         elif sys_dialogue_act == SystemAct.EXECUTE:
-            exec_intent = sys_act.get("intent", None)
-            exec_slots = sys_act.get("slots", list())
-            success = self.check_execution(exec_intent, exec_slots)
-            if not success:
-                undo_goal = build_user_act('inform', 'undo')
-                self.agenda.append(undo_goal)
-                reward = -5
-            else:
-                self.agenda.pop(0)
-                reward = 10
 
-            user_act = self.act_inform_goal()
+            if not self.get_photoshop_slot('execute_result')['value']:
+                # Failed exeuction on Photoshop => doesn't mean anything to the user.
+                user_act = None
+                reward = -1
+            else:
+                exec_intent = sys_act.get("intent", None)
+                exec_slots = sys_act.get("slots", list())
+                success = self.check_execution(exec_intent, exec_slots)
+                if not success:
+                    print("[user] check action failure")
+                    undo_goal = build_user_act('inform', 'undo')
+                    self.agenda.insert(0, undo_goal)
+                    reward = -10
+                else:
+                    print("[user] check action success")
+                    if len(self.agenda) > 0:
+                        self.agenda.pop(0)
+                    reward = 10
+
+                user_act = self.act_inform_goal()
         else:
             raise ValueError(
                 "Unknown sys_dialogue_act: {}".format(sys_dialogue_act))
+
+        if user_act is None:
+            user_act = self.act_inform_goal()
 
         user_acts.append(user_act)
 
@@ -168,14 +187,14 @@ class AgendaBasedUserSimulator(object):
         self.turn_id += 1
 
         # Check episode_done based on goal
-        curr_goal = self.get_current_goal()
-        episode_done = curr_goal["intent"]["value"] == "close" or self.turn_id >= self.patience
+        episode_done = len(self.agenda) == 0 or self.turn_id >= self.patience
 
         # Build return object
         user_act = {}
         user_act['user_acts'] = user_acts
         user_act['user_utterance'] = self.template_nlg(user_acts)
         user_act['episode_done'] = episode_done
+        user_act['reward'] = reward
         return user_act
 
     def act_inform_goal(self):
@@ -185,9 +204,12 @@ class AgendaBasedUserSimulator(object):
             slots (list): list of slot names(string) that needs to be informed
         Returns:
             user_act (dict): user act object
+            reward (float): reward
         """
         # Get current goal
         goal = self.get_current_goal()
+        if goal is None:
+            return build_user_act(UserAct.BYE)
 
         # user_act
         user_act = copy.deepcopy(goal)
@@ -206,23 +228,35 @@ class AgendaBasedUserSimulator(object):
         Args:
             request_slots (list): list of slot dict 
         Returns:
-            user_act (dict)
+            user_act (dict): None if invalid
         """
-        req_slot = request_slots[0]
-        req_name = req_slot['slot']
-        goal_slots = self.get_current_goal()['slots']
+
+        req_name = request_slots[0]['slot']
+        goal = self.get_current_goal()
+        if req_name == "intent":
+            goal_slots = [goal['intent']]
+        else:
+            goal_slots = goal['slots']
 
         if req_name == "object_mask_id":
-            # Compare with all the provided
-            #print("requesting object_mask_id")
+            # Get mask_strs from photoshop
+            mask_strs_slot = self.get_photoshop_slot('mask_strs')
+            mask_strs = mask_strs_slot['value']
 
-            mask_strs = req_slot['value']
-            goal_mask_str = find_slot_with_key(
-                'object_mask_str', goal_slots)['value']
+            if len(mask_strs) == 0:
+                return None
+
+            goal_mask_str_slot = find_slot_with_key(
+                'object_mask_str', goal_slots)
+            if goal_mask_str_slot is None:
+                return None
+
+            goal_mask_str = goal_mask_str_slot['value']
 
             dice_scores = [self.compute_dice(
-                mask_str, goal_mask_str) for mask_str in mask_strs]
+                mask_str, goal_mask_str) for mask_idx, mask_str in mask_strs]
 
+            # Find the one with the maximum dice score
             max_score = max(dice_scores)
             max_index = dice_scores.index(max_score)
 
@@ -234,42 +268,61 @@ class AgendaBasedUserSimulator(object):
         else:
             inform_slot = find_slot_with_key(req_name, goal_slots)
 
-        user_act = {}
-        user_act['dialogue_act'] = build_slot_dict(
-            'dialogue_act', UserAct.INFORM)
-        user_act['slots'] = [inform_slot]
+        if inform_slot is None:
+            return None
+
+        user_act = build_user_act(
+            UserAct.INFORM, UserAct.INFORM, [inform_slot])
         return user_act
 
     def act_confirm(self, confirm_slots):
-        assert len(confirm_slots) == 1
-        confirm_slot = confirm_slots[0]
-        goal_slots = self.get_current_goal()["slots"]
-        target_slot = find_slot_with_key(confirm_slot['slot'], goal_slots)
 
-        if target_slot is None:
-            # Is adjust_value 50?
-            # Select the dog
-            return self.act_inform_goal()
-
+        confirm_name = confirm_slots[0]['slot']
+        confirm_value = confirm_slots[0].get('value', None)
         # Check value
-        if confirm_slot['slot'] == "object_mask_str":
+        if confirm_value is None:
+            return None
+
+        goal = self.get_current_goal()
+        if confirm_name == "intent":
+            goal_slots = [goal['intent']]
+        else:
+            goal_slots = goal['slots']
+
+        target_slot = find_slot_with_key(confirm_name, goal_slots)
+
+        # What are you confirming?
+        if target_slot is None:
+            return None
+
+        # Check values
+        target_value = target_slot['value']
+        if confirm_name == "object_mask_str":
             # Calculate dice_score
-            mask_str = confirm_slot['value']
+            mask_str = confirm_value
             goal_mask_str_slot = find_slot_with_key(
                 'object_mask_str', goal_slots)
             goal_mask_str = goal_mask_str_slot['value']
             dice_score = self.compute_dice(mask_str, goal_mask_str)
             same = dice_score >= self.dice_threshold
         else:
-            same = confirm_slot['value'] == target_slot['value']
+            same = confirm_value == target_value
 
         if same:
             da = UserAct.AFFIRM
         else:
             da = UserAct.NEGATE
 
-        user_act = {}
-        user_act['dialogue_act'] = build_slot_dict('dialogue_act', da)
+        # Yes/No
+        user_act = build_user_act(da)
+        return user_act
+
+    def act_wait(self):
+        user_act = build_user_act(UserAct.WAIT)
+        return user_act
+
+    def act_bye(self):
+        user_act = build_user_act(UserAct.BYE)
         return user_act
 
     def check_execution(self, execute_intent, execute_slots):
@@ -285,7 +338,7 @@ class AgendaBasedUserSimulator(object):
             return False
 
         # Check value of goal_slots
-        for target_slot in goal['slots']:
+        for target_slot in goal.get('slots', list()):
             slot_name = target_slot['slot']
             target_value = target_slot['value']
 
@@ -293,8 +346,9 @@ class AgendaBasedUserSimulator(object):
                 continue
 
             slot = find_slot_with_key(slot_name, execute_slots)
-            if slot is None:
+            if slot is None or not slot.get('value'):
                 return False
+
             slot_value = slot['value']
 
             if slot_name == "object_mask_str":
@@ -353,6 +407,8 @@ class AgendaBasedUserSimulator(object):
                 utt = "No."
             elif user_dialogue_act == UserAct.WAIT:
                 utt = "(Waiting...)"
+            elif user_dialogue_act == UserAct.BYE:
+                utt = "Bye."
             else:
                 raise ValueError(
                     "Unknown user_dialogue_act: {}".format(user_dialogue_act))
@@ -363,7 +419,4 @@ class AgendaBasedUserSimulator(object):
 
 
 def builder(string):
-    """
-    Gets node class with string
-    """
     return getattr(sys.modules[__name__], string)

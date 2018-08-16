@@ -20,6 +20,7 @@ class UserAct:
     AFFIRM = "affirm"
     NEGATE = "negate"
     WAIT = "wait"
+    BYE = "bye"
 
     @staticmethod
     def confirm_acts():

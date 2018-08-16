@@ -217,7 +217,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_iers', type=int, default=5)
     parser.add_argument('--dir', type=str, default='./sampled')
     parser.add_argument('--seed', type=int, default=521)
-    parser.add_argument('--save', type=str, default='./sampled/agenda.pickle')
+    parser.add_argument('--save', type=str,
+                        default='./sampled/agenda.{}.pickle')
     args = parser.parse_args()
 
     assert args.num_iers >= args.num_objects
@@ -227,4 +228,16 @@ if __name__ == "__main__":
     agendas = generator.generate()
 
     print("Generated {} agendas".format(len(agendas)))
-    util.save_to_pickle(agendas, args.save)
+
+    save_template = args.save
+
+    util.save_to_pickle(agendas, save_template.format('all'))
+
+    # Shuffle first
+    random.shuffle(agendas)
+
+    train_agendas = agendas[:700]
+    util.save_to_pickle(train_agendas, save_template.format('train'))
+
+    test_agendas = agendas[700:]
+    util.save_to_pickle(test_agendas, save_template.format('test'))

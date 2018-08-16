@@ -21,7 +21,6 @@ class MultimodalChannel(object):
     """
     A channel that simulates the photohsop interface & speech recognition input
     Assign confidence scores based on the slots provided.
-
     """
 
     def __init__(self, ontology_file, speech_conf_mean, speech_conf_std):

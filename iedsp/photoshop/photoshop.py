@@ -55,7 +55,9 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         """
         # Get all system actions
         system_acts = self.observation.get('system_acts', list())
-        
+
+        execute_result = False
+
         for sys_act in system_acts:
             sys_dialogue_act = sys_act['dialogue_act']['value']
 
@@ -108,35 +110,56 @@ class SimplePhotoshopAgent(SimplePhotoshop):
                 data['args'] = json.dumps(args)
 
                 if action == "control":
-                    result, msg = self.control(intent, args)
+                    execute_result, msg = self.control(intent, args)
                 else:
-                    result, msg = self.execute(intent, args)
+                    execute_result, msg = self.execute(intent, args)
 
         # Get slots
-        image = self.get_image(False)
-        b64_img_str = img_to_b64(image)
+        ps_act = {}
+        slots = []
+        if self.get_image(False) is None:
+            b64_img_str = ""
+            masked_b64_img_str = ""
 
-        masked_image = self.get_image(True)
-        masked_b64_img_str = img_to_b64(masked_image)
+        else:
+            image = self.get_image(False)
+            b64_img_str = img_to_b64(image)
+
+            masked_image = self.get_image(True)
+            masked_b64_img_str = img_to_b64(masked_image)
+
+        b64_img_str_slot = build_slot_dict('b64_img_str', b64_img_str, 1.0)
+        masked_b64_img_str_slot = build_slot_dict(
+            'masked_b64_img_str', masked_b64_img_str, 1.0)
 
         mask_strs = []
         for mask_idx, mask in self.get_masks():
             mask_str = img_to_b64(mask)
             mask_strs.append((mask_idx, mask_str))
 
-        # Build return object
-        photoshop_act = {}
+        mask_strs_slot = build_slot_dict('mask_strs', mask_strs, 1.0)
+
+        exec_result_slot = build_slot_dict(
+            "execute_result", execute_result, 1.0)
+
+        slots.append(b64_img_str_slot)
+        slots.append(masked_b64_img_str_slot)
+        slots.append(mask_strs_slot)
+        slots.append(exec_result_slot)
+
+        if not execute_result:
+            print("[photoshop] execution failed")
+        else:
+            print("[photoshop] execution success")
+
         ps_act = {
             'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
-            'slots': [
-                build_slot_dict('b64_img_str', b64_img_str, 1.0),
-                build_slot_dict('masked_b64_img_str', masked_b64_img_str, 1.0),
-                build_slot_dict('mask_strs', mask_strs, 1.0)
-            ]
+            'slots': slots
         }
 
         photoshop_act = {}
         photoshop_act['photoshop_acts'] = [ps_act]
+
         self.observation = {}
         return photoshop_act
 
@@ -183,7 +206,7 @@ class SimplePhotoshopClient(object):
                 mask_str_slots = []
                 for slot in sys_act['slots']:
                     # is not a request
-                    if slot['slot'] == "mask_str" and slot.get('value'):
+                    if slot['slot'] == "object_mask_str" and slot.get('value'):
                         mask_str_slots.append(slot)
 
                 # Process mask_str_slot to SimplePhotoshop arg format

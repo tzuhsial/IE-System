@@ -148,10 +148,20 @@ class VisionEngineDatabase(BaseVisionEngine):
         self.db = load_from_pickle(kwargs['db_path'])
 
     def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None):
-        if b64_img_str not in self.db:
+        if b64_img_str is None:
+            print("[visionengine] missing b64_img_str")
+            logging.debug("[visionengine] missing b64_img_str")
+            return []
+        elif object is None:
+            print("[visionengine] missing object")
+            logging.debug("[visionengine] missing object")
+            return []
+        elif b64_img_str not in self.db:
+            print("[visionengine] b64_img_str not in db")
             logger.debug("{} not in db".format(b64_img_str))
             return []
-        return self.db.get(b64_img_str).get(object)
+        mask_strs = self.db.get(b64_img_str).get(object)
+        return mask_strs
 
 
 def builder(string):

@@ -56,7 +56,9 @@ def sort_slots_with_key(key, slots):
 def slots_to_args(slots):
     args = {}
     for slot_dict in slots:
-        args[slot_dict['slot']] = slot_dict['value']
+        slot_name = slot_dict['slot']
+        slot_value = slot_dict.get('value', None)
+        args[slot_name] = slot_value
     return args
 
 

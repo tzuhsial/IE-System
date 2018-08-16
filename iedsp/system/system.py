@@ -1,5 +1,5 @@
 from ..core import SystemAct
-from .policy import builder as policylib
+from ..policy import builder as policylib
 from .state import StatePortal
 from ..visionengine import VisionEnginePortal
 from ..util import find_slot_with_key, build_slot_dict, slots_to_args, load_from_json
@@ -36,6 +36,7 @@ class System(object):
         """
         self.observation = {}
         self.state.clear()
+        self.policy.reset()
         self.turn_id = 0
 
     def observe(self, observation):
@@ -65,44 +66,28 @@ class System(object):
             }
             self.state.update(**args)
 
-    def rule_policy(self):
-        """
-        A simple rule-based policy 
-        Returns:
-            system_acts (list): list of sys_acts
-        """
-        system_acts = []
-
-        sysintent = self.state.pull()
-
-        if len(sysintent.confirm_slots):
-            sys_act = self.act_confirm(sysintent.confirm_slots)
-        elif len(sysintent.request_slots):
-            sys_act = self.act_request(sysintent.request_slots)
-        elif len(sysintent.query_slots):
-            sys_act = self.act_query(sysintent.query_slots)
-        else:
-            sys_act = self.act_execute(sysintent.execute_slots)
-
-        # Request, Confirm, Label, Execute
-        system_acts += [sys_act]
-
-        return system_acts
-
     def act(self):
         """ 
         Perform action according to observation
         Returns:
             system_act (dict)
         """
-        # Update state with observation
+        ####################
+        #   State Update   #
+        ####################
         self.state_update()
 
-        # Policy, use agent is is provided
+        ####################
+        #      Policy      #
+        ####################
         sys_act = self.policy.next_action(self.state)
         system_acts = [sys_act]
 
-        # Query at the same turn...
+        reward = self.observation.get('reward', 0.0)
+        #print('[System] reward', reward)
+        self.policy.add_reward(reward)
+
+        # Part of the environment
         sys_dialogue_act = sys_act['dialogue_act']['value']
         if sys_dialogue_act == SystemAct.QUERY:
             query_slots = sys_act['slots']
@@ -145,6 +130,10 @@ class System(object):
 
         object_mask_str_node.last_update_turn_id += 1
 
+    def get_reward(self):
+        rewards = self.policy.rewards
+        return sum(rewards)
+
     ###########################
     #   Simple Template NLG   #
     ###########################
@@ -168,28 +157,28 @@ class System(object):
                 utt = "Let me confirm. "
                 confirm_list = []
                 for slot_dict in confirm_slots:
+                    slot_value = str(slot_dict.get('value', ""))
                     if slot_dict['slot'] == "object_mask_str":
-                        sv = slot_dict['slot'] + " is " + \
-                            str(slot_dict['value'][:5])
+                        sv = slot_dict['slot'] + " is " + slot_value[:5]
                     else:
-                        sv = slot_dict['slot'] + " is " + \
-                            str(slot_dict['value'])
+                        sv = slot_dict['slot'] + " is " + slot_value
                     confirm_list.append(sv)
                 utt += ','.join(confirm_list) + "?"
-            elif sys_dialogue_act == SystemAct.QUERY_VISIONENGINE:
+            elif sys_dialogue_act == SystemAct.QUERY:
                 query_slots = sys_act['slots']
-                slot_list = [slot['slot'] + "=" + str(slot['value'])
+                slot_list = [slot['slot'] + "=" + str(slot.get('value', ""))
                              for slot in query_slots]
                 utt = "Query Vision Engine: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.EXECUTE:
-                execute_slots = sys_act['slots']
+                execute_slots = sys_act['slots'] + [sys_act['intent']]
 
                 slot_list = []
                 for slot in execute_slots:
+                    slot_value = str(slot.get('value', ""))
                     if slot["slot"] == "object_mask_str":
-                        sv = slot['slot'] + "=" + str(slot['value'][:5])
+                        sv = slot['slot'] + "=" + slot_value[:5]
                     else:
-                        sv = slot['slot'] + "=" + str(slot['value'])
+                        sv = slot['slot'] + "=" + slot_value
                     slot_list.append(sv)
                 utt = "Execute: " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.BYE:

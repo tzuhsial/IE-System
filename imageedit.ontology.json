@@ -22,28 +22,6 @@
             ]
         },
         {
-            "name": "load",
-            "node": "IntentNode",
-            "speech": false,
-            "children": [
-                {
-                    "name": "b64_img_str",
-                    "optional": false
-                }
-            ]
-        },
-        {
-            "name": "select_object",
-            "node": "IntentNode",
-            "speech": true,
-            "children": [
-                {
-                    "name": "object_mask_str",
-                    "optional": false
-                }
-            ]
-        },
-        {
             "name": "adjust",
             "node": "IntentNode",
             "speech": true,
@@ -64,12 +42,6 @@
         },
         {
             "name": "undo",
-            "node": "IntentNode",
-            "speech": true,
-            "children": []
-        },
-        {
-            "name": "redo",
             "node": "IntentNode",
             "speech": true,
             "children": []
@@ -224,16 +196,7 @@
                 "toothbrush",
                 "image"
             ],
-            "children": [
-                {
-                    "name": "position",
-                    "optional": true
-                },
-                {
-                    "name": "adjective",
-                    "optional": true
-                }
-            ]
+            "children": []
         },
         {
             "name": "object_mask_str",
@@ -259,22 +222,6 @@
             "name": "object_mask_id",
             "node": "BeliefNode",
             "validator": "IntegerValidator",
-            "threshold": 0.7,
-            "possible_values": null,
-            "children": []
-        },
-        {
-            "name": "position",
-            "node": "BeliefNode",
-            "validator": "StringValidator",
-            "threshold": 0.7,
-            "possible_values": null,
-            "children": []
-        },
-        {
-            "name": "adjective",
-            "node": "BeliefNode",
-            "validator": "StringValidator",
             "threshold": 0.7,
             "possible_values": null,
             "children": []
