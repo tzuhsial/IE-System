@@ -1,4 +1,5 @@
 import copy
+import itertools
 import logging
 import random
 import sys
@@ -11,15 +12,14 @@ from ..util import find_slot_with_key, b64_to_img, build_slot_dict, sort_slots_w
 logger = logging.getLogger(__name__)
 
 
-def UserPortal(global_config):
-    user_config = global_config["USER"]
-    user_type = user_config["USER"]
-    dice_threshold = float(user_config["DICE_THRESHOLD"])
-    patience = int(user_config["PATIENCE"])
-
-    reward_config = global_config["REWARD"]
-
-    return builder(user_type)(dice_threshold, patience)
+def UserPortal(user_config):
+    user_type = user_config["user"]
+    args = {
+        "dice_threshold": float(user_config["dice_threshold"]),
+        "patience": int(user_config["patience"]),
+        "gesture_threshold": float(user_config["gesture_threshold"])
+    }
+    return builder(user_type)(**args)
 
 
 def build_user_act(da, intent=None, slots=None):
@@ -32,41 +32,17 @@ def build_user_act(da, intent=None, slots=None):
     return user_act
 
 
-class UserReward(object):
-    """
-    Defines the reward observed by the agent
-    """
-
-    def __init__(self):
-        """
-        """
-        pass
-
-    def get(self, sys_act):
-        """
-        Reward is defined based on sys_act
-        """
-        sys_dialogue_act = sys_act['dialogue_act']['value']
-        if sys_dialogue_act == SystemAct.REQUEST:
-            slots = sys_act['slots']
-            if find_slot_with_key('object_mask_str', slots) is not None:
-                return -3
-        return -1
-
-    def get_final(self, agenda):
-        pass
-
-
 class AgendaBasedUserSimulator(object):
     """
     Agenda based user simulator for image edit requests
-    Also contains reward definitions for reinforcement learning
+    Also defines reward model
     """
 
-    def __init__(self, dice_threshold, patience):
+    def __init__(self, gesture_threshold, dice_threshold, patience):
         """
         Initialize user simulator with configuration
         """
+        self.gesture_threshold = gesture_threshold
         self.dice_threshold = dice_threshold
         self.patience = patience
 
@@ -76,6 +52,20 @@ class AgendaBasedUserSimulator(object):
             agenda (list): list of goals
         """
         self.agenda = agenda.copy()
+        self.agenda_backup = self.agenda.copy()
+
+    def completed_goals(self):
+        """
+        Returns number of completed goals, excluding "undo"
+        """
+        remaining_goals = 0
+        for g in self.agenda:
+            if g['intent'] != "undo":
+                remaining_goals += 1
+
+        original_goals = len(self.agenda_backup)
+        completed_goals = original_goals - remaining_goals
+        return completed_goals
 
     def get_current_goal(self):
         """
@@ -89,6 +79,7 @@ class AgendaBasedUserSimulator(object):
 
     def reset(self):
         self.agenda = None
+        self.open_goal = None
         self.observation = {}
         self.turn_id = 0
 
@@ -130,6 +121,7 @@ class AgendaBasedUserSimulator(object):
         sys_dialogue_act = sys_act['dialogue_act']['value']
 
         if sys_dialogue_act == SystemAct.GREETING:
+            # Starting state
             user_act = self.act_inform_goal()
             reward = 0
 
@@ -163,9 +155,14 @@ class AgendaBasedUserSimulator(object):
                 exec_slots = sys_act.get("slots", list())
                 success = self.check_execution(exec_intent, exec_slots)
                 if not success:
-                    print("[user] check action failure")
-                    undo_goal = build_user_act('inform', 'undo')
-                    self.agenda.insert(0, undo_goal)
+                    # Special case: closed, you cannot undo a close, you need to reopen it
+                    if exec_intent["value"] == "close":
+                        print('[user] check action failure: close')
+                        self.agenda = self.agenda_backup.copy()
+                    else:
+                        print("[user] check action failure")
+                        undo_goal = build_user_act('inform', 'undo')
+                        self.agenda.insert(0, undo_goal)
                     reward = -10
                 else:
                     print("[user] check action success")
@@ -187,7 +184,8 @@ class AgendaBasedUserSimulator(object):
         self.turn_id += 1
 
         # Check episode_done based on goal
-        episode_done = len(self.agenda) == 0 or self.turn_id >= self.patience
+        episode_done = len(self.agenda) == 0 or \
+            self.turn_id >= self.patience
 
         # Build return object
         user_act = {}
@@ -215,9 +213,16 @@ class AgendaBasedUserSimulator(object):
         user_act = copy.deepcopy(goal)
         user_act["dialogue_act"] = build_slot_dict(
             "dialogue_act", UserAct.INFORM)
-        goal_slots = user_act.get("slots", list())  # Could be empty
+
+        target_slots = user_act.get("slots", list()).copy()  # Could be empty
+
+        if np.random.random() < self.gesture_threshold:
+            gesture_slot = find_slot_with_key('gesture_click', target_slots)
+            if gesture_slot:
+                target_slots.remove(gesture_slot)
+
         user_slots = filter(
-            lambda slot: slot['slot'] != 'object_mask_str', goal_slots)
+            lambda s: s['slot'] != 'object_mask_str', target_slots)
         user_slots = list(user_slots)
         user_act["slots"] = user_slots
         return user_act
@@ -238,41 +243,13 @@ class AgendaBasedUserSimulator(object):
         else:
             goal_slots = goal['slots']
 
-        if req_name == "object_mask_id":
-            # Get mask_strs from photoshop
-            mask_strs_slot = self.get_photoshop_slot('mask_strs')
-            mask_strs = mask_strs_slot['value']
-
-            if len(mask_strs) == 0:
-                return None
-
-            goal_mask_str_slot = find_slot_with_key(
-                'object_mask_str', goal_slots)
-            if goal_mask_str_slot is None:
-                return None
-
-            goal_mask_str = goal_mask_str_slot['value']
-
-            dice_scores = [self.compute_dice(
-                mask_str, goal_mask_str) for mask_idx, mask_str in mask_strs]
-
-            # Find the one with the maximum dice score
-            max_score = max(dice_scores)
-            max_index = dice_scores.index(max_score)
-
-            inform_slot = build_slot_dict('object_mask_id')
-            if max_score >= self.dice_threshold:
-                inform_slot['value'] = max_index
-            else:
-                inform_slot['value'] = -1
-        else:
-            inform_slot = find_slot_with_key(req_name, goal_slots)
+        inform_slot = find_slot_with_key(req_name, goal_slots)
 
         if inform_slot is None:
             return None
 
         user_act = build_user_act(
-            UserAct.INFORM, UserAct.INFORM, [inform_slot])
+            UserAct.INFORM, None, [inform_slot])
         return user_act
 
     def act_confirm(self, confirm_slots):
@@ -306,7 +283,7 @@ class AgendaBasedUserSimulator(object):
             dice_score = self.compute_dice(mask_str, goal_mask_str)
             same = dice_score >= self.dice_threshold
         else:
-            same = confirm_value == target_value
+            same = (confirm_value == target_value)
 
         if same:
             da = UserAct.AFFIRM
@@ -342,7 +319,7 @@ class AgendaBasedUserSimulator(object):
             slot_name = target_slot['slot']
             target_value = target_slot['value']
 
-            if slot_name == "object":  # Skip this slot in object_goal
+            if slot_name in ["object", "gesture_click"]  # Skip this slot in object_goal
                 continue
 
             slot = find_slot_with_key(slot_name, execute_slots)
@@ -361,6 +338,9 @@ class AgendaBasedUserSimulator(object):
 
         return True
 
+    ###################
+    #   Mask Related  #
+    ###################
     def compute_dice(self, mask_str, goal_mask_str):
         """
         The eyes of the user
@@ -373,9 +353,40 @@ class AgendaBasedUserSimulator(object):
         """
         mask = b64_to_img(mask_str)
         goal_mask = b64_to_img(goal_mask_str)
-        assert mask.shape == goal_mask.shape, "Weird shape"
+        assert mask.shape == goal_mask.shape
         dice = 2 * (mask & goal_mask).sum() / (mask.sum() + goal_mask.sum())
         return dice
+
+    def find_mask_centroid(self, mask):
+        """
+        Find the centroid of a 3 dimensional binary mask
+        """
+        X, Y, Z = mask.shape
+        moment_x = 0
+        moment_y = 0
+        moment_z = 0
+        npixels = 0
+        for x, y, z in itertools.product(range(X), range(Y), range(Z)):
+            if mask[x][y][z] == 255:
+                moment_x += x
+                moment_y += y
+                moment_z += z
+                npixels += 1
+        moment_x /= npixels
+        moment_y /= npixels
+        moment_z /= npixels
+        return round(moment_x), round(moment_y), round(moment_z)
+
+    def create_gesture_click(self, object_mask_str):
+        """
+        Returns a mask as gestures
+        """
+        mask = b64_to_img(object_mask_str)
+        x, y, _ = self.find_mask_centroid(mask)
+
+        gesture_click = np.zeros_like(mask)
+        gesture_click[x, y] = 1
+        return gesture_click
 
     def template_nlg(self, user_acts):
         """
@@ -397,6 +408,10 @@ class AgendaBasedUserSimulator(object):
                 for slot in slots:
                     if slot["slot"] == "object_mask_str":
                         slot_msg = slot["slot"] + "=" + slot["value"][:5]
+                    elif slot["slot"] == "gesture_click":
+                        slot_msg = slot["slot"] + "=" + "010"
+                    elif slot["slot"] == "mask_strs":
+                        slot_msg = slot["slot"] + "=" + len(slot["value"])
                     else:
                         slot_msg = slot["slot"] + "=" + str(slot["value"])
                     slot_list.append(slot_msg)

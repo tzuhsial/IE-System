@@ -11,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def VisionEnginePortal(visionengine_config):
-    visionengine_name = visionengine_config['VISIONENGINE']
-    uri = visionengine_config["VISIONENGINE_URI"]
-    db_path = visionengine_config["DATABASE_PATH"]
+    visionengine_name = visionengine_config['visionengine']
     args = {
-        'uri': uri,
-        'db_path': db_path
+        'uri': visionengine_config.get("uri"),
+        'db_path': visionengine_config.get('database_path')
     }
     return builder(visionengine_name)(**args)
 
@@ -147,7 +145,7 @@ class VisionEngineDatabase(BaseVisionEngine):
     def __init__(self, **kwargs):
         self.db = load_from_pickle(kwargs['db_path'])
 
-    def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None):
+    def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None, **kwargs):
         if b64_img_str is None:
             print("[visionengine] missing b64_img_str")
             logging.debug("[visionengine] missing b64_img_str")

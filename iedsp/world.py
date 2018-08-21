@@ -1,10 +1,10 @@
-
-class SelfPlayWorld(object):
-    def __init__(self, agents):
+class ImageEditWorld(object):
+    def __init__(self, config, agents):
         """
         Args:
             agents (list):  user 2. channel 3. agent 4. photoshop
         """
+        self.config = config
         self.agents = agents
 
     def reset(self):
@@ -31,9 +31,9 @@ class SelfPlayWorld(object):
         user.observe(self.acts[photoshop_idx])
         self.acts[user_idx] = user.act()
 
-        print("[User]", self.acts[user_idx]['user_utterance'], \
-             'reward', self.acts[user_idx]['reward'])
-
+        if self.config["verbose"]:
+            print("[User]", self.acts[user_idx]['user_utterance'],
+                  'reward', self.acts[user_idx]['reward'])
         # Channel observes User
         channel.observe(self.acts[user_idx])
         self.acts[channel_idx] = channel.act()
@@ -42,14 +42,21 @@ class SelfPlayWorld(object):
         system.observe(self.acts[channel_idx])
         system.observe(self.acts[photoshop_idx])
         self.acts[system_idx] = system.act()
-        print("[System]", self.acts[system_idx]['system_utterance'])
+
+        if self.config["verbose"]:
+            print("[System]", self.acts[system_idx]['system_utterance'])
 
         # Photoshop observes agent action
         photoshop.observe(self.acts[system_idx])
         self.acts[photoshop_idx] = photoshop.act()
 
         self.turn_count += 1
-        print("[World] Turn", self.turn_count)
+
+        if self.config["verbose"]:
+            print("[World] Turn", self.turn_count)
+
+    def reward(self):
+        return self.acts[0]['reward']
 
     def episode_done(self):
         """

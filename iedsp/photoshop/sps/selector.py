@@ -83,7 +83,7 @@ class Selector(object):
 
         captioned_img = cv2.putText(
             captioned_image, caption, (y, x), fontFace, fontScale, color, thickness)
-        return captioned_image
+        return captioned_img
 
     @staticmethod
     def find_mask_centroid(mask):

@@ -1,7 +1,11 @@
+import base64
 import logging
 import os
 import sys
 from urllib.parse import urlparse
+
+import cv2
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,17 @@ class PathValidator(BaseValidator):
         if not isinstance(obj, str):
             return False
         return os.path.exists(obj)
+
+
+class B64ImgStrValidator(BaseValidator):
+    def __call__(self, obj):
+        try:
+            buf = base64.b64decode(obj)
+            nparr = np.frombuffer(buf, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        except:
+            return False
+        return True
 
 
 def builder(string):

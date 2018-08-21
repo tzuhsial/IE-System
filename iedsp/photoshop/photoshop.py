@@ -6,23 +6,25 @@ from urllib.parse import urljoin
 from .sps import SimplePhotoshop
 
 from ..core import SystemAct, PhotoshopAct
-from ..util import find_slot_with_key, img_to_b64, build_slot_dict
+from ..util import find_slot_with_key, img_to_b64, build_slot_dict, slots_to_args
 
 
 logger = logging.getLogger(__name__)
 
 
 def PhotoshopPortal(photoshop_config):
-    use_sps = bool(int(photoshop_config['USE_SPS']))
-    use_sps_client = bool(int(photoshop_config['USE_SPS_CLIENT']))
-    sps_uri = photoshop_config['SPS_URI']
 
-    if use_sps:
-        if use_sps_client:
-            return SimplePhotoshopClient(sps_uri)
-        else:
+    photoshop_type = photoshop_config["photoshop"]
+    use_client = photoshop_config['client']
+    uri = photoshop_config['uri']
+
+    if photoshop_type == "SimplePhotoshop":
+        if not use_client:
             return SimplePhotoshopAgent()
-    return None
+        else:
+            return SimplePhotoshopClient(uri)
+    else:
+        raise NotImplementedError
 
 
 class SimplePhotoshopAgent(SimplePhotoshop):
@@ -41,6 +43,8 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         Reset
         """
         self.observation = {}
+        self.last_execute_result = False
+        self.last_execute_message = ""
 
     def observe(self, observation):
         """
@@ -50,70 +54,58 @@ class SimplePhotoshopAgent(SimplePhotoshop):
 
     def act(self):
         """
-        POST load_mask_strs if any of photoshop actions belong to load_mask_strs
-        POST action if EXECUTE is observed
+        Photoshop actions
         """
         # Get all system actions
         system_acts = self.observation.get('system_acts', list())
+        sys_act = system_acts[0]
+        sys_dialogue_act = sys_act['dialogue_act']['value']
 
-        execute_result = False
+        if sys_dialogue_act == SystemAct.EXECUTE:
+            intent = sys_act['intent']['value']
+            slots = sys_act['slots']
+            self.act_execute(intent, slots)
 
-        for sys_act in system_acts:
-            sys_dialogue_act = sys_act['dialogue_act']['value']
+        ps_act = self.act_inform()
 
-            # Load mask_strs action
-            if sys_dialogue_act in SystemAct.load_mask_strs_acts():
+        photoshop_act = {}
+        photoshop_act['photoshop_acts'] = [ps_act]
 
-                # Get all mask_str slots from mask, or could be empty
-                mask_str_slots = []
-                for slot in sys_act['slots']:
-                    # is not a request
-                    if slot['slot'] == "mask_str" and slot.get('value'):
-                        mask_str_slots.append(slot)
+        self.observation = {}
+        return photoshop_act
 
-                # Process mask_str_slot to SimplePhotoshop arg format
-                mask_strs = []
-                for idx, mask_slot in enumerate(mask_str_slots):
-                    tup = (str(idx),  mask_slot['value'])
-                    mask_strs.append(tup)
+    def act_execute(self, intent, slots):
 
-                args = {}
-                args['mask_strs'] = mask_strs
+        if intent in PhotoshopAct.control_acts():
+            action = "control"
+        else:
+            action = "edit"
 
-                result, msg = self.control(PhotoshopAct.LOAD_MASK_STRS, args)
-                logger.debug("{}: {}, {}".format(
-                    PhotoshopAct.LOAD_MASK_STRS, result, msg))
+        # Build data
+        args = slots_to_args(slots)
 
-            # Execute actions
-            if sys_dialogue_act == SystemAct.EXECUTE:
+        data = {}
+        data['action'] = action
+        data['intent'] = intent
+        data['args'] = json.dumps(args)
 
-                # control_type & edit_type
-                intent = sys_act['intent']['value']
+        if action == "control":
+            execute_result, msg = self.control(intent, args)
+        else:
+            execute_result, msg = self.execute(intent, args)
 
-                if intent in PhotoshopAct.control_acts():
-                    action = "control"
-                else:
-                    action = "edit"
+        self.last_execute_result = execute_result
+        self.last_execute_message = msg
 
-                # Build data
-                args = {}
-                for slot in sys_act['slots']:
-                    # Exclude mask_strs
-                    if slot['slot'] != 'mask_str':
-                        slot_name = slot.get('slot')
-                        slot_value = slot.get('value')
-                        args[slot_name] = slot_value
+        return execute_result, msg
 
-                data = {}
-                data['action'] = action
-                data['intent'] = intent
-                data['args'] = json.dumps(args)
-
-                if action == "control":
-                    execute_result, msg = self.control(intent, args)
-                else:
-                    execute_result, msg = self.execute(intent, args)
-
+    def act_inform(self):
+        """
+        Informs the user, basically what the user sees.
+        b64_img_str
+        masked_b64_img_str
+        mask_strs 
+        """
         # Get slots
         ps_act = {}
         slots = []
@@ -140,28 +132,19 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         mask_strs_slot = build_slot_dict('mask_strs', mask_strs, 1.0)
 
         exec_result_slot = build_slot_dict(
-            "execute_result", execute_result, 1.0)
+            "execute_result", self.last_execute_result, 1.0)
 
         slots.append(b64_img_str_slot)
         slots.append(masked_b64_img_str_slot)
         slots.append(mask_strs_slot)
         slots.append(exec_result_slot)
 
-        if not execute_result:
-            print("[photoshop] execution failed")
-        else:
-            print("[photoshop] execution success")
-
         ps_act = {
             'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
             'slots': slots
         }
 
-        photoshop_act = {}
-        photoshop_act['photoshop_acts'] = [ps_act]
-
-        self.observation = {}
-        return photoshop_act
+        return ps_act
 
 
 class SimplePhotoshopClient(object):

@@ -61,7 +61,7 @@ class SystemAct:
     @staticmethod
     def load_mask_strs_acts():
         """
-        Actions that photoshop needs to load mask strs
+        Actions that photoshop may needs to load mask strs
         """
         return [SystemAct.REQUEST, SystemAct.CONFIRM, SystemAct.EXECUTE]
 

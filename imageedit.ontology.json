@@ -49,7 +49,7 @@
         {
             "name": "close",
             "node": "IntentNode",
-            "speech": true,
+            "speech": false,
             "children": []
         }
     ],
@@ -57,16 +57,13 @@
         {
             "name": "intent",
             "node": "BeliefNode",
-            "threshold": 0.7,
+            "threshold": 0.8,
             "validator": "StringValidator",
             "possible_values": [
                 "open",
-                "load",
                 "close",
-                "select_object",
                 "adjust",
-                "undo",
-                "redo"
+                "undo"
             ],
             "children": []
         },
@@ -89,7 +86,7 @@
             "name": "attribute",
             "node": "BeliefNode",
             "validator": "StringValidator",
-            "threshold": 0.7,
+            "threshold": 0.8,
             "possible_values": [
                 "brightness",
                 "contrast",
@@ -103,15 +100,22 @@
             "name": "adjust_value",
             "node": "BeliefNode",
             "validator": "IntegerValidator",
-            "threshold": 0.7,
-            "possible_values": null,
+            "threshold": 0.8,
+            "possible_values": [
+                -30,
+                -10,
+                -5,
+                5,
+                10,
+                30
+            ],
             "children": []
         },
         {
             "name": "object",
             "node": "BeliefNode",
             "validator": "StringValidator",
-            "threshold": 0.7,
+            "threshold": 0.8,
             "possible_values": [
                 "BG",
                 "person",
@@ -201,7 +205,7 @@
         {
             "name": "object_mask_str",
             "node": "ObjectMaskStrNode",
-            "threshold": 0.7,
+            "threshold": 0.8,
             "possible_values": null,
             "children": [
                 {
@@ -213,16 +217,16 @@
                     "optional": false
                 },
                 {
-                    "name": "object_mask_id",
+                    "name": "gesture_click",
                     "optional": false
                 }
             ]
         },
         {
-            "name": "object_mask_id",
-            "node": "BeliefNode",
-            "validator": "IntegerValidator",
-            "threshold": 0.7,
+            "name": "gesture_click",
+            "node": "PSToolNode",
+            "validator": "B64ImgStrValidator",
+            "threshold": 1.0,
             "possible_values": null,
             "children": []
         }

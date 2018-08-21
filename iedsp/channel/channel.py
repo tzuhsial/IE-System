@@ -4,17 +4,17 @@ import sys
 import numpy as np
 
 from ..core import UserAct
-from ..util import load_from_json
+from .. import util
 
 
-def ChannelPortal(config):
-    ontology_file = config["DEFAULT"]["ONTOLOGY_FILE"]
-
-    channel_config = config["CHANNEL"]
-    channel_type = channel_config["CHANNEL"]
-    speech_conf_mean = float(channel_config["SPEECH_CONF_MEAN"])
-    speech_conf_std = float(channel_config["SPEECH_CONF_STD"])
-    return builder(channel_type)(ontology_file, speech_conf_mean, speech_conf_std)
+def ChannelPortal(channel_config):
+    channel_type = channel_config["channel"]
+    args = {
+        "ontology_json": util.load_from_json(channel_config["ontology"]),
+        "speech_conf_mean": float(channel_config["speech_conf_mean"]),
+        "speech_conf_std": float(channel_config["speech_conf_std"])
+    }
+    return builder(channel_type)(**args)
 
 
 class MultimodalChannel(object):
@@ -23,11 +23,11 @@ class MultimodalChannel(object):
     Assign confidence scores based on the slots provided.
     """
 
-    def __init__(self, ontology_file, speech_conf_mean, speech_conf_std):
+    def __init__(self, ontology_json, speech_conf_mean, speech_conf_std):
         """
         Loads configurations
         """
-        self.ontology_json = load_from_json(ontology_file)
+        self.ontology_json = ontology_json
         self.speech_conf_mean = speech_conf_mean
         self.speech_conf_std = speech_conf_std
 
@@ -36,32 +36,17 @@ class MultimodalChannel(object):
 
     def _process_ontology(self):
 
-        intents = self.ontology_json["intents"]
+        self.intents = {}
+        for intent in self.ontology_json["intents"]:
+            self.intents[intent['name']] = intent
 
-        self.speech_intents = []
-        self.photoshop_intents = []
-        for intent in intents:
-            intent_name = intent["name"]
-            if intent.get("speech", False):
-                self.speech_intents.append(intent_name)
-            else:
-                self.photoshop_intents.append(intent_name)
-
-        slots = self.ontology_json["slots"]
-
-        self.speech_slots = []
-        self.photoshop_slots = []
-
-        for slot in slots:
-            slot_name = slot["name"]
-            if slot["node"] == "BeliefNode":
-                self.speech_slots.append(slot_name)
-            else:
-                self.photoshop_slots.append(slot_name)
+        self.slots = {}
+        for slot in self.ontology_json["slots"]:
+            self.slots[slot['name']] = slot
 
     def reset(self):
         """ 
-        We don't need to do anything
+        We don't need to do anything here 
         """
         pass
 
@@ -73,36 +58,72 @@ class MultimodalChannel(object):
 
     def act(self):
         """
+        Corrupt the user_actions
         Iterate through confidence scores from the user and assign confidence scores
+
         Returns:
             channel_act (dict): user_act with channel confidence scores
         """
         channel_act = copy.deepcopy(self.observation)
+
         for user_act in channel_act['user_acts']:
-            # Assign confidence scores
+            # Dialogue Act
+            da_conf = self.generate_confidence()
+            da_value = user_act["dialogue_act"]["value"]
+
+            if np.random.random() > da_conf:
+                if da_value == UserAct.AFFIRM:
+                    da_value = UserAct.NEGATE
+                elif da_value == UserAct.NEGATE:
+                    da_value == UserAct.AFFIRM
+                else:
+                    pass
+
+            user_act["dialogue_act"]["value"] = da_value
             user_act["dialogue_act"]["conf"] = self.generate_confidence()
 
+            # Intent
             if "intent" in user_act:
-                intent_name = user_act["intent"]["value"]
-                if intent_name in self.photoshop_intents:
-                    user_act["intent"]["conf"] = 1.
+                intent_value = user_act["intent"]["value"]
+                if self.intents[intent_value].get("speech", False):
+                    intent_conf = 1.
                 else:
-                    user_act["intent"]["conf"] = self.generate_confidence()
+                    intent_conf = self.generate_confidence()
 
+                intent_possible_values = self.slots["intent"]["possible_values"].copy(
+                )
+
+                if np.random.random() > intent_conf:
+                    intent_possible_values.remove(intent_value)
+                    intent_value = np.random.choice(intent_possible_values)
+
+                user_act['intent']['value'] = intent_value
+                user_act['intent']['conf'] = intent_conf
+
+            # Slot Values
             for slot_dict in user_act.get('slots', list()):
                 slot_name = slot_dict["slot"]
-                if slot_name in self.photoshop_slots:
-                    slot_dict["conf"] = 1.
+                slot_value = slot_dict["value"]
+
+                if self.slots[slot_name]["node"] != "BeliefNode":
+                    slot_conf = 1.0
                 else:
-                    slot_dict['conf'] = self.generate_confidence()
+                    slot_conf = self.generate_confidence()
+
+                slot_possible_values = self.slots[slot_name].get(
+                    "possible_values")
+
+                if slot_possible_values is None:
+                    slot_possible_values = list()
+
+                slot_possible_values = slot_possible_values.copy()
+                if len(slot_possible_values) and np.random.random() > slot_conf:
+                    slot_possible_values.remove(slot_value)
+                    slot_value = np.random.choice(slot_possible_values)
+
+                slot_dict['conf'] = slot_conf
 
         return channel_act
-
-    def corrupt(self, slot_dict):
-        """
-        Modify the slot values according to the assigned confidence
-        """
-        pass
 
     def generate_confidence(self):
         """

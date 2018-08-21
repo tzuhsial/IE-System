@@ -14,7 +14,7 @@ from iedsp.channel import ChannelPortal
 from iedsp.photoshop import PhotoshopPortal
 from iedsp.system import System
 from iedsp.user import UserPortal
-from iedsp.world import SelfPlayWorld
+from iedsp.world import ImageEditWorld
 
 
 def print_mean_std(name, seq):
@@ -46,7 +46,7 @@ def main(argv):
 
     agents = [user, channel, system, photoshop]
 
-    world = SelfPlayWorld(agents)
+    world = ImageEditWorld(agents)
 
     turn_counts = []
     episode_rewards = []
@@ -65,6 +65,9 @@ def main(argv):
         turn_counts.append(world.turn_count)
         episode_rewards.append(system.get_reward())
         completed_goals.append(7 - len(user.agenda))
+
+        import pdb
+        pdb.set_trace()
 
     print_mean_std('turn', turn_counts)
     print_mean_std('reward', episode_rewards)

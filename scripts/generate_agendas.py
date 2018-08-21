@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import json
 import os
 import random
@@ -34,6 +35,39 @@ def annToMask(img, ann):
         rle = ann['segmentation']
     m = maskUtils.decode(rle)
     return m
+
+
+def find_mask_centroid(mask):
+    """
+    Find the centroid of a 3 dimensional binary mask
+    """
+    assert ((mask == 0) | (mask == 255)).all()
+    X, Y, Z = mask.shape
+    moment_x = 0
+    moment_y = 0
+    moment_z = 0
+    npixels = 0
+    for x, y, z in itertools.product(range(X), range(Y), range(Z)):
+        if mask[x][y][z] == 255:
+            moment_x += x
+            moment_y += y
+            moment_z += z
+            npixels += 1
+
+    moment_x /= npixels
+    moment_y /= npixels
+    moment_z /= npixels
+    return round(moment_x), round(moment_y), round(moment_z)
+
+
+def create_gesture_click(object_mask):
+    """
+    Returns a mask as gestures
+    """
+    x, y, _ = find_mask_centroid(object_mask)
+    gesture_click = np.zeros_like(object_mask)
+    gesture_click[x, y] = 255
+    return gesture_click
 
 
 def build_goal(intent, slots=None):
@@ -171,7 +205,8 @@ class AdjustAgendaGenerator(object):
                 'attribute', sampled_attribute)
 
             # 2. adjust_value
-            sampled_adjust_value = random.randint(-50, 50)
+            adjust_possible_values = adjust_value_ont['possible_values']
+            sampled_adjust_value = random.choice(adjust_possible_values)
             adjust_value_slot = util.build_slot_dict(
                 'adjust_value', sampled_adjust_value)
 
@@ -185,15 +220,23 @@ class AdjustAgendaGenerator(object):
             # 4. mask_str
             if object_name != "image":
                 # From boolean to image
-                object_mask = annToMask(img, object_ann)
+                one_dim_object_mask = annToMask(img, object_ann)
+                # Convert to 3D
+                object_mask = np.repeat(
+                    one_dim_object_mask[..., np.newaxis], 3, axis=2).astype(np.uint8)
                 indices = object_mask == 1
                 object_mask[indices] = 255
                 mask_str = util.img_to_b64(object_mask)
                 mask_str_slot = util.build_slot_dict(
                     'object_mask_str', mask_str)
 
+                # also, create gesture_slot
+                gesture_click = create_gesture_click(object_mask)
+                gesture_click_str = util.img_to_b64(gesture_click)
+                gesture_click_slot = util.build_slot_dict(
+                    'gesture_click', gesture_click_str)
                 slots = [attribute_slot, adjust_value_slot,
-                         object_slot, mask_str_slot]
+                         object_slot, mask_str_slot, gesture_click_slot]
             else:
                 # Without the mask_str_slot
                 slots = [attribute_slot, adjust_value_slot, object_slot]

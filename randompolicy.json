@@ -1,0 +1,40 @@
+{
+    "ontology": "imageedit.ontology.json",
+    "agendas": {
+        "train": "./sampled/agenda.train.pickle",
+        "test": "./sampled/agenda.test.pickle"
+    },
+    "world": {
+        "verbose": false
+    },
+    "agents": {
+        "user": {
+            "user": "AgendaBasedUserSimulator",
+            "patience": 30,
+            "dice_threshold": 0.5
+        },
+        "channel": {
+            "ontology": "imageedit.ontology.json",
+            "channel": "MultimodalChannel",
+            "speech_conf_mean": 1.0,
+            "speech_conf_std": 0.0
+        },
+        "system": {
+            "ontology": "imageedit.ontology.json",
+            "visionengine": {
+                "visionengine": "VisionEngineDatabase",
+                "database_path": "./sampled/visionengine.maskrcnn.pickle"
+            },
+            "policy": "RandomPolicy"
+        },
+        "photoshop": {
+            "photoshop": "SimplePhotoshop",
+            "client": false,
+            "uri": "http://localhost:2005"
+        }
+    },
+    "policy": {
+        "num_episodes": 100,
+        "save_path": ""
+    }
+}
