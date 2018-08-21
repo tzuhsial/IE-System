@@ -110,16 +110,22 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         ps_act = {}
         slots = []
         if self.get_image(False) is None:
+            original_b64_img_str = ""
             b64_img_str = ""
             masked_b64_img_str = ""
 
         else:
+            original_image = self.background
+            original_b64_img_str = img_to_b64(original_image)
+
             image = self.get_image(False)
             b64_img_str = img_to_b64(image)
 
             masked_image = self.get_image(True)
             masked_b64_img_str = img_to_b64(masked_image)
 
+        original_b64_img_str_slot = build_slot_dict(
+            'original_b64_img_str', original_b64_img_str, 1.0)
         b64_img_str_slot = build_slot_dict('b64_img_str', b64_img_str, 1.0)
         masked_b64_img_str_slot = build_slot_dict(
             'masked_b64_img_str', masked_b64_img_str, 1.0)
@@ -134,6 +140,7 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         exec_result_slot = build_slot_dict(
             "execute_result", self.last_execute_result, 1.0)
 
+        slots.append(original_b64_img_str_slot)
         slots.append(b64_img_str_slot)
         slots.append(masked_b64_img_str_slot)
         slots.append(mask_strs_slot)

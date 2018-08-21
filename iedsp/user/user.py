@@ -46,6 +46,14 @@ class AgendaBasedUserSimulator(object):
         self.dice_threshold = dice_threshold
         self.patience = patience
 
+    def reset(self):
+        self.agenda = None
+        self.observation = {}
+        self.turn_id = 0
+
+        # Goal comple
+        self.num_undos = 0
+
     def load_agenda(self, agenda):
         """
         Args:
@@ -76,12 +84,6 @@ class AgendaBasedUserSimulator(object):
         if self.agenda is None or len(self.agenda) == 0:
             return None
         return self.agenda[0]
-
-    def reset(self):
-        self.agenda = None
-        self.open_goal = None
-        self.observation = {}
-        self.turn_id = 0
 
     def observe(self, observation):
         """
@@ -157,15 +159,16 @@ class AgendaBasedUserSimulator(object):
                 if not success:
                     # Special case: closed, you cannot undo a close, you need to reopen it
                     if exec_intent["value"] == "close":
-                        print('[user] check action failure: close')
+                        #print('[user] check action failure: close')
                         self.agenda = self.agenda_backup.copy()
                     else:
-                        print("[user] check action failure")
+                        #print("[user] check action failure")
                         undo_goal = build_user_act('inform', 'undo')
+                        self.num_undos += 1
                         self.agenda.insert(0, undo_goal)
                     reward = -10
                 else:
-                    print("[user] check action success")
+                    #print("[user] check action success")
                     if len(self.agenda) > 0:
                         self.agenda.pop(0)
                     reward = 10
@@ -241,7 +244,7 @@ class AgendaBasedUserSimulator(object):
         if req_name == "intent":
             goal_slots = [goal['intent']]
         else:
-            goal_slots = goal['slots']
+            goal_slots = goal.get('slots', list())
 
         inform_slot = find_slot_with_key(req_name, goal_slots)
 
@@ -264,7 +267,7 @@ class AgendaBasedUserSimulator(object):
         if confirm_name == "intent":
             goal_slots = [goal['intent']]
         else:
-            goal_slots = goal['slots']
+            goal_slots = goal.get('slots', list())
 
         target_slot = find_slot_with_key(confirm_name, goal_slots)
 
@@ -319,7 +322,7 @@ class AgendaBasedUserSimulator(object):
             slot_name = target_slot['slot']
             target_value = target_slot['value']
 
-            if slot_name in ["object", "gesture_click"]  # Skip this slot in object_goal
+            if slot_name in ["object", "gesture_click"]:  # Skip this slot in object_goal
                 continue
 
             slot = find_slot_with_key(slot_name, execute_slots)
@@ -406,10 +409,8 @@ class AgendaBasedUserSimulator(object):
                 slots += user_act.get("slots", list())
                 slot_list = []
                 for slot in slots:
-                    if slot["slot"] == "object_mask_str":
+                    if slot["slot"] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
                         slot_msg = slot["slot"] + "=" + slot["value"][:5]
-                    elif slot["slot"] == "gesture_click":
-                        slot_msg = slot["slot"] + "=" + "010"
                     elif slot["slot"] == "mask_strs":
                         slot_msg = slot["slot"] + "=" + len(slot["value"])
                     else:

@@ -258,10 +258,10 @@ if __name__ == "__main__":
                         default='imageedit.ontology.json')
     parser.add_argument('--num_objects', type=int, default=3)
     parser.add_argument('--num_iers', type=int, default=5)
-    parser.add_argument('--dir', type=str, default='./sampled')
+    parser.add_argument('--dir', type=str, default='./sampled_100')
     parser.add_argument('--seed', type=int, default=521)
     parser.add_argument('--save', type=str,
-                        default='./sampled/agenda.{}.pickle')
+                        default='./sampled_100/agenda.{}.pickle')
     args = parser.parse_args()
 
     assert args.num_iers >= args.num_objects
@@ -279,8 +279,8 @@ if __name__ == "__main__":
     # Shuffle first
     random.shuffle(agendas)
 
-    train_agendas = agendas[:700]
+    train_agendas = agendas[:70]
     util.save_to_pickle(train_agendas, save_template.format('train'))
 
-    test_agendas = agendas[700:]
+    test_agendas = agendas[70:]
     util.save_to_pickle(test_agendas, save_template.format('test'))

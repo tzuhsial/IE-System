@@ -1,33 +1,30 @@
 {
     "ontology": "imageedit.ontology.json",
     "agendas": {
-        "train": "./sampled/agenda.train.pickle",
-        "test": "./sampled/agenda.test.pickle"
+        "train": "./sampled_100/agenda.train.pickle",
+        "test": "./sampled_100/agenda.test.pickle"
     },
     "world": {
-        "verbose": true
+        "verbose": false
     },
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "patience": 30,
+            "patience": 50,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
         "channel": {
             "ontology": "imageedit.ontology.json",
             "channel": "MultimodalChannel",
-            "speech_conf_mean": 1.0,
+            "speech_conf_mean": 0.75,
             "speech_conf_std": 0.0
         },
         "system": {
             "ontology": "imageedit.ontology.json",
-            "statetracker": {
-                "lambda": 0.9
-            },
             "visionengine": {
                 "visionengine": "VisionEngineDatabase",
-                "database_path": "./sampled/visionengine.annotation.pickle"
+                "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
             "policy": "RulePolicy"
         },

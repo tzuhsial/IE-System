@@ -23,7 +23,7 @@ class SimplePhotoshop(object):
     Based on Trung's Annotation Framework https://wiki.corp.adobe.com/display/~bui/Learning+to+map+between+natural+language+requests+to+image+editing+actions
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         # Background image
         self.background = None
         self.img = None
@@ -38,6 +38,9 @@ class SimplePhotoshop(object):
 
         # User and dialogue manager sees this
         self.state = defaultdict(lambda: object_state_factory())
+
+        # Verbose
+        self.verbose = kwargs.get("verbose", False)
 
     def reset(self):
         """Resets the image, history and state
@@ -115,9 +118,8 @@ class SimplePhotoshop(object):
             result = True
             message = "success"
         except Exception as e:
-            print(e)
             result = False
-            message = "failure"
+            message = e
         finally:
             return result, message
 
@@ -131,9 +133,8 @@ class SimplePhotoshop(object):
             result = True
             message = "success"
         except Exception as e:
-            print(e)
             result = False
-            message = "failure"
+            message = e
         finally:
             return result, message
 
@@ -143,15 +144,17 @@ class SimplePhotoshop(object):
 
     def control_redo(self, arguments={}):
         if not self.history.hasNextHistory():
-            print("[photoshop] execution failure: no next history")
-            return False, "failure"
+            #print("[photoshop] execution failure: no next history")
+            msg = "Error occured when executing \"redo\": no next history"
+            return False, msg
         (action_type, arguments), self.img = self.history.redo()
         return True, "success"
 
     def control_undo(self, arguments={}):
         if not self.history.hasPreviousHistory():
-            print("[photoshop] execution failure: no previous history")
-            return False, "failure"
+            #print("[photoshop] execution failure: no previous history")
+            msg = "Error occured when executing \"undo\": no previous history"
+            return False, msg
         (action_type, arguments), self.img = self.history.undo()
         return True, "success"
 
@@ -170,9 +173,8 @@ class SimplePhotoshop(object):
             result = True
             message = 'success'
         except Exception as e:
-            print(e)
             result = False
-            message = "failure"
+            message = e
         finally:
             return result, message
 
@@ -196,9 +198,9 @@ class SimplePhotoshop(object):
             result = True
             message = "success"
         except Exception as e:
-            print(e)
+
             result = False
-            message = "failure"
+            message = e
         finally:
             return result, message
 
@@ -219,9 +221,8 @@ class SimplePhotoshop(object):
             result = True
             message = "success"
         except Exception as e:
-            print(e)
             result = False
-            message = "failure"
+            message = e
         finally:
             return result, message
 
@@ -275,7 +276,7 @@ class SimplePhotoshop(object):
         elif edit_type == PSAct.Edit.ADJUST_COLOR:
             edited_img = self.edit_adjust_color(arguments)
         else:
-            print("Unknown edit_type: {}".format(edit_type))
+            #print("Unknown edit_type: {}".format(edit_type))
             edited_img = None
         return edited_img
 
@@ -285,7 +286,6 @@ class SimplePhotoshop(object):
             adjust_value = arguments.get(PSArgs.ADJUST_VALUE)
             edited_img = adjust(self.img, attribute, adjust_value)
         except Exception as e:
-            print(e)
             edited_img = None
         return edited_img
 
@@ -294,7 +294,6 @@ class SimplePhotoshop(object):
             color = arguments.get(PSArgs.COLOR)
             edited_img = adjust_color(self.img, color)
         except Exception as e:
-            print(e)
             edited_img = None
         return edited_img
 

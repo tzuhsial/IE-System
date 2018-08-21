@@ -36,11 +36,6 @@ def annToMask(img, ann):
     return m
 
 
-def mask2Dto3D(mask):
-    """
-    Convert 2D array to 3D by repeat and setting to 255
-    """
-
 
 def main(args):
 
@@ -86,9 +81,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='./sampled')
+    parser.add_argument('--dir', type=str, default='./sampled_100')
     parser.add_argument('--save', type=str,
-                        default='./sampled/visionengine.annotation.pickle')
+                        default='./sampled_100/visionengine.annotation.pickle')
     args = parser.parse_args()
 
     main(args)

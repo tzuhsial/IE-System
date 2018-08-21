@@ -37,6 +37,8 @@ class ImageEditWorld(object):
         # Channel observes User
         channel.observe(self.acts[user_idx])
         self.acts[channel_idx] = channel.act()
+        if self.config["verbose"]:
+            print("[Channel]", self.acts[channel_idx]['channel_utterance'])
 
         # Agent observes User from Channel and Photoshop
         system.observe(self.acts[channel_idx])

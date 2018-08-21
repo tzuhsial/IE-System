@@ -400,7 +400,7 @@ class ObjectMaskStrNode(BeliefNode):
         Returns:
             self.intent (object)
         """
-        assert sorted(self.children.keys()) == ['b64_img_str', 'gesture_click', 'object'],\
+        assert sorted(self.children.keys()) == ['gesture_click', 'object', 'original_b64_img_str'],\
             "ObjectMaskNode has wrong children"
 
         object_node = self.children['object']
@@ -481,9 +481,10 @@ class ObjectMaskStrNode(BeliefNode):
             True if gesture_click if sure, else False
         """
         n_clicked = 0
+
         for mask_candidate in self.value_conf_map:
             n_clicked += self.check_overlap(gesture_click, mask_candidate)
-            self.value_conf_map[mask_candidate] = 1.0
+            self.value_conf_map[mask_candidate] = 0.7
 
         if n_clicked == 0 or n_clicked > 1:
             self.value_conf_map.clear()

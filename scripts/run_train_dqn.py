@@ -22,6 +22,80 @@ def print_mean_std(name, seq):
     print(name, "{}(+/-{})".format(seq_mean, seq_std))
 
 
+def run_agendas(agendas, world, train_mode=False, train_config=None, global_step=None):
+
+    print("train_mode", train_mode)
+
+    user = world.agents[0]
+    policy = world.agents[2].policy
+
+    # Train
+    if train_mode:
+        random.shuffle(agendas)
+
+    returns = []
+    turns = []
+    losses = []
+    goals = []
+
+    for agenda in tqdm(agendas):
+
+        world.reset()
+        user.load_agenda(agenda)
+
+        R = 0
+        turn = 0
+        loss = 0
+        episode_done = False
+        while not episode_done:
+            if train_mode:
+                policy.update_epsilon(global_step)
+            else:
+                policy.update_epsilon(test=True)
+
+            world.parley()
+
+            reward = world.reward()  # User reward
+            episode_done = world.episode_done()  # User episode_done
+
+            # Extract
+            if train_mode:
+                policy.record(reward, episode_done)
+
+                batch_loss = policy.update_network()
+
+                if global_step % train_config["freeze_interval"] == 0:
+                    policy.copy_qnetwork()
+
+                global_step += 1
+            else:
+                batch_loss = 0
+
+            # Evaluation Manager
+            turn += 1
+            R += reward
+            loss += batch_loss
+
+            # Finally
+            if episode_done:
+                break
+
+        ngoal = user.completed_goals()
+
+        returns.append(R)
+        turns.append(turn)
+        losses.append(loss)
+        goals.append(ngoal)
+
+    summary = {
+        "return": returns,
+        'turn': turns,
+        'loss': losses,
+        'goal': goals
+    }
+    return summary
+
+
 def main(argv):
     # Get config
     config_file = argv[1]
@@ -52,58 +126,35 @@ def main(argv):
 
     # Load agendas
 
-    train_agendas = util.load_from_pickle(config["agendas"]["train"])
-    test_agendas = util.load_from_pickle(config["agendas"]["test"])
+    train_agendas = util.load_from_pickle(config["agendas"]["train"])[:5]
+    test_agendas = util.load_from_pickle(config["agendas"]["test"])[:1]
 
     # Main loop here
     train_config = config["policy"]
-    #scribe = EvaluationManager()
+    scribe = EvaluationManager()
 
     # First burn_in memory
 
     global_step = 0
     for epoch in tqdm(range(1, train_config["num_epochs"]+1, 1)):
         print("epoch", epoch)
+
         # Train
-        random.shuffle(train_agendas)
+        train_summary = run_agendas(
+            train_agendas, world, True, train_config, global_step)
+        scribe.add_summary(epoch, 'train', train_summary)
 
-        for agenda in train_agendas:
+        print("train")
+        scribe.pprint_summary(train_summary)
 
-            world.reset()
-            user.load_agenda(agenda)
+        test_summary = run_agendas(test_agendas, world)
+        scribe.add_summary(epoch, 'test', test_summary)
 
-            R = 0
-            turn = 0
-            loss = 0
-            episode_done = False
-            while not episode_done:
+        print("train")
+        scribe.pprint_summary(test_summary)
 
-                policy.update_epsilon(global_step)
-
-                world.parley()
-
-                reward = world.reward()  # User reward
-                episode_done = world.episode_done()  # User episode_done
-
-                # Extract
-                policy.record(reward, episode_done)
-
-                batch_loss = policy.update_network()
-
-                if global_step % train_config["freeze_interval"] == 0:
-                    policy.copy_qnetwork()
-
-                # Evaluation Manager
-                turn += 1
-                R += reward
-                loss += batch_loss
-                global_step += 1
-                
-                # Finally
-                if episode_done:
-                    break
-
-            ngoals = user.num_remaining_goals()
+        import pdb
+        pdb.set_trace()
 
 
 if __name__ == "__main__":

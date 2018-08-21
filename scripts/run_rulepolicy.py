@@ -57,9 +57,6 @@ def run_agendas(agendas, world):
         Returns.append(R)
         Goals.append(ngoals)
 
-        import pdb
-        pdb.set_trace()
-
     return Turns, Returns, Goals
 
 

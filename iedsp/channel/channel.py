@@ -123,6 +123,8 @@ class MultimodalChannel(object):
 
                 slot_dict['conf'] = slot_conf
 
+        channel_act["channel_utterance"] = self.template_nlg(
+            channel_act['user_acts'])
         return channel_act
 
     def generate_confidence(self):
@@ -139,6 +141,48 @@ class MultimodalChannel(object):
         conf_score = max(conf_score, 0.0)  # >= 0.
         conf_score = min(conf_score, 1.0)  # <= 1.
         return conf_score
+
+    def template_nlg(self, user_acts):
+        """
+        Converts user_acts into tempplate utterances
+        Args:
+            user_acts (list): list of user_act
+        Returns:
+            user_utterance (str): the template utterance
+        """
+        utt_list = []
+        for user_act in user_acts:
+            user_dialogue_act = user_act['dialogue_act']['value']
+            if user_dialogue_act == UserAct.INFORM:
+                # Template based NLG based on intent
+                intent_slot = user_act.get('intent', None)
+                slots = [intent_slot] if intent_slot is not None else []
+                slots += user_act.get("slots", list())
+                slot_list = []
+                for slot in slots:
+                    if slot["slot"] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
+                        slot_msg = slot["slot"] + "=" + slot["value"][:5]
+                    elif slot["slot"] == "mask_strs":
+                        slot_msg = slot["slot"] + "=" + len(slot["value"])
+                    else:
+                        slot_msg = slot["slot"] + "=" + str(slot["value"])
+                    slot_list.append(slot_msg)
+                utt = "I want " + ', '.join(slot_list) + "."
+            elif user_dialogue_act == UserAct.AFFIRM:
+                utt = "Yes."
+            elif user_dialogue_act == UserAct.NEGATE:
+                utt = "No."
+            elif user_dialogue_act == UserAct.WAIT:
+                utt = "(Waiting...)"
+            elif user_dialogue_act == UserAct.BYE:
+                utt = "Bye."
+            else:
+                raise ValueError(
+                    "Unknown user_dialogue_act: {}".format(user_dialogue_act))
+            utt_list.append(utt)
+
+        utterance = ' '.join(utt_list)
+        return utterance
 
 
 def builder(string):

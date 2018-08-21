@@ -145,7 +145,8 @@ class System(object):
         Query vision engine
         """
         args = slots_to_args(query_slots)
-        b64_img_str = self.state.get_slot('b64_img_str').get_max_value()
+        b64_img_str = self.state.get_slot(
+            'original_b64_img_str').get_max_value()
         args['b64_img_str'] = b64_img_str
 
         mask_strs = self.visionengine.select_object(**args)
@@ -198,7 +199,7 @@ class System(object):
                 confirm_list = []
                 for slot_dict in confirm_slots:
                     slot_value = str(slot_dict.get('value', ""))
-                    if slot_dict['slot'] in ["object_mask_str", "gesture_click"]:
+                    if slot_dict['slot'] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
                         sv = slot_dict['slot'] + " is " + slot_value[:5]
                     elif slot_dict["slot"] == "mask_strs":
                         sv = slot_dict["slot"] + " is " + str(len(slot_value))

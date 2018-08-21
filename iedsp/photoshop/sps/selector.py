@@ -88,15 +88,16 @@ class Selector(object):
     @staticmethod
     def find_mask_centroid(mask):
         """
-        Find the centroid of a 3 dimensional binary mask
+        Find the centroid of a 3 dimensional uint8 mask image
         """
+        assert ((mask == 0) | (mask == 255)).all() # Either 0 or 255
         X, Y, Z = mask.shape
         moment_x = 0
         moment_y = 0
         moment_z = 0
         npixels = 0
         for x, y, z in itertools.product(range(X), range(Y), range(Z)):
-            if mask[x][y][z] == 1:
+            if mask[x][y][z] == 255:
                 moment_x += x
                 moment_y += y
                 moment_z += z

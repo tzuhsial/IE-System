@@ -76,7 +76,7 @@
             "children": []
         },
         {
-            "name": "b64_img_str",
+            "name": "original_b64_img_str",
             "node": "PSToolNode",
             "threshold": 1.0,
             "possible_values": null,
@@ -209,7 +209,7 @@
             "possible_values": null,
             "children": [
                 {
-                    "name": "b64_img_str",
+                    "name": "original_b64_img_str",
                     "optional": false
                 },
                 {
