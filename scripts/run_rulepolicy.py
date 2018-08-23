@@ -10,10 +10,10 @@ sys.path.insert(0, root_dir)
 import numpy as np
 from tqdm import tqdm
 
-from iedsp import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
-from iedsp.policy import ActionMapper, DQNPolicy
-from iedsp.evaluate import EvaluationManager
-from iedsp import util
+from cie import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
+from cie.policy import ActionMapper, DQNPolicy
+from cie.evaluate import EvaluationManager
+from cie import util
 
 
 def print_mean_std(name, seq):
@@ -56,7 +56,6 @@ def run_agendas(agendas, world):
         Turns.append(turn)
         Returns.append(R)
         Goals.append(ngoals)
-
     return Turns, Returns, Goals
 
 
@@ -80,6 +79,7 @@ def main(argv):
 
     train_agendas = util.load_from_pickle(config["agendas"]["train"])
     test_agendas = util.load_from_pickle(config["agendas"]["test"])
+    print("train", len(train_agendas), "test", len(test_agendas))
 
     # Main loop here
     """

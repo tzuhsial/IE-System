@@ -10,10 +10,10 @@ sys.path.insert(0, root_dir)
 import numpy as np
 from tqdm import tqdm
 
-from iedsp import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
-from iedsp.policy import ActionMapper, DQNPolicy
-from iedsp.evaluate import EvaluationManager
-from iedsp import util
+from cie import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
+from cie.policy import ActionMapper, DQNPolicy
+from cie.evaluate import EvaluationManager
+from cie import util
 
 
 def print_mean_std(name, seq):
@@ -87,6 +87,9 @@ def run_agendas(agendas, world, train_mode=False, train_config=None, global_step
         losses.append(loss)
         goals.append(ngoal)
 
+        import pdb
+        pdb.set_trace()
+
     summary = {
         "return": returns,
         'turn': turns,
@@ -122,13 +125,19 @@ def main(argv):
     policy_config["qnetwork"]["output_size"] = action_mapper.size()
     policy = DQNPolicy(policy_config, action_mapper)
 
+    print("state size", policy_config["qnetwork"]["input_size"])
+    print("action size", policy_config["qnetwork"]["output_size"])
+
+    if policy_config.get("load") is not None:
+        policy.load(policy_config["load"])
+
     system.load_policy(policy)
 
     # Load agendas
-
-    train_agendas = util.load_from_pickle(config["agendas"]["train"])[:5]
-    test_agendas = util.load_from_pickle(config["agendas"]["test"])[:1]
-
+    train_agendas = util.load_from_pickle(config["agendas"]["train"])
+    test_agendas = util.load_from_pickle(config["agendas"]["test"])
+    print("train", len(train_agendas))
+    print("test", len(test_agendas))
     # Main loop here
     train_config = config["policy"]
     scribe = EvaluationManager()
@@ -136,25 +145,29 @@ def main(argv):
     # First burn_in memory
 
     global_step = 0
-    for epoch in tqdm(range(1, train_config["num_epochs"]+1, 1)):
-        print("epoch", epoch)
+    try:
+        for epoch in tqdm(range(1, train_config["num_epochs"]+1, 1)):
+            print("epoch", epoch)
+            """
+            # Train
+            train_summary = run_agendas(
+                train_agendas, world, True, train_config, global_step)
+            scribe.add_summary(epoch, 'train', train_summary)
 
-        # Train
-        train_summary = run_agendas(
-            train_agendas, world, True, train_config, global_step)
-        scribe.add_summary(epoch, 'train', train_summary)
+            print("train")
+            scribe.pprint_summary(train_summary)
+            """
+            test_summary = run_agendas(test_agendas, world)
+            scribe.add_summary(epoch, 'test', test_summary)
 
-        print("train")
-        scribe.pprint_summary(train_summary)
+            print("train")
+            scribe.pprint_summary(test_summary)
+    except KeyboardInterrupt:
+        print("Killed by hand")
 
-        test_summary = run_agendas(test_agendas, world)
-        scribe.add_summary(epoch, 'test', test_summary)
-
-        print("train")
-        scribe.pprint_summary(test_summary)
-
-        import pdb
-        pdb.set_trace()
+    import pdb
+    pdb.set_trace()
+    policy.save("")
 
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ sys.path.insert(0, root_dir)
 import numpy as np
 from tqdm import tqdm
 
-from iedsp import util
-from iedsp.channel import ChannelPortal
-from iedsp.photoshop import PhotoshopPortal
-from iedsp.system import System
-from iedsp.user import UserPortal
-from iedsp.world import ImageEditWorld
+from cie import util
+from cie.channel import ChannelPortal
+from cie.photoshop import PhotoshopPortal
+from cie.system import System
+from cie.user import UserPortal
+from cie.world import ImageEditWorld
 
 
 def print_mean_std(name, seq):

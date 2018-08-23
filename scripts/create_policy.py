@@ -2,10 +2,10 @@ import sys
 
 import numpy as np
 
-from iedsp.ontology import OntologyEngine
-from iedsp.policy import ActionMap, builder as policylib
-from iedsp.system import State
-import iedsp.util as util
+from cie.ontology import OntologyEngine
+from cie.policy import ActionMap, builder as policylib
+from cie.system import State
+import cie.util as util
 
 
 config_file = sys.argv[1]

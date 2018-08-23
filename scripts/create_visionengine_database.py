@@ -10,7 +10,7 @@ import numpy as np
 from pycocotools import mask as maskUtils
 from tqdm import tqdm
 
-from iedsp import util
+from cie import util
 
 
 def annToMask(img, ann):
