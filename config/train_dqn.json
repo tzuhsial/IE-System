@@ -5,12 +5,12 @@
         "test": "./sampled_100/agenda.test.pickle"
     },
     "world": {
-        "verbose": false
+        "verbose": true
     },
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "patience": 30,
+            "patience": 50,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
@@ -36,10 +36,12 @@
         }
     },
     "policy": {
-        "num_epochs": 1,
+        "num_epochs": 100,
         "batch_size": 32,
         "freeze_interval": 500,
+        "gamma": 0.99,
         "burn_in": 1000,
+        "load": "exp/exp1",
         "load_replaymemory": null,
         "qnetwork": {
             "input_size": null,

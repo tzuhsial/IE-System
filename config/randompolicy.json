@@ -5,7 +5,7 @@
         "test": "./sampled_100/agenda.test.pickle"
     },
     "world": {
-        "verbose": false
+        "verbose": true
     },
     "agents": {
         "user": {

@@ -17,7 +17,7 @@
         "channel": {
             "ontology": "imageedit.ontology.json",
             "channel": "MultimodalChannel",
-            "speech_conf_mean": 0.75,
+            "speech_conf_mean": 0.85,
             "speech_conf_std": 0.0
         },
         "system": {
