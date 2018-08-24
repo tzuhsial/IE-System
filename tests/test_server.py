@@ -189,3 +189,45 @@ def test_system_demo():
     system_act = system.act()
 
     assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]
+
+    # Turn 7: Undo
+    photoshop.observe(system_act)
+    ps_act = photoshop.act()
+
+    user_act = {
+        'user_acts': [
+            {
+                'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
+                'intent': build_slot_dict('intent', 'undo', 1.0),
+            }
+        ]
+    }
+
+    ps_act = photoshop.act()
+
+    system.observe(ps_act)
+    system.observe(user_act)
+    system_act = system.act()
+
+    assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]
+
+    # Turn 8: Redo
+    photoshop.observe(system_act)
+    ps_act = photoshop.act()
+
+    user_act = {
+        'user_acts': [
+            {
+                'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
+                'intent': build_slot_dict('intent', 'redo', 1.0),
+            }
+        ]
+    }
+
+    ps_act = photoshop.act()
+
+    system.observe(ps_act)
+    system.observe(user_act)
+    system_act = system.act()
+
+    assert extract_das(system_act) == [SystemAct.EXECUTE, SystemAct.ASK]

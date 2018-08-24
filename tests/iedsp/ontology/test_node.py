@@ -98,9 +98,7 @@ def test_select_object_intent():
     select = IntentNode('select_object')
 
     # object_mask_slot
-    visionengine = DummyClient("fake")
-    object_mask_slot = ObjectMaskStrNode(
-        'object_mask_str', visionengine=visionengine)
+    object_mask_slot = ObjectMaskStrNode('object_mask_str')
 
     b64_img_str_slot = PSToolNode('b64_img_str')
     object_slot = BeliefNode('object')
@@ -159,7 +157,8 @@ def test_select_object_intent():
 
     select_intent = select.pull()
     assert select_intent == SysIntent(
-        request_slots=[build_slot_dict('object_mask_str')]
+        query_slots=[build_slot_dict('object', 'dog', 1.0),
+                     build_slot_dict('position', 'right', 0.9)]
     )
 
     # Turn 3:

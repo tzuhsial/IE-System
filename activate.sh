@@ -1,1 +1,1 @@
-source activate selfplay
+source activate cie

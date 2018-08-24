@@ -255,7 +255,7 @@ class AdjustAgendaGenerator(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--ontology_file', type=str,
-                        default='imageedit.ontology.json')
+                        default='./config/imageedit.ontology.json')
     parser.add_argument('--num_objects', type=int, default=3)
     parser.add_argument('--num_iers', type=int, default=5)
     parser.add_argument('--dir', type=str, default='./sampled_100')

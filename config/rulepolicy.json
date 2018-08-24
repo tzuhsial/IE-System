@@ -1,8 +1,8 @@
 {
-    "ontology": "imageedit.ontology.json",
+    "ontology": "./config/imageedit.ontology.json",
     "agendas": {
-        "train": "./sampled_100/agenda.train.pickle",
-        "test": "./sampled_100/agenda.test.pickle"
+        "train": "./sampled_100/agenda.v1.train.pickle",
+        "test": "./sampled_100/agenda.v1.test.pickle"
     },
     "world": {
         "verbose": false
@@ -15,13 +15,13 @@
             "gesture_threshold": 0.0
         },
         "channel": {
-            "ontology": "imageedit.ontology.json",
+            "ontology": "./config/imageedit.ontology.json",
             "channel": "MultimodalChannel",
-            "speech_conf_mean": 0.85,
+            "speech_conf_mean": 1.0,
             "speech_conf_std": 0.0
         },
         "system": {
-            "ontology": "imageedit.ontology.json",
+            "ontology": "./config/imageedit.ontology.json",
             "visionengine": {
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
@@ -34,5 +34,9 @@
             "uri": "http://localhost:2005"
         }
     },
-    "policy": {}
+    "policy": {
+        "replaymemory": {
+            "save": null
+        }
+    }
 }

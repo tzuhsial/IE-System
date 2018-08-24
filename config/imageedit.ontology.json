@@ -47,6 +47,12 @@
             "children": []
         },
         {
+            "name": "redo",
+            "node": "IntentNode",
+            "speech": true,
+            "children": []
+        },
+        {
             "name": "close",
             "node": "IntentNode",
             "speech": false,

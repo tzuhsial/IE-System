@@ -51,9 +51,6 @@ class AgendaBasedUserSimulator(object):
         self.observation = {}
         self.turn_id = 0
 
-        # Goal comple
-        self.num_undos = 0
-
     def load_agenda(self, agenda):
         """
         Args:
@@ -103,11 +100,13 @@ class AgendaBasedUserSimulator(object):
 
     def act(self):
         """
-        Perform actions according to the current agenda
-
+        act according to observsation
+        reward is also defined here
         """
         assert self.agenda is None or len(self.agenda) > 0
 
+        episode_done = False
+        reward = 0
         user_acts = []
 
         # The default action for the user is to inform the agenda
@@ -119,7 +118,6 @@ class AgendaBasedUserSimulator(object):
         assert len(system_acts) == 1
 
         sys_act = system_acts[0]
-
         sys_dialogue_act = sys_act['dialogue_act']['value']
 
         if sys_dialogue_act == SystemAct.GREETING:
@@ -139,7 +137,6 @@ class AgendaBasedUserSimulator(object):
         elif sys_dialogue_act == SystemAct.CONFIRM:
             confirm_slots = sys_act["slots"]
             user_act = self.act_confirm(confirm_slots)
-
             reward = -1
 
         elif sys_dialogue_act in SystemAct.query_acts():
@@ -148,47 +145,59 @@ class AgendaBasedUserSimulator(object):
 
         elif sys_dialogue_act == SystemAct.EXECUTE:
 
-            if not self.get_photoshop_slot('execute_result')['value']:
-                # Failed exeuction on Photoshop => doesn't mean anything to the user.
-                user_act = None
-                reward = -1
-            else:
+            photoshop_execute_slot = self.get_photoshop_slot("execute_result")
+            photoshop_execute_result = photoshop_execute_slot['value']
+
+            if photoshop_execute_result:
+
                 exec_intent = sys_act.get("intent", None)
                 exec_slots = sys_act.get("slots", list())
-                success = self.check_execution(exec_intent, exec_slots)
-                if not success:
-                    # Special case: closed, you cannot undo a close, you need to reopen it
-                    if exec_intent["value"] == "close":
-                        #print('[user] check action failure: close')
-                        self.agenda = self.agenda_backup.copy()
-                    else:
-                        #print("[user] check action failure")
-                        undo_goal = build_user_act('inform', 'undo')
-                        self.num_undos += 1
-                        self.agenda.insert(0, undo_goal)
-                    reward = -10
-                else:
-                    #print("[user] check action success")
+                success = self.check_system_execution(exec_intent, exec_slots)
+
+                if success:
                     if len(self.agenda) > 0:
                         self.agenda.pop(0)
                     reward = 10
+                else:
+                    exec_intent_value = exec_intent["value"]
+                    if exec_intent_value == "close":
+                        episode_done = True
+                        reward = -50
+                    elif exec_intent_value == "undo":
+                        # Build redo goal
+                        redo_goal = build_user_act('inform', 'redo')
+                        self.agenda.insert(0, redo_goal)
+                        reward = -10
+                    else:  # open, adjust, undo
+                        # Build undo goal
+                        undo_goal = build_user_act('inform', 'undo')
+                        self.agenda.insert(0, undo_goal)
+                        reward = -10
 
                 user_act = self.act_inform_goal()
+            else:
+                user_act = None
+                reward = -1
         else:
             raise ValueError(
                 "Unknown sys_dialogue_act: {}".format(sys_dialogue_act))
 
+        # Inform goal by default
         if user_act is None:
             user_act = self.act_inform_goal()
 
+        # TODO: customizer user behavior for more than one user acts
         user_acts.append(user_act)
 
         # Update turn_id
         self.turn_id += 1
 
-        # Check episode_done based on goal
-        episode_done = len(self.agenda) == 0 or \
-            self.turn_id >= self.patience
+        # Episode Done
+        if self.turn_id >= self.patience or len(self.agenda) == 0:
+            episode_done = True
+
+        if episode_done and len(self.agenda) > 0:
+            reward = -self.patience
 
         # Build return object
         user_act = {}
@@ -277,11 +286,10 @@ class AgendaBasedUserSimulator(object):
 
         # Check values
         target_value = target_slot['value']
-        if confirm_name == "object_mask_str":
+        if confirm_name in ["object_mask_str", "gesture_click"]:
             # Calculate dice_score
             mask_str = confirm_value
-            goal_mask_str_slot = find_slot_with_key(
-                'object_mask_str', goal_slots)
+            goal_mask_str_slot = find_slot_with_key(confirm_name, goal_slots)
             goal_mask_str = goal_mask_str_slot['value']
             dice_score = self.compute_dice(mask_str, goal_mask_str)
             same = dice_score >= self.dice_threshold
@@ -305,7 +313,7 @@ class AgendaBasedUserSimulator(object):
         user_act = build_user_act(UserAct.BYE)
         return user_act
 
-    def check_execution(self, execute_intent, execute_slots):
+    def check_system_execution(self, execute_intent, execute_slots):
         """
         Check if system execution result matches current goal
         Returns:
@@ -334,6 +342,8 @@ class AgendaBasedUserSimulator(object):
             if slot_name == "object_mask_str":
                 dice_score = self.compute_dice(slot_value, target_value)
                 if dice_score < self.dice_threshold:
+                    logger.info("dice score {} < dice threshold {}".format(
+                        dice_score, self.dice_threshold))
                     return False
             else:
                 if slot['value'] != target_value:
@@ -359,37 +369,6 @@ class AgendaBasedUserSimulator(object):
         assert mask.shape == goal_mask.shape
         dice = 2 * (mask & goal_mask).sum() / (mask.sum() + goal_mask.sum())
         return dice
-
-    def find_mask_centroid(self, mask):
-        """
-        Find the centroid of a 3 dimensional binary mask
-        """
-        X, Y, Z = mask.shape
-        moment_x = 0
-        moment_y = 0
-        moment_z = 0
-        npixels = 0
-        for x, y, z in itertools.product(range(X), range(Y), range(Z)):
-            if mask[x][y][z] == 255:
-                moment_x += x
-                moment_y += y
-                moment_z += z
-                npixels += 1
-        moment_x /= npixels
-        moment_y /= npixels
-        moment_z /= npixels
-        return round(moment_x), round(moment_y), round(moment_z)
-
-    def create_gesture_click(self, object_mask_str):
-        """
-        Returns a mask as gestures
-        """
-        mask = b64_to_img(object_mask_str)
-        x, y, _ = self.find_mask_centroid(mask)
-
-        gesture_click = np.zeros_like(mask)
-        gesture_click[x, y] = 1
-        return gesture_click
 
     def template_nlg(self, user_acts):
         """

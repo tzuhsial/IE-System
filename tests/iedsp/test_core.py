@@ -1,4 +1,4 @@
-from iedsp.core import Slot, SysIntent
+from iedsp.core import SysIntent
 
 
 def test_systemintent():
@@ -41,22 +41,3 @@ def test_systemintent():
     i1.clear()
     assert i1 == SysIntent()
     assert i1.empty()
-
-
-def test_slot():
-
-    s1 = Slot('a')
-    s2 = Slot('b')
-
-    assert sorted([s2, s1]) == [s1, s2]
-
-    assert s1 < s2
-    assert s2 > s1
-    assert s1 <= s1
-    assert s2 >= s2
-
-    s3 = Slot('a')
-    assert s1 == s1 and s1 is s1
-    assert s1 == s3 and s1 is not s3
-
-    assert s1.to_json() == {'slot': 'a', 'value': None, 'conf': None}

@@ -10,9 +10,8 @@ def test_ontology():
 
     ontology_file = "imageedit.ontology.json"
     ontology_json = util.load_from_json(ontology_file)
-    visionengine = None
 
-    engine = OntologyEngine(visionengine, ontology_json)
+    engine = OntologyEngine(ontology_json)
 
     for intent_json in ontology_json["intents"]:
         assert intent_json["name"] in engine.intents
@@ -21,5 +20,4 @@ def test_ontology():
         assert slot_json["name"] in engine.slots
 
     # TODO: validate engine dependency graph, or validate ontology_file
-
-    assert engine.slots['position'].add_observation(123, 1.0, 1) == False
+    assert engine.slots['image_path'].add_observation(123, 1.0, 1) == False

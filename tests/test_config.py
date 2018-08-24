@@ -1,5 +1,6 @@
 import configparser
 
+
 def test_config_format():
     """ Test config format
     """
