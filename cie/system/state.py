@@ -156,8 +156,8 @@ class State(object):
             slot_node = self.get_slot(slot_name)
             result = slot_node.add_observation(**obsrv)
             if not result:
-                logger.info(
-                    "Failed to add observation {} to slot {}".format(obsrv, slot_name))
+                logger.info("Failed to add observation {} to slot {}".format(
+                    obsrv, slot_name))
 
     def pull(self):
         """

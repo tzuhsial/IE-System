@@ -90,8 +90,8 @@ class MultimodalChannel(object):
                 else:
                     intent_conf = self.generate_confidence()
 
-                intent_possible_values = self.slots["intent"]["possible_values"].copy(
-                )
+                intent_possible_values = self.slots["intent"][
+                    "possible_values"].copy()
 
                 if np.random.random() > intent_conf:
                     intent_possible_values.remove(intent_value)
@@ -135,8 +135,8 @@ class MultimodalChannel(object):
         Returns:
             conf_score (float)
         """
-        conf_score = np.random.normal(
-            self.speech_conf_mean, self.speech_conf_std)
+        conf_score = np.random.normal(self.speech_conf_mean,
+                                      self.speech_conf_std)
         conf_score = round(conf_score, 2)
         conf_score = max(conf_score, 0.0)  # >= 0.
         conf_score = min(conf_score, 1.0)  # <= 1.
@@ -160,7 +160,10 @@ class MultimodalChannel(object):
                 slots += user_act.get("slots", list())
                 slot_list = []
                 for slot in slots:
-                    if slot["slot"] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
+                    if slot["slot"] in [
+                            "object_mask_str", "gesture_click",
+                            "original_b64_img_str"
+                    ]:
                         slot_msg = slot["slot"] + "=" + slot["value"][:5]
                     elif slot["slot"] == "mask_strs":
                         slot_msg = slot["slot"] + "=" + len(slot["value"])

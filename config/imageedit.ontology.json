@@ -1,32 +1,26 @@
 {
-    "intents": [
-        {
+    "intents": [{
             "name": "intent",
             "node": "IntentNode",
-            "children": [
-                {
-                    "name": "intent",
-                    "optional": false
-                }
-            ]
+            "children": [{
+                "name": "intent",
+                "optional": false
+            }]
         },
         {
             "name": "open",
             "node": "IntentNode",
             "speech": false,
-            "children": [
-                {
-                    "name": "image_path",
-                    "optional": false
-                }
-            ]
+            "children": [{
+                "name": "image_path",
+                "optional": false
+            }]
         },
         {
             "name": "adjust",
             "node": "IntentNode",
             "speech": true,
-            "children": [
-                {
+            "children": [{
                     "name": "object_mask_str",
                     "optional": false
                 },
@@ -59,8 +53,7 @@
             "children": []
         }
     ],
-    "slots": [
-        {
+    "slots": [{
             "name": "intent",
             "node": "BeliefNode",
             "threshold": 0.8,
@@ -69,7 +62,8 @@
                 "open",
                 "close",
                 "adjust",
-                "undo"
+                "undo",
+                "redo"
             ],
             "children": []
         },
@@ -107,10 +101,7 @@
             "node": "BeliefNode",
             "validator": "IntegerValidator",
             "threshold": 0.8,
-            "possible_values": [
-                -30,
-                -10,
-                -5,
+            "possible_values": [-30, -10, -5,
                 5,
                 10,
                 30
@@ -213,8 +204,7 @@
             "node": "ObjectMaskStrNode",
             "threshold": 0.8,
             "possible_values": null,
-            "children": [
-                {
+            "children": [{
                     "name": "original_b64_img_str",
                     "optional": false
                 },

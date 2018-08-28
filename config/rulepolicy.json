@@ -11,6 +11,10 @@
         "user": {
             "user": "AgendaBasedUserSimulator",
             "patience": 50,
+            "turn_penalty": -1,
+            "success_goal_reward": 10,
+            "failure_goal_penalty": -10,
+            "request_object_mask_str_penalty": -5,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
@@ -26,7 +30,11 @@
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
-            "policy": "RulePolicy"
+            "policy": "RulePolicy",
+            "actionmapper": {
+                "ignore_intents": ["intent"],
+                "ignore_slots": ["original_b64_img_str"]
+            }
         },
         "photoshop": {
             "photoshop": "SimplePhotoshop",

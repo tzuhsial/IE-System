@@ -1,6 +1,6 @@
 """
     Tensorflow Utils, 
-    Hides direct tensorflow manipulation from DQNAgent
+Hides direct tensorflow manipulation from DQNAgent
 """
 import tensorflow as tf
 
@@ -33,3 +33,13 @@ def copy_variable_scope(source_name, target_name):
 def create_saver():
     saver = tf.train.Saver(max_to_keep=5)
     return saver
+
+
+def create_filewriter(logdir, graph=None):
+    writer = tf.summary.FileWriter(logdir, graph)
+    return writer
+
+
+def create_summary_value(tag, value):
+    summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+    return summary

@@ -22,7 +22,11 @@ def print_mean_std(name, seq):
     print(name, "{}(+/-{})".format(seq_mean, seq_std))
 
 
-def run_agendas(agendas, world, train_mode=False, train_config=None, global_step=None):
+def run_agendas(agendas,
+                world,
+                train_mode=False,
+                train_config=None,
+                global_step=None):
 
     print("train_mode", train_mode)
 
@@ -44,9 +48,11 @@ def run_agendas(agendas, world, train_mode=False, train_config=None, global_step
         user.load_agenda(agenda)
 
         R = 0
+        reward_list = []
         turn = 0
         loss = 0
         episode_done = False
+
         while not episode_done:
             if train_mode:
                 policy.update_epsilon(global_step)
@@ -74,12 +80,14 @@ def run_agendas(agendas, world, train_mode=False, train_config=None, global_step
             # Evaluation Manager
             turn += 1
             R += reward
+            reward_list.append(reward)
             loss += batch_loss
 
             # Finally
             if episode_done:
                 break
 
+        # Freeze interval
         ngoal = user.completed_goals()
 
         returns.append(R)
@@ -87,15 +95,13 @@ def run_agendas(agendas, world, train_mode=False, train_config=None, global_step
         losses.append(loss)
         goals.append(ngoal)
 
-        import pdb
-        pdb.set_trace()
+    summary = {"return": returns, 'turn': turns, 'loss': losses, 'goal': goals}
 
-    summary = {
-        "return": returns,
-        'turn': turns,
-        'loss': losses,
-        'goal': goals
-    }
+    mode_prefix = "train/" if train_mode else "test/"
+    policy.log_scalar(mode_prefix + "return", np.mean(returns), global_step)
+    policy.log_scalar(mode_prefix + "turns", np.mean(turns), global_step)
+    policy.log_scalar(mode_prefix + "losses", np.mean(losses), global_step)
+    policy.log_scalar(mode_prefix + "goals", np.mean(goals), global_step)
     return summary
 
 
@@ -121,7 +127,8 @@ def main(argv):
     # network input_size & output_size
     policy_config["qnetwork"]["input_size"] = len(system.state.to_list())
     ontology_json = util.load_from_json(config["ontology"])
-    action_mapper = ActionMapper(ontology_json)
+    ignore_config = config["agents"]["system"]["actionmapper"]
+    action_mapper = ActionMapper(ontology_json, ignore_config)
     policy_config["qnetwork"]["output_size"] = action_mapper.size()
     policy = DQNPolicy(policy_config, action_mapper)
 
@@ -146,18 +153,18 @@ def main(argv):
 
     global_step = 0
     try:
-        for epoch in tqdm(range(1, train_config["num_epochs"]+1, 1)):
+        for epoch in tqdm(range(1, train_config["num_epochs"] + 1, 1)):
             print("epoch", epoch)
-            """
             # Train
-            train_summary = run_agendas(
-                train_agendas, world, True, train_config, global_step)
+            train_summary = run_agendas(train_agendas, world, True,
+                                        train_config, global_step)
             scribe.add_summary(epoch, 'train', train_summary)
 
             print("train")
             scribe.pprint_summary(train_summary)
-            """
-            test_summary = run_agendas(test_agendas, world)
+
+            test_summary = run_agendas(
+                test_agendas, world, global_step=global_step)
             scribe.add_summary(epoch, 'test', test_summary)
 
             print("train")
@@ -165,9 +172,14 @@ def main(argv):
     except KeyboardInterrupt:
         print("Killed by hand")
 
-    import pdb
-    pdb.set_trace()
-    policy.save("")
+    exp_path = train_config["save"]
+    policy.save(exp_path)
+    if not os.path.isdir(exp_path):
+        os.makedirs(exp_path)
+    history_path = os.path.join(exp_path, 'history.pickle')
+    scribe.save(history_path)
+    meta_path = os.path.join(exp_path, 'meta.json')
+    util.save_to_json(config, meta_path)
 
 
 if __name__ == "__main__":

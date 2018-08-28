@@ -5,7 +5,7 @@
         "test": "./sampled_100/agenda.v1.test.pickle"
     },
     "world": {
-        "verbose": false
+        "verbose": true
     },
     "agents": {
         "user": {
@@ -30,7 +30,7 @@
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
-            "policy": "RandomPolicy",
+            "policy": "CommandLinePolicy",
             "actionmapper": {
                 "ignore_intents": ["intent"],
                 "ignore_slots": ["original_b64_img_str"]
@@ -43,7 +43,6 @@
         }
     },
     "policy": {
-        "num_epochs": 1,
         "replaymemory": {
             "save": null
         }

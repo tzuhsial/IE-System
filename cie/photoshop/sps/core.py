@@ -2,6 +2,7 @@ import copy
 from collections import defaultdict
 import itertools
 import json
+import os
 
 import cv2
 import numpy as np
@@ -111,6 +112,8 @@ class SimplePhotoshop(object):
     def control_open(self, arguments):
         try:
             image_path = arguments.get(PSArgs.IMAGE_PATH, "QQ.jpg")
+            if not os.path.exists(image_path):
+                raise OSError
             img = utils.imread(image_path)
             self.reset()
             self.history._background = self.background = self.img = img
@@ -160,7 +163,7 @@ class SimplePhotoshop(object):
 
     def control_select_object(self, arguments):
         try:
-             # API select
+            # API select
             noun = arguments.get('object')
             masks = []
 
@@ -206,8 +209,8 @@ class SimplePhotoshop(object):
 
     def control_load_mask_strs(self, arguments):
         try:
-            mask_strs = arguments.get(
-                PSArgs.MASK_STRS, list())  # list of b64_img_str
+            mask_strs = arguments.get(PSArgs.MASK_STRS,
+                                      list())  # list of b64_img_str
 
             masks = []
             for mask_idx, mask_str in mask_strs:

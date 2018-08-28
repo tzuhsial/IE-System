@@ -28,7 +28,12 @@ class BeliefNode(object):
 
     LAMBDA = 0.9
 
-    def __init__(self, name, threshold=0.8, possible_values=None, validator=None, **kwargs):
+    def __init__(self,
+                 name,
+                 threshold=0.8,
+                 possible_values=None,
+                 validator=None,
+                 **kwargs):
         """
         Args:
             name (str): slot name
@@ -44,7 +49,8 @@ class BeliefNode(object):
         # Reset slot
         self.last_update_turn_id = 0
         self.value_conf_map = OrderedDict(
-            {v: 0. for v in self.possible_values})
+            {v: 0.
+             for v in self.possible_values})
 
         # Dependency Graph Related
         self.children = {}
@@ -82,16 +88,14 @@ class BeliefNode(object):
             return False
 
         # Rule-based belief update
-
         for key in self.value_conf_map:
             self.value_conf_map[key] *= (1 - self.LAMBDA)
-            logger.debug("node {} decayed value {} conf to {}"
-                         .format(self.name, key, self.value_conf_map[key]))
+            logger.debug("node {} decayed value {} conf to {}".format(
+                self.name, key, self.value_conf_map[key]))
 
         # Simply assign confidence for now
         prev_decayed_conf = self.value_conf_map.get(value, 0.0)
         self.value_conf_map[value] = prev_decayed_conf + self.LAMBDA * conf
-
         self.last_update_turn_id = turn_id
         return True
 
@@ -138,8 +142,10 @@ class BeliefNode(object):
         l = []
         if len(self.possible_values) > 0:
             # has possible values
-            l = [self.value_conf_map.get(value, 0.0)
-                 for value in self.possible_values]
+            l = [
+                self.value_conf_map.get(value, 0.0)
+                for value in self.possible_values
+            ]
         else:
             # Return number of values in map & max confidence score
             nvalues = len(self.value_conf_map)
@@ -223,7 +229,8 @@ class BeliefNode(object):
                 child_intent = child.pull()
                 optional = self.optional[child_name]
                 if optional:
-                    child_intent.request_slots = []  # Optional child node's request slots is empty!
+                    child_intent.request_slots = [
+                    ]  # Optional child node's request slots is empty!
                 children_intent += child_intent
 
             update_turn_id = max(child.last_update_turn_id, update_turn_id)
@@ -324,7 +331,8 @@ class IntentNode(BeliefNode):
             child_intent = child.pull()
             optional = self.optional[child_name]
             if optional:
-                child_intent.request_slots = []  # Optional child node's request slots is empty!
+                child_intent.request_slots = [
+                ]  # Optional child node's request slots is empty!
             children_intent += child_intent
 
         update_turn_id = max(child.last_update_turn_id, update_turn_id)
@@ -338,14 +346,19 @@ class PSToolNode(BeliefNode):
     """
     LAMBDA = 1.0
 
-    def __init__(self, name, threshold=1.0, possible_values=None, validator=None, **kwargs):
+    def __init__(self,
+                 name,
+                 threshold=1.0,
+                 possible_values=None,
+                 validator=None,
+                 **kwargs):
         """
         Threshold should always be 1.0, and no restriction on possible values
         """
         assert threshold == 1.0
         assert possible_values == None
-        super(PSToolNode, self).__init__(
-            name, threshold, possible_values, validator)
+        super(PSToolNode, self).__init__(name, threshold, possible_values,
+                                         validator)
 
     def add_observation(self, value, conf, turn_id):
         """
@@ -353,7 +366,8 @@ class PSToolNode(BeliefNode):
         """
         if conf < 1.0:
             logger.error(
-                "PSToolNode {} observed confidence less than 1.0!".format(self.name))
+                "PSToolNode {} observed confidence less than 1.0!".format(
+                    self.name))
             return False
         prev_value_conf_map = copy.deepcopy(self.value_conf_map)
         self.value_conf_map = {}
@@ -385,10 +399,15 @@ class ObjectMaskStrNode(BeliefNode):
 
     LAMBDA = 1.0
 
-    def __init__(self, name="object_mask_str", threshold=0.8, possible_values=None, validator=None, **kwargs):
+    def __init__(self,
+                 name="object_mask_str",
+                 threshold=0.8,
+                 possible_values=None,
+                 validator=None,
+                 **kwargs):
         assert name == "object_mask_str", "name should be ObjectMaskStrNode"
-        super(ObjectMaskStrNode, self).__init__(
-            name, threshold, possible_values, validator)
+        super(ObjectMaskStrNode, self).__init__(name, threshold,
+                                                possible_values, validator)
 
     def pull(self):
         """
@@ -411,8 +430,8 @@ class ObjectMaskStrNode(BeliefNode):
         object_turn_id = object_node.last_update_turn_id
         gesture_click_turn_id = gesture_click_node.last_update_turn_id
 
-        self.last_update_turn_id = max(
-            object_mask_str_turn_id, object_turn_id, gesture_click_turn_id)
+        self.last_update_turn_id = max(object_mask_str_turn_id, object_turn_id,
+                                       gesture_click_turn_id)
 
         # Start to do pulling
         self.intent = SysIntent()

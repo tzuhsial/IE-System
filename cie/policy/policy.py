@@ -27,7 +27,7 @@ class ActionMapper(object):
     Maps index to user_act with ontology_json
     """
 
-    def __init__(self, ontology_json):
+    def __init__(self, ontology_json, ignore_config):
         """
         Builds action map here
         """
@@ -35,6 +35,8 @@ class ActionMapper(object):
 
         # Request
         for slot in ontology_json["slots"]:
+            if slot["name"] in ignore_config["ignore_slots"]:
+                continue
             action_info = {
                 'dialogue_act': SystemAct.REQUEST,
                 'slot': slot["name"]
@@ -44,6 +46,8 @@ class ActionMapper(object):
 
         # Confirm
         for slot in ontology_json["slots"]:
+            if slot["name"] in ignore_config["ignore_slots"]:
+                continue
             action_info = {
                 'dialogue_act': SystemAct.CONFIRM,
                 'slot': slot["name"]
@@ -60,6 +64,8 @@ class ActionMapper(object):
 
         # Execute
         for intent in ontology_json["intents"]:
+            if intent["name"] in ignore_config["ignore_intents"]:
+                continue
             action_info = {
                 'dialogue_act': SystemAct.EXECUTE,
                 'intent': intent["name"]
@@ -186,11 +192,11 @@ class CommandLinePolicy(BasePolicy):
         and ask for integer input
         """
         cmd_msg_list = []
-        for action_idx, action_dict in self.action_map.items():
+        for action_idx, action_dict in self.action_mapper.action_map.items():
             da_name = action_dict.get('dialogue_act')
             slot_name = action_dict.get("intent") or action_dict.get("slot")
-            action_msg = "Action {} : {} {}".format(
-                action_idx, da_name, slot_name)
+            action_msg = "Action {} : {} {}".format(action_idx, da_name,
+                                                    slot_name)
             cmd_msg_list.append(action_msg)
 
         cmd_msg = " | ".join(cmd_msg_list)
@@ -277,11 +283,16 @@ class DQNPolicy(BasePolicy):
         # Initialize all variables
         tf_utils.initialize_all_variables(self.sess)
 
+        # Log to tensorboard
+        logdir = self.config["logdir"]
+        self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
+
     def build_from_config(self):
 
         # Directly load config
         self.batch_size = self.config["batch_size"]
         self.epsilon = float(self.config["scheduler"]['init_epsilon'])
+        self.gamma = float(self.config["gamma"])
 
         # Create Q Network and Target Q Network
         source_name = 'qnetwork'
@@ -356,9 +367,9 @@ class DQNPolicy(BasePolicy):
         self.reward = reward
         self.episode_done = episode_done
 
-        if self.previous_state:
-            self.replaymemory.add(
-                self.previous_state, self.previous_action, self.reward, self.state, self.episode_done)
+        if self.previous_state:  # is not None
+            self.replaymemory.add(self.previous_state, self.previous_action,
+                                  self.reward, self.state, self.episode_done)
 
     ########################
     #  Tensorflow Related  #
@@ -409,7 +420,7 @@ class DQNPolicy(BasePolicy):
         batch_max_target_qvalues = np.max(batch_target_qvalues, axis=-1)
 
         batch_target_qvalues = batch_rewards + \
-            (1 - batch_done) * batch_max_target_qvalues
+            self.gamma * (1 - batch_done) * batch_max_target_qvalues
 
         # Pass to QNetwork for update
         batch_loss = self.qnetwork.train_batch(
@@ -428,6 +439,17 @@ class DQNPolicy(BasePolicy):
         """
         print("[DQNPolicy] Restoring from {}".format(load_path))
         self.saver.restore(self.sess, load_path)
+
+    def log_scalar(self, tag, value, step):
+        """
+        Log scalar to tensorboard
+        Args:
+            tag (str): name of scalar
+            value (float): value
+            step (int): number of step
+        """
+        summary = tf_utils.create_summary_value(tag, value)
+        self.writer.add_summary(summary, step)
 
 
 def builder(string):

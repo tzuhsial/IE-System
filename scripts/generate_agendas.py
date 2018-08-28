@@ -201,14 +201,14 @@ class AdjustAgendaGenerator(object):
 
             sampled_attribute = random.choice(attribute_possible_values)
 
-            attribute_slot = util.build_slot_dict(
-                'attribute', sampled_attribute)
+            attribute_slot = util.build_slot_dict('attribute',
+                                                  sampled_attribute)
 
             # 2. adjust_value
             adjust_possible_values = adjust_value_ont['possible_values']
             sampled_adjust_value = random.choice(adjust_possible_values)
-            adjust_value_slot = util.build_slot_dict(
-                'adjust_value', sampled_adjust_value)
+            adjust_value_slot = util.build_slot_dict('adjust_value',
+                                                     sampled_adjust_value)
 
             # 3. object
             object_ann = final_anns[n_ier]
@@ -223,20 +223,23 @@ class AdjustAgendaGenerator(object):
                 one_dim_object_mask = annToMask(img, object_ann)
                 # Convert to 3D
                 object_mask = np.repeat(
-                    one_dim_object_mask[..., np.newaxis], 3, axis=2).astype(np.uint8)
+                    one_dim_object_mask[..., np.newaxis], 3,
+                    axis=2).astype(np.uint8)
                 indices = object_mask == 1
                 object_mask[indices] = 255
                 mask_str = util.img_to_b64(object_mask)
-                mask_str_slot = util.build_slot_dict(
-                    'object_mask_str', mask_str)
+                mask_str_slot = util.build_slot_dict('object_mask_str',
+                                                     mask_str)
 
                 # also, create gesture_slot
                 gesture_click = create_gesture_click(object_mask)
                 gesture_click_str = util.img_to_b64(gesture_click)
                 gesture_click_slot = util.build_slot_dict(
                     'gesture_click', gesture_click_str)
-                slots = [attribute_slot, adjust_value_slot,
-                         object_slot, mask_str_slot, gesture_click_slot]
+                slots = [
+                    attribute_slot, adjust_value_slot, object_slot,
+                    mask_str_slot, gesture_click_slot
+                ]
             else:
                 # Without the mask_str_slot
                 slots = [attribute_slot, adjust_value_slot, object_slot]
@@ -254,20 +257,22 @@ class AdjustAgendaGenerator(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ontology_file', type=str,
-                        default='./config/imageedit.ontology.json')
+    parser.add_argument(
+        '--ontology_file',
+        type=str,
+        default='./config/imageedit.ontology.json')
     parser.add_argument('--num_objects', type=int, default=3)
     parser.add_argument('--num_iers', type=int, default=5)
     parser.add_argument('--dir', type=str, default='./sampled_100')
     parser.add_argument('--seed', type=int, default=521)
-    parser.add_argument('--save', type=str,
-                        default='./sampled_100/agenda.{}.pickle')
+    parser.add_argument(
+        '--save', type=str, default='./sampled_100/agenda.v1.{}.pickle')
     args = parser.parse_args()
 
     assert args.num_iers >= args.num_objects
 
-    generator = AdjustAgendaGenerator(
-        args.ontology_file, args.num_objects, args.dir, args.num_iers, args.seed)
+    generator = AdjustAgendaGenerator(args.ontology_file, args.num_objects,
+                                      args.dir, args.num_iers, args.seed)
     agendas = generator.generate()
 
     print("Generated {} agendas".format(len(agendas)))

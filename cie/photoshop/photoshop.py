@@ -8,7 +8,6 @@ from .sps import SimplePhotoshop
 from ..core import SystemAct, PhotoshopAct
 from ..util import find_slot_with_key, img_to_b64, build_slot_dict, slots_to_args
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -84,11 +83,6 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         # Build data
         args = slots_to_args(slots)
 
-        data = {}
-        data['action'] = action
-        data['intent'] = intent
-        data['args'] = json.dumps(args)
-
         if action == "control":
             execute_result, msg = self.control(intent, args)
         else:
@@ -124,11 +118,11 @@ class SimplePhotoshopAgent(SimplePhotoshop):
             masked_image = self.get_image(True)
             masked_b64_img_str = img_to_b64(masked_image)
 
-        original_b64_img_str_slot = build_slot_dict(
-            'original_b64_img_str', original_b64_img_str, 1.0)
+        original_b64_img_str_slot = build_slot_dict('original_b64_img_str',
+                                                    original_b64_img_str, 1.0)
         b64_img_str_slot = build_slot_dict('b64_img_str', b64_img_str, 1.0)
-        masked_b64_img_str_slot = build_slot_dict(
-            'masked_b64_img_str', masked_b64_img_str, 1.0)
+        masked_b64_img_str_slot = build_slot_dict('masked_b64_img_str',
+                                                  masked_b64_img_str, 1.0)
 
         mask_strs = []
         for mask_idx, mask in self.get_masks():
@@ -137,8 +131,8 @@ class SimplePhotoshopAgent(SimplePhotoshop):
 
         mask_strs_slot = build_slot_dict('mask_strs', mask_strs, 1.0)
 
-        exec_result_slot = build_slot_dict(
-            "execute_result", self.last_execute_result, 1.0)
+        exec_result_slot = build_slot_dict("execute_result",
+                                           self.last_execute_result, 1.0)
 
         slots.append(original_b64_img_str_slot)
         slots.append(b64_img_str_slot)
@@ -202,7 +196,7 @@ class SimplePhotoshopClient(object):
                 # Process mask_str_slot to SimplePhotoshop arg format
                 mask_strs = []
                 for idx, mask_slot in enumerate(mask_str_slots):
-                    tup = (str(idx),  mask_slot['value'])
+                    tup = (str(idx), mask_slot['value'])
                     mask_strs.append(tup)
 
                 args = {}
@@ -249,11 +243,7 @@ class SimplePhotoshopClient(object):
                 res.raise_for_status()
 
         # Retrieve Image
-        data = {
-            'action': 'control',
-            'intent': 'check',
-            'args': json.dumps({})
-        }
+        data = {'action': 'control', 'intent': 'check', 'args': json.dumps({})}
         res = requests.post(self.action_uri, data=data)
         res.raise_for_status()
         check_obj = res.json()
@@ -264,7 +254,8 @@ class SimplePhotoshopClient(object):
         # Build return object
         photoshop_act = {}
         ps_act = {
-            'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
+            'dialogue_act':
+            build_slot_dict('dialogue_act', 'inform', 1.0),
             'slots': [
                 build_slot_dict('b64_img_str', b64_img_str, 1.0),
                 build_slot_dict('masked_b64_img_str', masked_b64_img_str, 1.0)

@@ -1,4 +1,3 @@
-
 class EditHistory(object):
     """ 
         Stores the edit history of Photoshop
@@ -29,8 +28,8 @@ class EditHistory(object):
         """
         assert self._background is not None, "Need to load image before performing edits!"
 
-        self._actions = self._actions[:self._ptr+1]
-        self._images = self._images[:self._ptr+1]
+        self._actions = self._actions[:self._ptr + 1]
+        self._images = self._images[:self._ptr + 1]
 
         self._actions.append((edit_type, args))
         self._images.append(img)
@@ -39,9 +38,9 @@ class EditHistory(object):
 
     def hasPreviousHistory(self):
         return self._ptr >= 0
-    
+
     def hasNextHistory(self):
-        return self._ptr < len(self._actions)
+        return self._ptr >= 0 and self._ptr < (len(self._actions) - 1)
 
     def undo(self):
         assert self._ptr >= 0
@@ -52,6 +51,6 @@ class EditHistory(object):
             return ('none', {}), self._background
 
     def redo(self):
-        assert self._ptr < (len(self._actions))
+        assert self._ptr < (len(self._actions) - 1)
         self._ptr += 1
         return self._actions[self._ptr], self._images[self._ptr]

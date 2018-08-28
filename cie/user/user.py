@@ -14,12 +14,7 @@ logger = logging.getLogger(__name__)
 
 def UserPortal(user_config):
     user_type = user_config["user"]
-    args = {
-        "dice_threshold": float(user_config["dice_threshold"]),
-        "patience": int(user_config["patience"]),
-        "gesture_threshold": float(user_config["gesture_threshold"])
-    }
-    return builder(user_type)(**args)
+    return builder(user_type)(user_config)
 
 
 def build_user_act(da, intent=None, slots=None):
@@ -38,13 +33,14 @@ class AgendaBasedUserSimulator(object):
     Also defines reward model
     """
 
-    def __init__(self, gesture_threshold, dice_threshold, patience):
+    def __init__(self, user_config, **kwargs):
         """
         Initialize user simulator with configuration
         """
-        self.gesture_threshold = gesture_threshold
-        self.dice_threshold = dice_threshold
-        self.patience = patience
+        self.config = user_config
+        self.patience = user_config["patience"]
+        self.dice_threshold = user_config["dice_threshold"]
+        self.gesture_threshold = user_config["gesture_threshold"]
 
     def reset(self):
         self.agenda = None
@@ -110,8 +106,10 @@ class AgendaBasedUserSimulator(object):
         user_acts = []
 
         # The default action for the user is to inform the agenda
-        default_system_acts = [
-            {'dialogue_act': build_slot_dict('dialogue_act', SystemAct.GREETING)}]
+        default_system_acts = [{
+            'dialogue_act':
+            build_slot_dict('dialogue_act', SystemAct.GREETING)
+        }]
 
         # We needs system_acts
         system_acts = self.observation.get('system_acts', default_system_acts)
@@ -130,18 +128,18 @@ class AgendaBasedUserSimulator(object):
             user_act = self.act_inform_request(request_slots)
 
             if user_act is not None and request_slots[0]['slot'] == "object_mask_str":
-                reward = -5
+                reward = self.config["request_object_mask_str_penalty"]
             else:
-                reward = -1
+                reward = self.config["turn_penalty"]
 
         elif sys_dialogue_act == SystemAct.CONFIRM:
             confirm_slots = sys_act["slots"]
             user_act = self.act_confirm(confirm_slots)
-            reward = -1
+            reward = self.config["turn_penalty"]
 
         elif sys_dialogue_act in SystemAct.query_acts():
             user_act = self.act_wait()
-            reward = -1
+            reward = self.config["turn_penalty"]
 
         elif sys_dialogue_act == SystemAct.EXECUTE:
 
@@ -157,27 +155,27 @@ class AgendaBasedUserSimulator(object):
                 if success:
                     if len(self.agenda) > 0:
                         self.agenda.pop(0)
-                    reward = 10
+                    reward = self.config["success_goal_reward"]
                 else:
                     exec_intent_value = exec_intent["value"]
                     if exec_intent_value == "close":
                         episode_done = True
-                        reward = -50
+                        reward = -self.patience
                     elif exec_intent_value == "undo":
                         # Build redo goal
                         redo_goal = build_user_act('inform', 'redo')
                         self.agenda.insert(0, redo_goal)
-                        reward = -10
+                        reward = self.config["failure_goal_penalty"]
                     else:  # open, adjust, undo
                         # Build undo goal
                         undo_goal = build_user_act('inform', 'undo')
                         self.agenda.insert(0, undo_goal)
-                        reward = -10
+                        reward = self.config["failure_goal_penalty"]
 
                 user_act = self.act_inform_goal()
             else:
                 user_act = None
-                reward = -1
+                reward = self.config["turn_penalty"]
         else:
             raise ValueError(
                 "Unknown sys_dialogue_act: {}".format(sys_dialogue_act))
@@ -223,8 +221,8 @@ class AgendaBasedUserSimulator(object):
 
         # user_act
         user_act = copy.deepcopy(goal)
-        user_act["dialogue_act"] = build_slot_dict(
-            "dialogue_act", UserAct.INFORM)
+        user_act["dialogue_act"] = build_slot_dict("dialogue_act",
+                                                   UserAct.INFORM)
 
         target_slots = user_act.get("slots", list()).copy()  # Could be empty
 
@@ -233,8 +231,8 @@ class AgendaBasedUserSimulator(object):
             if gesture_slot:
                 target_slots.remove(gesture_slot)
 
-        user_slots = filter(
-            lambda s: s['slot'] != 'object_mask_str', target_slots)
+        user_slots = filter(lambda s: s['slot'] != 'object_mask_str',
+                            target_slots)
         user_slots = list(user_slots)
         user_act["slots"] = user_slots
         return user_act
@@ -260,8 +258,7 @@ class AgendaBasedUserSimulator(object):
         if inform_slot is None:
             return None
 
-        user_act = build_user_act(
-            UserAct.INFORM, None, [inform_slot])
+        user_act = build_user_act(UserAct.INFORM, None, [inform_slot])
         return user_act
 
     def act_confirm(self, confirm_slots):
@@ -330,7 +327,8 @@ class AgendaBasedUserSimulator(object):
             slot_name = target_slot['slot']
             target_value = target_slot['value']
 
-            if slot_name in ["object", "gesture_click"]:  # Skip this slot in object_goal
+            if slot_name in ["object",
+                             "gesture_click"]:  # Skip this slot in object_goal
                 continue
 
             slot = find_slot_with_key(slot_name, execute_slots)
@@ -388,7 +386,10 @@ class AgendaBasedUserSimulator(object):
                 slots += user_act.get("slots", list())
                 slot_list = []
                 for slot in slots:
-                    if slot["slot"] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
+                    if slot["slot"] in [
+                            "object_mask_str", "gesture_click",
+                            "original_b64_img_str"
+                    ]:
                         slot_msg = slot["slot"] + "=" + slot["value"][:5]
                     elif slot["slot"] == "mask_strs":
                         slot_msg = slot["slot"] + "=" + len(slot["value"])

@@ -17,10 +17,11 @@ def SystemPortal(system_config):
     state = State(ontology)
     visionengine = VisionEnginePortal(system_config['visionengine'])
     policy_name = system_config['policy']
+    ignore_config = system_config["actionmapper"]
 
     if policy_name != "DQNPolicy":
         args = {
-            "action_mapper": ActionMapper(ontology_json),
+            "action_mapper": ActionMapper(ontology_json, ignore_config),
             "state_size": len(state.to_list())
         }
         policy = policylib(policy_name)(**args)
@@ -199,7 +200,10 @@ class System(object):
                 confirm_list = []
                 for slot_dict in confirm_slots:
                     slot_value = str(slot_dict.get('value', ""))
-                    if slot_dict['slot'] in ["object_mask_str", "gesture_click", "original_b64_img_str"]:
+                    if slot_dict['slot'] in [
+                            "object_mask_str", "gesture_click",
+                            "original_b64_img_str"
+                    ]:
                         sv = slot_dict['slot'] + " is " + slot_value[:5]
                     elif slot_dict["slot"] == "mask_strs":
                         sv = slot_dict["slot"] + " is " + str(len(slot_value))
@@ -214,7 +218,9 @@ class System(object):
 
                 for slot_dict in query_slots:
                     slot_value = str(slot_dict.get('value', ""))
-                    if slot_dict['slot'] in ["object_mask_str", "gesture_click"]:
+                    if slot_dict['slot'] in [
+                            "object_mask_str", "gesture_click"
+                    ]:
                         sv = slot_dict['slot'] + " is " + slot_value[:5]
                     elif slot_dict["slot"] == "mask_strs":
                         sv = slot_dict["slot"] + "=" + str(len(slot_value))

@@ -1,32 +1,40 @@
 {
-    "ontology": "imageedit.ontology.json",
+    "ontology": "./config/imageedit.ontology.json",
     "agendas": {
-        "train": "./sampled_100/agenda.train.pickle",
-        "test": "./sampled_100/agenda.test.pickle"
+        "train": "./sampled_100/agenda.v1.train.pickle",
+        "test": "./sampled_100/agenda.v1.test.pickle"
     },
     "world": {
-        "verbose": true
+        "verbose": false
     },
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
             "patience": 50,
+            "turn_penalty": -1,
+            "success_goal_reward": 10,
+            "failure_goal_penalty": -10,
+            "request_object_mask_str_penalty": -5,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
         "channel": {
-            "ontology": "imageedit.ontology.json",
+            "ontology": "./config/imageedit.ontology.json",
             "channel": "MultimodalChannel",
             "speech_conf_mean": 1.0,
             "speech_conf_std": 0.0
         },
         "system": {
-            "ontology": "imageedit.ontology.json",
+            "ontology": "./config/imageedit.ontology.json",
             "visionengine": {
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
-            "policy": "DQNPolicy"
+            "policy": "DQNPolicy",
+            "actionmapper": {
+                "ignore_intents": ["intent"],
+                "ignore_slots": ["original_b64_img_str"]
+            }
         },
         "photoshop": {
             "photoshop": "SimplePhotoshop",
@@ -36,13 +44,15 @@
         }
     },
     "policy": {
-        "num_epochs": 100,
+        "num_epochs": 2,
         "batch_size": 32,
-        "freeze_interval": 500,
+        "freeze_interval": 100,
         "gamma": 0.99,
         "burn_in": 1000,
-        "load": "exp/exp1",
+        "load": null,
         "load_replaymemory": null,
+        "logdir": "./log/train_dqn",
+        "save": "./exp/train_dqn",
         "qnetwork": {
             "input_size": null,
             "hidden_size": 100,

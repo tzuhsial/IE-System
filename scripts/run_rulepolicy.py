@@ -52,7 +52,6 @@ def run_agendas(agendas, world):
                 break
 
         ngoals = user.completed_goals()
-
         Turns.append(turn)
         Returns.append(R)
         Goals.append(ngoals)
