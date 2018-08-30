@@ -30,7 +30,39 @@
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
-            "policy": "DQNPolicy",
+            "policy": {
+                "name": "DQNPolicy",
+                "action_mapper": {
+                    "ignore_intents": ["intent"],
+                    "ignore_slots": ["original_b64_img_str"]
+                },
+                "num_epochs": 40,
+                "batch_size": 32,
+                "freeze_interval": 100,
+                "gamma": 0.99,
+                "burn_in": 1000,
+                "load": null,
+                "logdir": "./log/train_dqn",
+                "save": "./exp/train_dqn",
+                "qnetwork": {
+                    "input_size": null,
+                    "hidden_size": 50,
+                    "output_size": null,
+                    "dropout_rate": 0.0,
+                    "optimizer": "AdamOptimizer",
+                    "learning_rate": 1e-3
+                },
+                "replaymemory": {
+                    "memory_size": 1000,
+                    "load_path": "memory/rulepolicy.pickle"
+                },
+                "scheduler": {
+                    "scheduler": "LinearScheduler",
+                    "init_epsilon": 0.5,
+                    "min_epsilon": 0.05,
+                    "schedule_timesteps": 1e5
+                }
+            },
             "actionmapper": {
                 "ignore_intents": ["intent"],
                 "ignore_slots": ["original_b64_img_str"]
@@ -41,34 +73,6 @@
             "client": false,
             "uri": "http://localhost:2005",
             "verbose": true
-        }
-    },
-    "policy": {
-        "num_epochs": 2,
-        "batch_size": 32,
-        "freeze_interval": 100,
-        "gamma": 0.99,
-        "burn_in": 1000,
-        "load": null,
-        "load_replaymemory": null,
-        "logdir": "./log/train_dqn",
-        "save": "./exp/train_dqn",
-        "qnetwork": {
-            "input_size": null,
-            "hidden_size": 100,
-            "output_size": null,
-            "dropout_rate": 0.0,
-            "optimizer": "AdamOptimizer",
-            "learning_rate": 1e-3
-        },
-        "replaymemory": {
-            "memory_size": 10000
-        },
-        "scheduler": {
-            "scheduler": "LinearScheduler",
-            "init_epsilon": 0.5,
-            "min_epsilon": 0.05,
-            "schedule_timesteps": 1e7
         }
     }
 }

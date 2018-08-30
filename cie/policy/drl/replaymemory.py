@@ -1,16 +1,29 @@
 """
     Replay Memory for DQN Agent
 """
+import logging
+import pickle
 import random
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 
 class ReplayMemory(object):
-    def __init__(self, memory_size):
+    def __init__(self, memory_size, load_path, **kwargs):
         self.memory_size = int(memory_size)
         self.storage = list()
         self.ptr = 0
+
+        # Load from designated path
+        if load_path:
+            msg = "Loading buffered memory from {}...".format(load_path)
+            print(msg)
+            logger.info(msg)
+            with open(load_path, 'rb') as fin:
+                self.storage = pickle.load(fin)
+                self.ptr = len(self.storage) - 1
 
     def __len__(self):
         return len(self.storage)

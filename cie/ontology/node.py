@@ -140,7 +140,7 @@ class BeliefNode(object):
         Else: return the number of entries in the map & maximum confidence score
         """
         l = []
-        if len(self.possible_values) > 0:
+        if False and len(self.possible_values) > 0:
             # has possible values
             l = [
                 self.value_conf_map.get(value, 0.0)

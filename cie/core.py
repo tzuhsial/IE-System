@@ -41,7 +41,7 @@ class UserAct:
         """
         Wait for the system to query...
         """
-        return[UserAct.WAIT]
+        return [UserAct.WAIT]
 
 
 class SystemAct:
@@ -53,8 +53,6 @@ class SystemAct:
     REQUEST = "request"
     CONFIRM = "confirm"
     QUERY = "query"
-    QUERY_VISIONENGINE = "query_visionengine"
-    QUERY_HISTORY = "query_history"
     EXECUTE = "execute"
     BYE = "bye"
 
@@ -70,7 +68,7 @@ class SystemAct:
         """
         Actions that requires the user to wait
         """
-        return [SystemAct.QUERY, SystemAct.QUERY_VISIONENGINE, SystemAct.QUERY_HISTORY]
+        return [SystemAct.QUERY]
 
 
 class SysIntent(object):
@@ -78,7 +76,11 @@ class SysIntent(object):
     A utility object for system intent slots
     """
 
-    def __init__(self, confirm_slots=None, request_slots=None, query_slots=None, execute_slots=None):
+    def __init__(self,
+                 confirm_slots=None,
+                 request_slots=None,
+                 query_slots=None,
+                 execute_slots=None):
         """
         default argument cannot be list -> a bug that fucked me for 2 days...
         """
@@ -107,7 +109,8 @@ class SysIntent(object):
         request_slots = self.request_slots + other_intent.request_slots
         query_slots = self.query_slots + other_intent.query_slots
         execute_slots = self.execute_slots + other_intent.execute_slots
-        return SysIntent(confirm_slots, request_slots, query_slots, execute_slots)
+        return SysIntent(confirm_slots, request_slots, query_slots,
+                         execute_slots)
 
     def __radd__(self, other_intent):
         return other_intent.__add__(self)
@@ -116,13 +119,21 @@ class SysIntent(object):
         """
         Compare slots, regardless of order
         """
-        if sort_slots_with_key('slot', self.confirm_slots) != sort_slots_with_key('slot', other_intent.confirm_slots):
+        if sort_slots_with_key('slot',
+                               self.confirm_slots) != sort_slots_with_key(
+                                   'slot', other_intent.confirm_slots):
             return False
-        if sort_slots_with_key('slot', self.request_slots) != sort_slots_with_key('slot', other_intent.request_slots):
+        if sort_slots_with_key('slot',
+                               self.request_slots) != sort_slots_with_key(
+                                   'slot', other_intent.request_slots):
             return False
-        if sort_slots_with_key('slot', self.query_slots) != sort_slots_with_key('slot', other_intent.query_slots):
+        if sort_slots_with_key('slot',
+                               self.query_slots) != sort_slots_with_key(
+                                   'slot', other_intent.query_slots):
             return False
-        if sort_slots_with_key('slot', self.execute_slots) != sort_slots_with_key('slot', other_intent.execute_slots):
+        if sort_slots_with_key('slot',
+                               self.execute_slots) != sort_slots_with_key(
+                                   'slot', other_intent.execute_slots):
             return False
         return True
 
@@ -144,7 +155,8 @@ class SysIntent(object):
         self.execute_slots.clear()
 
     def copy(self):
-        return SysIntent(self.confirm_slots, self.request_slots, self.query_slots, self.execute_slots)
+        return SysIntent(self.confirm_slots, self.request_slots,
+                         self.query_slots, self.execute_slots)
 
     def to_json(self):
         obj = {
@@ -195,9 +207,12 @@ class PhotoshopAct:
 
     @staticmethod
     def control_acts():
-        return [PhotoshopAct.OPEN, PhotoshopAct.LOAD, PhotoshopAct.CLOSE, PhotoshopAct.UNDO,
-                PhotoshopAct.REDO, PhotoshopAct.LOAD_MASK_STRS,
-                PhotoshopAct.SELECT_OBJECT, PhotoshopAct.SELECT_OBJECT_MASK_ID, PhotoshopAct.DESELECT]
+        return [
+            PhotoshopAct.OPEN, PhotoshopAct.LOAD, PhotoshopAct.CLOSE,
+            PhotoshopAct.UNDO, PhotoshopAct.REDO, PhotoshopAct.LOAD_MASK_STRS,
+            PhotoshopAct.SELECT_OBJECT, PhotoshopAct.SELECT_OBJECT_MASK_ID,
+            PhotoshopAct.DESELECT
+        ]
 
     @staticmethod
     def edit_acts():

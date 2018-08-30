@@ -179,7 +179,12 @@ class AdjustAgendaGenerator(object):
         # [ 0, 2 ]
         # => [ 0, 0, 1, 2, 2 ]
         # => [ dog, dog, cat, mice, mice ]
-        ann_pool = [{'category_id': 0}] + anns
+
+        ################################
+        #    Create Annotation  Pool   #
+        ################################
+        ann_pool = anns
+        # ann_pool = [{'category_id': 0}] + anns
         sampled_anns = np.random.choice(ann_pool, self.num_objects)
 
         num_duplicates = self.num_iers - self.num_objects

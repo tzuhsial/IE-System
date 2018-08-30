@@ -30,21 +30,22 @@
                 "visionengine": "VisionEngineDatabase",
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
-            "policy": "RulePolicy",
-            "actionmapper": {
-                "ignore_intents": ["intent"],
-                "ignore_slots": ["original_b64_img_str"]
+            "policy": {
+                "name": "RulePolicy",
+                "replaymemory": {
+                    "memory_size": 1000
+                },
+                "action_mapper": {
+                    "ignore_intents": ["intent"],
+                    "ignore_slots": ["original_b64_img_str"]
+                },
+                "save_replaymemory": "memory/rulepolicy.pickle"
             }
         },
         "photoshop": {
             "photoshop": "SimplePhotoshop",
             "client": false,
             "uri": "http://localhost:2005"
-        }
-    },
-    "policy": {
-        "replaymemory": {
-            "save": null
         }
     }
 }

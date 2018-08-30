@@ -75,6 +75,22 @@ class ActionMapper(object):
 
         self.action_map = action_map
 
+        # Build inverse map here
+        self.inv_action_map = {}
+        self.inv_action_map[SystemAct.REQUEST] = {}
+        self.inv_action_map[SystemAct.CONFIRM] = {}
+        self.inv_action_map[SystemAct.QUERY] = {}
+        self.inv_action_map[SystemAct.EXECUTE] = {}
+
+        for action_idx, action_info in self.action_map.items():
+            da = action_info['dialogue_act']
+            if da != SystemAct.EXECUTE:
+                slot_name = action_info['slot']
+                self.inv_action_map[da][slot_name] = action_idx
+            else:
+                intent_name = action_info['intent']
+                self.inv_action_map[da][intent_name] = action_idx
+
     def size(self):
         return len(self.action_map)
 
@@ -108,6 +124,18 @@ class ActionMapper(object):
         sys_act = build_sys_act(da, intent, slots)
         return sys_act
 
+    def sys_act_to_action_idx(self, sys_act):
+        da = sys_act["dialogue_act"]['value']
+        intent = sys_act["intent"]
+        slots = sys_act["slots"]
+
+        if da != SystemAct.EXECUTE:
+            key = slots[0]['slot']
+        else:
+            key = intent['value']
+        action_idx = self.inv_action_map[da][key]
+        return action_idx
+
 
 class BasePolicy(object):
     """
@@ -116,6 +144,7 @@ class BasePolicy(object):
     public methods:
         next_action
         record
+
     private methods:
         build_action_map
         step
@@ -125,15 +154,24 @@ class BasePolicy(object):
         state_size (int):
         action_size (int):
         action_map (dict): map action index to system actions
+        replaymemory (object): a replay memory which maps objects into categories
     """
 
-    def __init__(self, state_size, action_mapper, **kwargs):
-        self.state_size = state_size
+    def __init__(self, config, action_mapper):
+        self.state_size = config["state_size"]
+        self.action_size = config["action_size"]
         self.action_mapper = action_mapper
-        self.action_size = self.action_mapper.size()
+
+        self.replaymemory = ReplayMemory(**config["replaymemory"])
 
     def reset(self):
         self.rewards = []
+        self.previous_state = None
+        self.previous_action = None
+        self.state = None
+        self.action = None
+        self.reward = None
+        self.episode_done = None
 
     def next_action(self, state):
         """
@@ -146,6 +184,10 @@ class BasePolicy(object):
         state_list = state.to_list()
         action_idx = self.step(state_list)
         sys_act = self.action_mapper(action_idx, state)
+        self.previous_state = self.state
+        self.previous_action = self.action
+        self.state = state_list
+        self.action = action_idx
         return sys_act
 
     def step(self, state):
@@ -158,11 +200,16 @@ class BasePolicy(object):
         """
         raise NotImplementedError
 
-    def add_reward(self, reward):
+    def record(self, reward, episode_done):
         """
-        Records 
+        Sends into replay memory
         """
-        self.rewards.append(reward)
+        self.reward = reward
+        self.episode_done = episode_done
+
+        if self.previous_state:  # is not None
+            self.replaymemory.add(self.previous_state, self.previous_action,
+                                  self.reward, self.state, self.episode_done)
 
 
 class RandomPolicy(BasePolicy):
@@ -247,6 +294,19 @@ class RulePolicy(BasePolicy):
             slots = sysintent.execute_slots.copy()
 
         sys_act = build_sys_act(da, intent, slots)
+
+        action_idx = self.action_mapper.sys_act_to_action_idx(sys_act)
+
+        # Find action index from sys_act
+        state_list = state.to_list()
+        #action_idx = self.step(state_list)
+        #sys_act = self.action_mapper(action_idx, state)
+
+        self.previous_state = self.state
+        self.previous_action = self.action
+        self.state = state_list
+        self.action = action_idx
+
         return sys_act
 
 
@@ -271,9 +331,11 @@ class DQNPolicy(BasePolicy):
         # Setup config
         self.config = policy_config
         self.action_mapper = action_mapper
-        self.config["qnetwork"]["output_size"] = self.action_mapper.size()
 
-        # Load configuration
+        self.config["qnetwork"]["input_size"] = policy_config["state_size"]
+        self.config["qnetwork"]["output_size"] = policy_config["action_size"]
+
+        # Build with configuration
         self.build_from_config()
 
         # Create session and saver

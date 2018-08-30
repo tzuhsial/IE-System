@@ -24,6 +24,7 @@ def print_mean_std(name, seq):
 
 def run_agendas(agendas, world):
     user = world.agents[0]
+    policy = world.agents[2].policy
     Turns = []
     Returns = []
     Goals = []
@@ -42,6 +43,8 @@ def run_agendas(agendas, world):
 
             reward = world.reward()  # User reward
             episode_done = world.episode_done()  # User episode_done
+
+            policy.record(reward, episode_done)
 
             # Evaluation Manager
             turn += 1
@@ -75,19 +78,22 @@ def main(argv):
     world = ImageEditWorld(world_config, agents)
 
     # Load agendas
-
     train_agendas = util.load_from_pickle(config["agendas"]["train"])
     test_agendas = util.load_from_pickle(config["agendas"]["test"])
     print("train", len(train_agendas), "test", len(test_agendas))
 
     # Main loop here
-    """
-    turns, returns, goals = run_agendas(train_agendas, world)
-    print("Train")
-    print_mean_std("turn", turns)
-    print_mean_std("return", returns)
-    print_mean_std("goals", goals)
-    """
+    policy_config = config["agents"]["system"]["policy"]
+    if policy_config["save_replaymemory"]:
+        turns, returns, goals = run_agendas(train_agendas, world)
+        print("Train")
+        print_mean_std("turn", turns)
+        print_mean_std("return", returns)
+        print_mean_std("goals", goals)
+
+        experience = world.agents[2].policy.replaymemory.storage
+        util.save_to_pickle(experience, policy_config['save_replaymemory'])
+
     turns, returns, goals = run_agendas(test_agendas, world)
     print("Test")
     print_mean_std("turn", turns)

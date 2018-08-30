@@ -121,24 +121,11 @@ def main(argv):
     world_config = config["world"]
     world = ImageEditWorld(world_config, agents)
 
-    # Load Policy
-    policy_config = config["policy"]
-
-    # network input_size & output_size
-    policy_config["qnetwork"]["input_size"] = len(system.state.to_list())
-    ontology_json = util.load_from_json(config["ontology"])
-    ignore_config = config["agents"]["system"]["actionmapper"]
-    action_mapper = ActionMapper(ontology_json, ignore_config)
-    policy_config["qnetwork"]["output_size"] = action_mapper.size()
-    policy = DQNPolicy(policy_config, action_mapper)
-
-    print("state size", policy_config["qnetwork"]["input_size"])
-    print("action size", policy_config["qnetwork"]["output_size"])
+    policy_config = config["agents"]["system"]["policy"]
+    policy = world.agents[2].policy
 
     if policy_config.get("load") is not None:
         policy.load(policy_config["load"])
-
-    system.load_policy(policy)
 
     # Load agendas
     train_agendas = util.load_from_pickle(config["agendas"]["train"])
@@ -146,7 +133,7 @@ def main(argv):
     print("train", len(train_agendas))
     print("test", len(test_agendas))
     # Main loop here
-    train_config = config["policy"]
+    train_config = policy_config
     scribe = EvaluationManager()
 
     # First burn_in memory

@@ -16,20 +16,18 @@ def SystemPortal(system_config):
     ontology = OntologyEngine(ontology_json)
     state = State(ontology)
     visionengine = VisionEnginePortal(system_config['visionengine'])
-    policy_name = system_config['policy']
-    ignore_config = system_config["actionmapper"]
 
-    if policy_name != "DQNPolicy":
-        args = {
-            "action_mapper": ActionMapper(ontology_json, ignore_config),
-            "state_size": len(state.to_list())
-        }
-        policy = policylib(policy_name)(**args)
-    else:
-        policy = None
+    # Setup Policy here
+    policy_config = system_config["policy"]
+    ignore_config = policy_config["action_mapper"]
+    action_mapper = ActionMapper(ontology_json, ignore_config)
+    
+    policy_config["state_size"] = len(state.to_list())
+    policy_config["action_size"] = action_mapper.size()
+    policy_name = policy_config["name"]
+    policy = policylib(policy_name)(policy_config, action_mapper)
 
     system = System(state, visionengine, policy)
-
     return system
 
 
@@ -191,9 +189,6 @@ class System(object):
                 utt = "Hello! My name is PS. I am here to help you edit your image!"
             elif sys_dialogue_act == SystemAct.ASK:
                 utt = "What would you like to do?"
-            elif sys_dialogue_act == SystemAct.REQUEST:
-                request_slots = [s['slot'] for s in sys_act['slots']]
-                utt = "What " + ', '.join(request_slots) + " do you want?"
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
