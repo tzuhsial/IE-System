@@ -154,6 +154,7 @@ class State(object):
 
             obsrv = slot_to_observation(slot, turn_id)
             slot_node = self.get_slot(slot_name)
+
             result = slot_node.add_observation(**obsrv)
             if not result:
                 logger.info("Failed to add observation {} to slot {}".format(
@@ -220,6 +221,4 @@ class State(object):
             l += node.to_list()
             c += [node.get_max_conf()]
 
-        #print(names)
-        #print(l)
         return c + l

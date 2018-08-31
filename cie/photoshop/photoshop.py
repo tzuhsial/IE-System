@@ -51,7 +51,7 @@ class SuperficialPhotoshopAgent(object):
     def reset(self):
         self.observation = {}
         self.last_execute_result = False
-        self.original_b64_img_str = None
+        self.original_b64_img_str = ""
         # Simulate the history
         self.num_edits = 0
         self.ptr = 0
