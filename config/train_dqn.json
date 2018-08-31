@@ -10,11 +10,11 @@
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "patience": 50,
+            "patience": 30,
             "turn_penalty": -1,
-            "success_goal_reward": 10,
-            "failure_goal_penalty": -10,
-            "request_object_mask_str_penalty": -5,
+            "success_goal_reward": -1,
+            "failure_goal_penalty": -1,
+            "request_object_mask_str_penalty": -1,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
@@ -40,20 +40,19 @@
                 "batch_size": 32,
                 "freeze_interval": 100,
                 "gamma": 0.99,
-                "burn_in": 1000,
                 "load": null,
                 "logdir": "./log/train_dqn",
                 "save": "./exp/train_dqn",
                 "qnetwork": {
                     "input_size": null,
-                    "hidden_size": 50,
+                    "hidden_size": 40,
                     "output_size": null,
                     "dropout_rate": 0.0,
                     "optimizer": "AdamOptimizer",
                     "learning_rate": 1e-3
                 },
                 "replaymemory": {
-                    "memory_size": 1000,
+                    "memory_size": 2000,
                     "load_path": "memory/rulepolicy.pickle"
                 },
                 "scheduler": {

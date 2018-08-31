@@ -10,11 +10,11 @@
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "patience": 50,
+            "patience": 30,
             "turn_penalty": -1,
-            "success_goal_reward": 10,
-            "failure_goal_penalty": -10,
-            "request_object_mask_str_penalty": -5,
+            "success_goal_reward": -1,
+            "failure_goal_penalty": -1,
+            "request_object_mask_str_penalty": -1,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
         },
@@ -33,7 +33,8 @@
             "policy": {
                 "name": "RulePolicy",
                 "replaymemory": {
-                    "memory_size": 1000
+                    "memory_size": 1000,
+                    "load_path": null
                 },
                 "action_mapper": {
                     "ignore_intents": ["intent"],
@@ -43,7 +44,7 @@
             }
         },
         "photoshop": {
-            "photoshop": "SimplePhotoshop",
+            "photoshop": "SuperficialPhotoshop",
             "client": false,
             "uri": "http://localhost:2005"
         }

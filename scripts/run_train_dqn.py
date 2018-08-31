@@ -137,7 +137,6 @@ def main(argv):
     scribe = EvaluationManager()
 
     # First burn_in memory
-
     global_step = 0
     try:
         for epoch in tqdm(range(1, train_config["num_epochs"] + 1, 1)):

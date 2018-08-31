@@ -1,12 +1,13 @@
 import json
 import logging
+import os
 import requests
 from urllib.parse import urljoin
 
 from .sps import SimplePhotoshop
 
 from ..core import SystemAct, PhotoshopAct
-from ..util import find_slot_with_key, img_to_b64, build_slot_dict, slots_to_args
+from ..util import find_slot_with_key, img_to_b64, build_slot_dict, slots_to_args, imread
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +18,130 @@ def PhotoshopPortal(photoshop_config):
     use_client = photoshop_config['client']
     uri = photoshop_config['uri']
 
-    if photoshop_type == "SimplePhotoshop":
+    if photoshop_type == "SuperficialPhotoshop":
+        return SuperficialPhotoshopAgent()
+    elif photoshop_type == "SimplePhotoshop":
         if not use_client:
             return SimplePhotoshopAgent()
         else:
             return SimplePhotoshopClient(uri)
     else:
         raise NotImplementedError
+
+
+class SuperficialPhotoshopAgent(object):
+    """
+    Doesn't perform any real image edits
+    """
+
+    def __init__(self):
+        # Define here for now
+        self.action_slot_dict = {
+            "open": ["image_path"],
+            "adjust": ["object_mask_str", "attribute", "adjust_value"],
+            "redo": [],
+            "close": [],
+            "undo": []
+        }
+
+        # Simulate the history
+        self.num_edits = -1
+        self.ptr = -1
+
+    def reset(self):
+        self.observation = {}
+        self.last_execute_result = False
+        self.original_b64_img_str = None
+        # Simulate the history
+        self.num_edits = 0
+        self.ptr = 0
+
+    def observe(self, observation):
+        """
+        Observes system act
+        """
+        self.observation = observation
+
+    def act(self):
+        system_acts = self.observation.get('system_acts', list())
+        sys_act = system_acts[0]
+        sys_dialogue_act = sys_act['dialogue_act']['value']
+
+        if sys_dialogue_act == SystemAct.EXECUTE:
+            intent = sys_act['intent']['value']
+            slots = sys_act['slots']
+            self.act_execute(intent, slots)
+
+        ps_act = self.act_inform()
+
+        photoshop_act = {}
+        photoshop_act['photoshop_acts'] = [ps_act]
+
+        self.observation = {}
+        return photoshop_act
+
+    def act_inform(self):
+        """
+        Creates observation for user & system
+        """
+        slots = []
+        exec_result_slot = build_slot_dict('execute_result',
+                                           self.last_execute_result, 1.0)
+        original_b64_img_str = build_slot_dict('original_b64_img_str',
+                                               self.original_b64_img_str, 1.0)
+
+        slots.append(exec_result_slot)
+        slots.append(original_b64_img_str)
+
+        ps_act = {}
+        ps_act['dialogue_act'] = build_slot_dict('dialogue_act', "inform", 1.0)
+        ps_act['slots'] = slots
+        return ps_act
+
+    def act_execute(self, intent, slots):
+
+        execute_result = True
+        if intent in ["open", "adjust"]:
+            required_slot_names = self.action_slot_dict[intent]
+            for slot_name in required_slot_names:
+                s = find_slot_with_key(slot_name, slots)
+                if not s or not s.get('value'):
+                    execute_result = False
+                    break
+
+            # Needs to open an image before adjusting
+            if intent == "adjust" and self.original_b64_img_str is None:
+                execute_result = False
+
+            if intent == "open":
+                assert slots[0]["slot"] == "image_path"
+                image_path = slots[0]['value']
+                if not os.path.exists(image_path):
+                    raise ValueError
+                image = imread(image_path)
+                b64_img_str = img_to_b64(image)
+                self.original_b64_img_str = b64_img_str
+
+            if execute_result:
+                self.ptr += 1
+                self.num_edits += 1
+
+        elif intent == "undo":
+            if self.ptr <= 0:
+                execute_result = False
+            else:
+                self.ptr -= 1
+
+        elif intent == "redo":
+            if self.ptr >= self.num_edits:
+                execute_result = False
+            else:
+                self.ptr += 1
+
+        elif intent == "close":
+            execute_result = True
+
+        self.last_execute_result = execute_result
 
 
 class SimplePhotoshopAgent(SimplePhotoshop):

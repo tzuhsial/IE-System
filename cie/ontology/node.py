@@ -26,7 +26,7 @@ class BeliefNode(object):
         validator (function): a function to validate the values
     """
 
-    LAMBDA = 0.9
+    LAMBDA = 1.0
 
     def __init__(self,
                  name,
@@ -140,17 +140,16 @@ class BeliefNode(object):
         Else: return the number of entries in the map & maximum confidence score
         """
         l = []
-        if False and len(self.possible_values) > 0:
+        if self.name not in ["object"] and len(self.possible_values) > 0:
             # has possible values
-            l = [
-                self.value_conf_map.get(value, 0.0)
-                for value in self.possible_values
-            ]
+            l = []
+            for value in self.possible_values:
+                value_conf = self.value_conf_map.get(value, 0.0)
+                l.append(value_conf)
         else:
             # Return number of values in map & max confidence score
-            nvalues = len(self.value_conf_map)
             max_conf = self.get_max_conf()
-            l = [nvalues, max_conf]
+            l = [max_conf]
         return l
 
     #########################
@@ -368,6 +367,9 @@ class PSToolNode(BeliefNode):
             logger.error(
                 "PSToolNode {} observed confidence less than 1.0!".format(
                     self.name))
+            return False
+        if value == "":
+            logger.info("PSToolNode observed value empty")
             return False
         prev_value_conf_map = copy.deepcopy(self.value_conf_map)
         self.value_conf_map = {}

@@ -57,13 +57,13 @@ class AgendaBasedUserSimulator(object):
 
     def completed_goals(self):
         """
-        Returns number of completed goals, excluding "undo"
+        Returns number of completed goals, excluding "undo, redo"
         """
+
         remaining_goals = 0
         for g in self.agenda:
-            if g['intent'] != "undo":
+            if g['intent']['value'] not in ["undo", "redo"]:
                 remaining_goals += 1
-
         original_goals = len(self.agenda_backup)
         completed_goals = original_goals - remaining_goals
         return completed_goals
@@ -155,24 +155,31 @@ class AgendaBasedUserSimulator(object):
                 if success:
                     if len(self.agenda) > 0:
                         self.agenda.pop(0)
-                    reward = self.config["success_goal_reward"]
+                        if len(self.agenda):
+                            reward = self.config["success_goal_reward"]
+                        else:
+                            reward = 2 * self.patience
+                    user_act = self.act_inform_goal()
                 else:
                     exec_intent_value = exec_intent["value"]
                     if exec_intent_value == "close":
                         episode_done = True
                         reward = -self.patience
+                        user_act = self.act_bye()
+
                     elif exec_intent_value == "undo":
                         # Build redo goal
                         redo_goal = build_user_act('inform', 'redo')
                         self.agenda.insert(0, redo_goal)
                         reward = self.config["failure_goal_penalty"]
+                        user_act = self.act_inform_goal()
+
                     else:  # open, adjust, undo
                         # Build undo goal
                         undo_goal = build_user_act('inform', 'undo')
                         self.agenda.insert(0, undo_goal)
                         reward = self.config["failure_goal_penalty"]
-
-                user_act = self.act_inform_goal()
+                        user_act = self.act_inform_goal()
             else:
                 user_act = None
                 reward = self.config["turn_penalty"]

@@ -21,9 +21,12 @@ def SystemPortal(system_config):
     policy_config = system_config["policy"]
     ignore_config = policy_config["action_mapper"]
     action_mapper = ActionMapper(ontology_json, ignore_config)
-    
+
     policy_config["state_size"] = len(state.to_list())
     policy_config["action_size"] = action_mapper.size()
+
+    print("state_size", policy_config["state_size"])
+    print("action_size", policy_config["action_size"])
     policy_name = policy_config["name"]
     policy = policylib(policy_name)(policy_config, action_mapper)
 
@@ -125,7 +128,7 @@ class System(object):
             # Stack the intent to history and clear slots
             intent = sys_act['intent']['value']
             self.state.stack_intent(intent)
-            self.state.clear_ontology()
+            #self.state.clear_ontology()
 
         # Update turn_id
         self.turn_id += 1
@@ -189,6 +192,10 @@ class System(object):
                 utt = "Hello! My name is PS. I am here to help you edit your image!"
             elif sys_dialogue_act == SystemAct.ASK:
                 utt = "What would you like to do?"
+            elif sys_dialogue_act == SystemAct.REQUEST:
+                req_slot = sys_act['slots'][0]
+                req_name = req_slot['slot']
+                utt = "What {} do you want?".format(req_name)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
@@ -241,6 +248,8 @@ class System(object):
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:
+                import pdb
+                pdb.set_trace()
                 utt = ""
             utt_list.append(utt)
 

@@ -184,6 +184,8 @@ class BasePolicy(object):
         state_list = state.to_list()
         action_idx = self.step(state_list)
         sys_act = self.action_mapper(action_idx, state)
+
+        print(sys_act['dialogue_act'], sys_act['slots'])
         self.previous_state = self.state
         self.previous_action = self.action
         self.state = state_list

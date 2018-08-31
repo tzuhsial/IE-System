@@ -89,7 +89,6 @@ class MultimodalChannel(object):
                     intent_conf = 1.
                 else:
                     intent_conf = self.generate_confidence()
-
                 intent_possible_values = self.slots["intent"][
                     "possible_values"].copy()
 

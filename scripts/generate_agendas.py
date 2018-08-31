@@ -266,8 +266,8 @@ if __name__ == "__main__":
         '--ontology_file',
         type=str,
         default='./config/imageedit.ontology.json')
-    parser.add_argument('--num_objects', type=int, default=3)
-    parser.add_argument('--num_iers', type=int, default=5)
+    parser.add_argument('--num_objects', type=int, default=1)
+    parser.add_argument('--num_iers', type=int, default=1)
     parser.add_argument('--dir', type=str, default='./sampled_100')
     parser.add_argument('--seed', type=int, default=521)
     parser.add_argument(

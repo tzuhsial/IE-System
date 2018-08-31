@@ -212,7 +212,14 @@ class State(object):
         State as list for RL agent observation space
         """
         # Slots
+        names = []
         l = []
-        for slot in self.ontology.slots.values():
-            l += slot.to_list()
-        return l
+        c = []
+        for node in self.ontology.slots.values():
+            names.append(node.name)
+            l += node.to_list()
+            c += [node.get_max_conf()]
+
+        #print(names)
+        #print(l)
+        return c + l
