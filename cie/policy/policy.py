@@ -6,8 +6,7 @@ import numpy as np
 from ..core import SystemAct
 from ..util import load_from_json, slots_to_args, build_slot_dict, find_slot_with_key
 
-from .drl import QNetwork, ReplayMemory, tf_utils
-from .drl.scheduler import builder as schedulerlib
+from .drl import ReplayMemory, QNetwork, tf_utils, LinearScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +184,6 @@ class BasePolicy(object):
         action_idx = self.step(state_list)
         sys_act = self.action_mapper(action_idx, state)
 
-        print(sys_act['dialogue_act'], sys_act['slots'])
         self.previous_state = self.state
         self.previous_action = self.action
         self.state = state_list
@@ -320,9 +318,7 @@ class DQNPolicy(BasePolicy):
         next_action
         record
     private methods:
-        build_action_map
         step
-        action_idx_to_sys_act
 
     Attributes:
         config: 
@@ -374,34 +370,162 @@ class DQNPolicy(BasePolicy):
         self.scheduler = schedulerlib(scheduler_name)(
             **self.config["scheduler"])
 
-    def reset(self):
-        self.rewards = []
-
-        self.previous_state = None
-        self.previous_action = None
-        self.state = None
-        self.action = None
-        self.reward = None
-        self.episode_done = None
-
-    def next_action(self, state):
+    def step(self, state):
         """
         Args:
-            state (object): state of the system
-        Returns:
-            sys_act (dict): one system_action
+        - state: list
+
+        Return: 
+        - action: int
         """
-        # Predict next action index
-        state_list = state.to_list()
-        action_idx = self.step(state_list)
-        sys_act = self.action_mapper(action_idx, state)
+        if isinstance(state, list):
+            assert not any(isinstance(x, list) for x in state)
 
-        self.previous_state = self.state
-        self.previous_action = self.action
+        state = np.expand_dims(state, axis=0)  # Expect only one dimension only
 
-        self.state = state_list
-        self.action = action_idx
-        return sys_act
+        q_values = self.qnetwork.predict_batch(
+            self.sess, state)  # (batch_size, action_space)
+
+        # Here we decide which epsilon decay policy we should use
+        action = self.epsilon_greedy_policy(q_values)
+
+        return action
+
+    def record(self, reward, episode_done):
+        """
+        Sends into replay memory
+        """
+        self.reward = reward
+        self.episode_done = episode_done
+
+        if self.previous_state:  # is not None
+            self.replaymemory.add(self.previous_state, self.previous_action,
+                                  self.reward, self.state, self.episode_done)
+
+    ##########################
+    #   Tensorflow Related   #
+    ##########################
+    def copy_qnetwork(self):
+        # Copy current Qnetwork to previous qnetwork
+        self.sess.run([self.copy_op])
+
+    def update_epsilon(self, current_timestep=None, test=False):
+        if not test:
+            self.epsilon = self.scheduler.value(current_timestep)
+        else:
+            self.epsilon = self.scheduler.end_value()
+        return self.epsilon
+
+    def epsilon_greedy_policy(self, qvalues, epsilon=None):
+        """
+        Sample according to probability
+        """
+        action_size = qvalues.size
+
+        max_action_index = np.argmax(qvalues)
+        probs = []
+        for action_index in range(action_size):
+            if action_index == max_action_index:
+                action_prob = 1 - self.epsilon
+            else:
+                action_prob = self.epsilon / (action_size - 1)
+            probs.append(action_prob)
+
+        action = np.random.choice(action_size, p=probs)
+        return action
+
+    def update_network(self):
+        """
+        Sample from Replay Memory and update network for one batch
+        """
+        if self.replaymemory.size() < self.batch_size:
+            return 0.0
+
+        batch_states, batch_actions, batch_rewards, batch_next_states, batch_done = \
+            self.replaymemory.sample_encode(self.batch_size)
+
+        # Target QNetwork Prediction
+        batch_target_qvalues = self.target_qnetwork.predict_batch(
+            self.sess, batch_next_states)  # (batch_size, action_size)
+
+        batch_max_target_qvalues = np.max(batch_target_qvalues, axis=-1)
+
+        batch_target_qvalues = batch_rewards + \
+            self.gamma * (1 - batch_done) * batch_max_target_qvalues
+
+        # Pass to QNetwork for update
+        batch_loss = self.qnetwork.train_batch(
+            self.sess, batch_states, batch_actions, batch_target_qvalues)
+        return batch_loss
+
+    def save(self, exp_path, global_step=None):
+        """
+        Save 
+        """
+        self.saver.save(self.sess, exp_path, global_step)
+
+    def load(self, load_path):
+        """
+        Load existing session
+        """
+        print("[DQNPolicy] Restoring from {}".format(load_path))
+        self.saver.restore(self.sess, load_path)
+
+    def log_scalar(self, tag, value, step):
+        """
+        Log scalar to tensorboard
+        Args:
+            tag (str): name of scalar
+            value (float): value
+            step (int): number of step
+        """
+        summary = tf_utils.create_summary_value(tag, value)
+        self.writer.add_summary(summary, step)
+
+
+class A2CPolicy(BasePolicy):
+    """
+    Implementation of an actor-critic policy
+    """
+
+    def __init__(self, policy_config, action_mapper):
+        # Setup config
+        self.config = policy_config
+        self.action_mapper = action_mapper
+
+        self.config["qnetwork"]["input_size"] = policy_config["state_size"]
+        self.config["qnetwork"]["output_size"] = policy_config["action_size"]
+
+        # Build with configuration
+        self.build_from_config()
+
+        # Create session and saver
+        self.sess = tf_utils.create_session()
+        self.saver = tf_utils.create_saver()
+
+        # Initialize all variables
+        tf_utils.initialize_all_variables(self.sess)
+
+        # Log to tensorboard
+        logdir = self.config["logdir"]
+        self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
+
+    def build_from_config(self):
+        raise NotImplementedError
+        # Directly load config
+        self.batch_size = self.config["batch_size"]
+        self.epsilon = float(self.config["scheduler"]['init_epsilon'])
+        self.gamma = float(self.config["gamma"])
+
+        # Create Actor and Critic
+
+        # Replay Memory
+        self.replaymemory = ReplayMemory(**self.config["replaymemory"])
+
+        # Scheduler
+        scheduler_name = self.config["scheduler"]["scheduler"]
+        self.scheduler = schedulerlib(scheduler_name)(
+            **self.config["scheduler"])
 
     def step(self, state):
         """
@@ -501,7 +625,7 @@ class DQNPolicy(BasePolicy):
         """
         Load existing session
         """
-        print("[DQNPolicy] Restoring from {}".format(load_path))
+        print("[A2CPolicy] Restoring from {}".format(load_path))
         self.saver.restore(self.sess, load_path)
 
     def log_scalar(self, tag, value, step):

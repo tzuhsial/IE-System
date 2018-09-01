@@ -1,11 +1,24 @@
+from .channel import ChannelPortal
+from .user import UserPortal
+from .system import SystemPortal
+from .photoshop import PhotoshopPortal
+
+
 class ImageEditWorld(object):
-    def __init__(self, config, agents):
+    def __init__(self, config, agents_config):
         """
+        Set config and build agents
         Args:
             agents (list):  user 2. channel 3. agent 4. photoshop
         """
         self.config = config
-        self.agents = agents
+
+        user = UserPortal(agents_config["user"])
+        channel = ChannelPortal(agents_config["channel"])
+        system = SystemPortal(agents_config["system"])
+        photoshop = PhotoshopPortal(agents_config["photoshop"])
+
+        self.agents = [user, channel, system, photoshop]
 
     def reset(self):
         """
@@ -32,8 +45,8 @@ class ImageEditWorld(object):
         self.acts[user_idx] = user.act()
 
         if self.config["verbose"]:
-            print("[User]", self.acts[user_idx]['user_utterance'],
-                  'reward', self.acts[user_idx]['reward'])
+            print("[User]", self.acts[user_idx]['user_utterance'], 'reward',
+                  self.acts[user_idx]['reward'])
         # Channel observes User
         channel.observe(self.acts[user_idx])
         self.acts[channel_idx] = channel.act()
