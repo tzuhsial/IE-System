@@ -6,7 +6,9 @@ import numpy as np
 from ..core import SystemAct
 from ..util import load_from_json, slots_to_args, build_slot_dict, find_slot_with_key
 
-from .drl import ReplayMemory, QNetwork, tf_utils, LinearScheduler
+from .drl import ReplayMemory, tf_utils
+from .drl import models as modellib
+from .drl.scheduler import builder as schedulerlib
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +301,6 @@ class RulePolicy(BasePolicy):
 
         # Find action index from sys_act
         state_list = state.to_list()
-        #action_idx = self.step(state_list)
-        #sys_act = self.action_mapper(action_idx, state)
 
         self.previous_state = self.state
         self.previous_action = self.action
@@ -358,8 +358,9 @@ class DQNPolicy(BasePolicy):
         source_name = 'qnetwork'
         target_name = 'target_qnetwork'
         qnetwork_config = self.config["qnetwork"]
-        self.qnetwork = QNetwork(qnetwork_config, name=source_name)
-        self.target_qnetwork = QNetwork(qnetwork_config, name=target_name)
+        self.qnetwork = modellib.QNetwork(qnetwork_config, name=source_name)
+        self.target_qnetwork = modellib.QNetwork(
+            qnetwork_config, name=target_name)
         self.copy_op = tf_utils.copy_variable_scope(source_name, target_name)
 
         # Replay Memory
@@ -491,13 +492,16 @@ class A2CPolicy(BasePolicy):
     def __init__(self, policy_config, action_mapper):
         # Setup config
         self.config = policy_config
-        self.action_mapper = action_mapper
-
-        self.config["qnetwork"]["input_size"] = policy_config["state_size"]
-        self.config["qnetwork"]["output_size"] = policy_config["action_size"]
+        self.config["actor"]["input_size"] = policy_config["state_size"]
+        self.config["actor"]["output_size"] = policy_config["action_size"]
+        self.config["critic"]["input_size"] = policy_config["state_size"]
+        self.config["critic"]["output_size"] = 1  # V(S)
 
         # Build with configuration
         self.build_from_config()
+
+        # Setup action mapper
+        self.action_mapper = action_mapper
 
         # Create session and saver
         self.sess = tf_utils.create_session()
@@ -511,21 +515,34 @@ class A2CPolicy(BasePolicy):
         self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
 
     def build_from_config(self):
-        raise NotImplementedError
-        # Directly load config
-        self.batch_size = self.config["batch_size"]
-        self.epsilon = float(self.config["scheduler"]['init_epsilon'])
         self.gamma = float(self.config["gamma"])
 
         # Create Actor and Critic
+        self.actor = modellib.Actor(self.config["actor"], name="actor")
+        self.critic = modellib.Critic(self.config["critic"], name="critic")
 
-        # Replay Memory
-        self.replaymemory = ReplayMemory(**self.config["replaymemory"])
+    def reset(self):
+        self.rewards = []
+        self.states = []
+        self.actions = []
+        self.episode_done = None
 
-        # Scheduler
-        scheduler_name = self.config["scheduler"]["scheduler"]
-        self.scheduler = schedulerlib(scheduler_name)(
-            **self.config["scheduler"])
+    def next_action(self, state):
+        """
+        Args:
+            state (object): state of the system
+        Returns:
+            sys_act (dict): one system_action
+        """
+        # Predict next action index
+        state_list = state.to_list()
+        action_idx = self.step(state_list)
+        sys_act = self.action_mapper(action_idx, state)
+
+        # Store state & action
+        self.states.append(state_list)
+        self.actions.append(action_idx)
+        return sys_act
 
     def step(self, state):
         """
@@ -533,87 +550,78 @@ class A2CPolicy(BasePolicy):
         - state: list
 
         Return: 
-        - action: int
+        - action_idx: int
         """
         if isinstance(state, list):
             assert not any(isinstance(x, list) for x in state)
 
         state = np.expand_dims(state, axis=0)  # Expect only one dimension only
-
-        q_values = self.qnetwork.predict_batch(
-            self.sess, state)  # (batch_size, action_space)
-
-        # Here we decide which epsilon decay policy we should use
-        action = self.epsilon_greedy_policy(q_values)
-
-        return action
+        action_probs = self.actor.predict_batch(self.sess, state)
+        action_idx = np.random.choice(
+            action_probs.size, p=action_probs.squeeze())
+        return action_idx
 
     def record(self, reward, episode_done):
         """
         Sends into replay memory
         """
-        self.reward = reward
+        self.rewards.append(reward)
         self.episode_done = episode_done
-
-        if self.previous_state:  # is not None
-            self.replaymemory.add(self.previous_state, self.previous_action,
-                                  self.reward, self.state, self.episode_done)
 
     ########################
     #  Tensorflow Related  #
     ########################
-    def copy_qnetwork(self):
-        # Copy current Qnetwork to previous qnetwork
-        self.sess.run([self.copy_op])
+    def compute_reward(self, rewards, gamma):
+        Gts = []
+        T = len(rewards)
 
-    def update_epsilon(self, current_timestep=None, test=False):
-        if not test:
-            self.epsilon = self.scheduler.value(current_timestep)
-        else:
-            self.epsilon = self.scheduler.end_value()
-        return self.epsilon
+        # Downscale
+        rewards = [r / 100 for r in rewards]
 
-    def epsilon_greedy_policy(self, qvalues, epsilon=None):
-        """
-        Sample according to probability
-        """
-        action_size = qvalues.size
-
-        max_action_index = np.argmax(qvalues)
-        probs = []
-        for action_index in range(action_size):
-            if action_index == max_action_index:
-                action_prob = 1 - self.epsilon
+        for t in range(T - 1, -1, -1):
+            if t == T - 1:
+                gt = rewards[t]
             else:
-                action_prob = self.epsilon / (action_size - 1)
-            probs.append(action_prob)
+                gt = gamma * Gts[-1] + rewards[t]
+            Gts.append(gt)
 
-        action = np.random.choice(action_size, p=probs)
-        return action
+        Gts = Gts[::-1]
+        return Gts
 
-    def update_network(self):
+    def end_episode(self, train_mode=False):
         """
-        Sample from Replay Memory and update network for one batch
+        Perform a network update
+        Args:
+            train_mode (bool)
+        Returns:
+            actor_batch_loss (float)
+            critic_batch_loss (float)
         """
-        if self.replaymemory.size() < self.batch_size:
-            return 0.0
+        if not train_mode:
+            return 0., 0.
 
-        batch_states, batch_actions, batch_rewards, batch_next_states, batch_done = \
-            self.replaymemory.sample_encode(self.batch_size)
+        Gts = self.compute_reward(self.rewards, self.gamma)
 
-        # Target QNetwork Prediction
-        batch_target_qvalues = self.target_qnetwork.predict_batch(
-            self.sess, batch_next_states)  # (batch_size, action_size)
+        # Preprocess to numpy
+        batch_states = np.array(self.states)
+        batch_state_values = self.critic.predict_batch(self.sess, batch_states)
+        batch_actions = np.array(self.actions)
 
-        batch_max_target_qvalues = np.max(batch_target_qvalues, axis=-1)
+        batch_Gts = np.array(Gts)
+        batch_Gts = np.expand_dims(batch_Gts, axis=1)
 
-        batch_target_qvalues = batch_rewards + \
-            self.gamma * (1 - batch_done) * batch_max_target_qvalues
+        # Advantage function
+        batch_advts = batch_Gts - batch_state_values
 
-        # Pass to QNetwork for update
-        batch_loss = self.qnetwork.train_batch(
-            self.sess, batch_states, batch_actions, batch_target_qvalues)
-        return batch_loss
+        # Update actor
+        actor_batch_loss = self.actor.train_batch(self.sess, batch_states,
+                                                  batch_actions, batch_advts)
+
+        # Update critic
+        critic_batch_loss = self.critic.train_batch(self.sess, batch_states,
+                                                    batch_Gts)
+
+        return actor_batch_loss, critic_batch_loss
 
     def save(self, exp_path, global_step=None):
         """
