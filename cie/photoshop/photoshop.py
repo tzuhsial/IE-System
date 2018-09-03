@@ -44,17 +44,13 @@ class SuperficialPhotoshopAgent(object):
             "undo": []
         }
 
-        # Simulate the history
-        self.num_edits = -1
-        self.ptr = -1
-
     def reset(self):
         self.observation = {}
         self.last_execute_result = False
         self.original_b64_img_str = ""
         # Simulate the history
-        self.num_edits = 0
-        self.ptr = 0
+        self.num_edits = -1
+        self.ptr = -1
 
     def observe(self, observation):
         """
@@ -82,17 +78,28 @@ class SuperficialPhotoshopAgent(object):
 
     def act_inform(self):
         """
-        Creates observation for user & system
+        Creates observation for user & system,
+        User:
+            execute_result
+        System:
+            original_b64_img_str
+            has_previous_history
+            has_next_history
         """
         slots = []
         exec_result_slot = build_slot_dict('execute_result',
                                            self.last_execute_result, 1.0)
         original_b64_img_str = build_slot_dict('original_b64_img_str',
                                                self.original_b64_img_str, 1.0)
+        has_previous_history = build_slot_dict('has_previous_history',
+                                               self.ptr > 0, 1.0)
+        has_next_history = build_slot_dict('has_next_history',
+                                           self.ptr < self.num_edits, 1.0)
 
         slots.append(exec_result_slot)
         slots.append(original_b64_img_str)
-
+        slots.append(has_previous_history)
+        slots.append(has_next_history)
         ps_act = {}
         ps_act['dialogue_act'] = build_slot_dict('dialogue_act', "inform", 1.0)
         ps_act['slots'] = slots
@@ -113,7 +120,7 @@ class SuperficialPhotoshopAgent(object):
             if intent == "adjust" and self.original_b64_img_str is None:
                 execute_result = False
 
-            if intent == "open":
+            if intent == "open" and execute_result:
                 assert slots[0]["slot"] == "image_path"
                 image_path = slots[0]['value']
                 if not os.path.exists(image_path):

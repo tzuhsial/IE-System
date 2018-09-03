@@ -55,7 +55,7 @@
     ],
     "slots": [{
             "name": "intent",
-            "node": "BeliefNode",
+            "node": "IntentBeliefNode",
             "threshold": 0.8,
             "validator": "StringValidator",
             "possible_values": [
@@ -222,6 +222,22 @@
             "name": "gesture_click",
             "node": "PSToolNode",
             "validator": "B64ImgStrValidator",
+            "threshold": 1.0,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "has_previous_history",
+            "node": "PSBinaryInfoNode",
+            "validator": "BooleanValidator",
+            "threshold": 1.0,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "has_next_history",
+            "node": "PSBinaryInfoNode",
+            "validator": "BooleanValidator",
             "threshold": 1.0,
             "possible_values": null,
             "children": []

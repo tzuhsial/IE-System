@@ -87,7 +87,6 @@ def run_agendas(agendas,
             if episode_done:
                 break
 
-        # Freeze interval
         ngoal = user.completed_goals()
 
         returns.append(R)
@@ -111,19 +110,13 @@ def main(argv):
     config = util.load_from_json(config_file)
 
     # Setup world & agents & policy
-    agents_config = config["agents"]
-    user = UserPortal(agents_config["user"])
-    channel = ChannelPortal(agents_config["channel"])
-    system = SystemPortal(agents_config["system"])
-    photoshop = PhotoshopPortal(agents_config["photoshop"])
-
-    agents = [user, channel, system, photoshop]
     world_config = config["world"]
-    world = ImageEditWorld(world_config, agents)
+    agents_config = config["agents"]
+    world = ImageEditWorld(world_config, agents_config)
 
-    policy_config = config["agents"]["system"]["policy"]
+    # Load policy if specified
     policy = world.agents[2].policy
-
+    policy_config = config["agents"]["system"]["policy"]
     if policy_config.get("load") is not None:
         policy.load(policy_config["load"])
 
@@ -153,7 +146,7 @@ def main(argv):
                 test_agendas, world, global_step=global_step)
             scribe.add_summary(epoch, 'test', test_summary)
 
-            print("train")
+            print("test")
             scribe.pprint_summary(test_summary)
     except KeyboardInterrupt:
         print("Killed by hand")
@@ -163,6 +156,7 @@ def main(argv):
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
     history_path = os.path.join(exp_path, 'history.pickle')
+    print("Saving history to {}".format(history_path))
     scribe.save(history_path)
     meta_path = os.path.join(exp_path, 'meta.json')
     util.save_to_json(config, meta_path)

@@ -11,7 +11,6 @@ import numpy as np
 from tqdm import tqdm
 
 from cie import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
-from cie.policy import ActionMapper, DQNPolicy
 from cie.evaluate import EvaluationManager
 from cie import util
 
@@ -24,6 +23,7 @@ def print_mean_std(name, seq):
 
 def run_agendas(agendas, world):
     user = world.agents[0]
+    policy = world.agents[2].policy
     Turns = []
     Returns = []
     Goals = []
@@ -43,6 +43,8 @@ def run_agendas(agendas, world):
             reward = world.reward()  # User reward
             episode_done = world.episode_done()  # User episode_done
 
+            policy.record(reward, episode_done)
+
             # Evaluation Manager
             turn += 1
             R += reward
@@ -50,8 +52,7 @@ def run_agendas(agendas, world):
             # Finally
             if episode_done:
                 break
-        import pdb
-        pdb.set_trace()
+
         ngoals = user.completed_goals()
 
         Turns.append(turn)
@@ -66,30 +67,16 @@ def main(argv):
     config = util.load_from_json(config_file)
 
     # Setup world & agents & policy
-    agents_config = config["agents"]
-    user = UserPortal(agents_config["user"])
-    channel = ChannelPortal(agents_config["channel"])
-    system = SystemPortal(agents_config["system"])
-    photoshop = PhotoshopPortal(agents_config["photoshop"])
-
-    agents = [user, channel, system, photoshop]
     world_config = config["world"]
-    world = ImageEditWorld(world_config, agents)
+    agents_config = config["agents"]
+    world = ImageEditWorld(world_config, agents_config)
 
     # Load agendas
-
     train_agendas = util.load_from_pickle(config["agendas"]["train"])
     test_agendas = util.load_from_pickle(config["agendas"]["test"])
     print("train", len(train_agendas), "test", len(test_agendas))
 
     # Main loop here
-    """
-    turns, returns, goals = run_agendas(train_agendas, world)
-    print("Train")
-    print_mean_std("turn", turns)
-    print_mean_std("return", returns)
-    print_mean_std("goals", goals)
-    """
     turns, returns, goals = run_agendas(test_agendas, world)
     print("Test")
     print_mean_std("turn", turns)

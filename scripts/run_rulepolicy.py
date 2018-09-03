@@ -11,7 +11,6 @@ import numpy as np
 from tqdm import tqdm
 
 from cie import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
-from cie.policy import ActionMapper, DQNPolicy
 from cie.evaluate import EvaluationManager
 from cie import util
 
@@ -55,6 +54,7 @@ def run_agendas(agendas, world):
                 break
 
         ngoals = user.completed_goals()
+
         Turns.append(turn)
         Returns.append(R)
         Goals.append(ngoals)
@@ -67,15 +67,9 @@ def main(argv):
     config = util.load_from_json(config_file)
 
     # Setup world & agents & policy
-    agents_config = config["agents"]
-    user = UserPortal(agents_config["user"])
-    channel = ChannelPortal(agents_config["channel"])
-    system = SystemPortal(agents_config["system"])
-    photoshop = PhotoshopPortal(agents_config["photoshop"])
-
-    agents = [user, channel, system, photoshop]
     world_config = config["world"]
-    world = ImageEditWorld(world_config, agents)
+    agents_config = config["agents"]
+    world = ImageEditWorld(world_config, agents_config)
 
     # Load agendas
     train_agendas = util.load_from_pickle(config["agendas"]["train"])

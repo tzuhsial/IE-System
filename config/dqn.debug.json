@@ -31,17 +31,37 @@
                 "database_path": "./sampled_100/visionengine.annotation.pickle"
             },
             "policy": {
-                "name": "CommandLinePolicy",
+                "name": "DQNPolicy",
                 "action_mapper": {
                     "intents": ["open", "adjust", "close", "undo", "redo"],
                     "slots": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
                     "query": ["object"]
                 },
+                "num_epochs": 40,
+                "batch_size": 32,
+                "freeze_interval": 100,
+                "gamma": 0.99,
+                "load": null,
+                "logdir": "./log/train_dqn_debug",
+                "save": "./exp/train_dqn_debug",
+                "qnetwork": {
+                    "input_size": null,
+                    "hidden_size": 40,
+                    "output_size": null,
+                    "dropout_rate": 0.0,
+                    "optimizer": "AdamOptimizer",
+                    "learning_rate": 1e-3
+                },
                 "replaymemory": {
                     "memory_size": 2000,
-                    "load_path": null
+                    "load_path": "memory/rulepolicy_error0.pickle"
                 },
-                "save_replaymemory"
+                "scheduler": {
+                    "scheduler": "LinearScheduler",
+                    "init_epsilon": 0.5,
+                    "min_epsilon": 0.05,
+                    "schedule_timesteps": 1e5
+                }
             }
         },
         "photoshop": {

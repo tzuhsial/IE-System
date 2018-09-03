@@ -33,16 +33,17 @@
             "policy": {
                 "name": "DQNPolicy",
                 "action_mapper": {
-                    "ignore_intents": ["intent"],
-                    "ignore_slots": ["original_b64_img_str"]
+                    "intents": ["open", "adjust", "close", "undo", "redo"],
+                    "slots": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "query": ["object"]
                 },
-                "num_epochs": 40,
-                "batch_size": 32,
-                "freeze_interval": 100,
+                "num_epochs": 20,
+                "batch_size": 16,
+                "freeze_interval": 1000,
                 "gamma": 0.99,
                 "load": null,
-                "logdir": "./log/train_dqn",
-                "save": "./exp/train_dqn",
+                "logdir": "./log/train_dqn_state_2_error_0",
+                "save": "./exp/train_dqn_state_2_error_0",
                 "qnetwork": {
                     "input_size": null,
                     "hidden_size": 40,
@@ -53,7 +54,7 @@
                 },
                 "replaymemory": {
                     "memory_size": 2000,
-                    "load_path": "memory/rulepolicy.pickle"
+                    "load_path": null
                 },
                 "scheduler": {
                     "scheduler": "LinearScheduler",
@@ -61,14 +62,10 @@
                     "min_epsilon": 0.05,
                     "schedule_timesteps": 1e5
                 }
-            },
-            "actionmapper": {
-                "ignore_intents": ["intent"],
-                "ignore_slots": ["original_b64_img_str"]
             }
         },
         "photoshop": {
-            "photoshop": "SimplePhotoshop",
+            "photoshop": "SuperficialPhotoshop",
             "client": false,
             "uri": "http://localhost:2005",
             "verbose": true

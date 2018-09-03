@@ -60,6 +60,11 @@ class B64ImgStrValidator(BaseValidator):
         return True
 
 
+class BooleanValidator(BaseValidator):
+    def __call__(self, obj):
+        return isinstance(obj, bool)
+
+
 def builder(string):
     # Returns Validator Objects
     try:

@@ -28,7 +28,7 @@ class ActionMapper(object):
     Maps index to user_act with ontology_json
     """
 
-    def __init__(self, ontology_json, ignore_config):
+    def __init__(self, ontology_json, action_config):
         """
         Builds action map here
         """
@@ -36,7 +36,7 @@ class ActionMapper(object):
 
         # Request
         for slot in ontology_json["slots"]:
-            if slot["name"] in ignore_config["ignore_slots"]:
+            if slot["name"] not in action_config["slots"]:
                 continue
             action_info = {
                 'dialogue_act': SystemAct.REQUEST,
@@ -47,7 +47,7 @@ class ActionMapper(object):
 
         # Confirm
         for slot in ontology_json["slots"]:
-            if slot["name"] in ignore_config["ignore_slots"]:
+            if slot["name"] not in action_config["slots"]:
                 continue
             action_info = {
                 'dialogue_act': SystemAct.CONFIRM,
@@ -57,15 +57,20 @@ class ActionMapper(object):
             action_map[action_idx] = action_info
 
         # Query
-        action_idx = len(action_map)
-        action_map[action_idx] = {
-            'dialogue_act': SystemAct.QUERY,
-            'slot': 'object'
-        }
+        for slot in ontology_json["slots"]:
+            if slot["name"] not in action_config["query"]:
+                continue
+
+            action_info = {
+                'dialogue_act': SystemAct.QUERY,
+                'slot': slot["name"]
+            }
+            action_idx = len(action_map)
+            action_map[action_idx] = action_info
 
         # Execute
         for intent in ontology_json["intents"]:
-            if intent["name"] in ignore_config["ignore_intents"]:
+            if intent["name"] not in action_config["intents"]:
                 continue
             action_info = {
                 'dialogue_act': SystemAct.EXECUTE,
@@ -155,7 +160,7 @@ class BasePolicy(object):
         state_size (int):
         action_size (int):
         action_map (dict): map action index to system actions
-        replaymemory (object): a replay memory which maps objects into categories
+        replaymemory (object): records (state, action, reward, next_action, episode_done)
     """
 
     def __init__(self, config, action_mapper):
@@ -515,6 +520,7 @@ class A2CPolicy(BasePolicy):
         self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
 
     def build_from_config(self):
+        # Gamma
         self.gamma = float(self.config["gamma"])
 
         # Create Actor and Critic

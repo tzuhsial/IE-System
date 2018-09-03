@@ -83,7 +83,11 @@ def run_agendas(agendas,
     mode_prefix = "train/" if train_mode else "test/"
     policy.log_scalar(mode_prefix + "return", np.mean(returns), global_step)
     policy.log_scalar(mode_prefix + "turns", np.mean(turns), global_step)
-    policy.log_scalar(mode_prefix + "losses", np.mean(losses), global_step)
+    actor_losses, critic_losses = zip(*losses)
+    policy.log_scalar(mode_prefix + "actor_losses", np.mean(actor_losses),
+                      global_step)
+    policy.log_scalar(mode_prefix + "critic_losses", np.mean(critic_losses),
+                      global_step)
     policy.log_scalar(mode_prefix + "goals", np.mean(goals), global_step)
     return summary
 

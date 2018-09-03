@@ -8,6 +8,7 @@ def print_mean_std(name, seq):
     seq_std = np.std(seq)
     print(name, "{}(+/-{})".format(seq_mean, seq_std))
 
+
 class EvaluationManager(object):
     """
     An evaluation manager
@@ -21,7 +22,7 @@ class EvaluationManager(object):
     def add_summary(self, epoch, name, summary):
         if epoch not in self.history:
             self.history[epoch] = {}
-        
+
         self.history[epoch][name] = summary
 
     def pprint_summary(self, summary):

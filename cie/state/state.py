@@ -2,88 +2,38 @@ import copy
 import logging
 
 from ..core import UserAct, SysIntent
-from ..ontology import OntologyPortal
+from .executionhistory import ExecutionHistory
+from .ontology import OntologyEngine
+from .node import builder as nodelib
 from ..util import slot_to_observation
 
 logger = logging.getLogger(__name__)
 
 
-def StatePortal(global_config):
-    """
-    Constructs state with global_config
-    """
-    ontology = OntologyPortal(global_config)
-    state = State(ontology)
-    return state
-
-
-class ExecutionHistory(object):
-    """
-    A C++ like stack to store current intent slots
-    Also provides search functions like visionengine
-    """
-
-    def __init__(self):
-        self._stack = list()
-
-    def top(self):
-        if len(self._stack):
-            return self._stack[0]
-        return None
-
-    def push(self, intent_tree):
-        self._stack.insert(0, intent_tree)
-
-    def pop(self):
-        self._stack.pop(0)
-
-    def size(self):
-        return len(self._stack)
-
-    def empty(self):
-        return self.size() == 0
-
-    def clear(self):
-        return self._stack.clear()
-
-    def select_object(self, object, **kwargs):
-        """
-        Args
-            object (str): name of object
-        Returns:
-            mask_strs (list): list of mask strings
-        """
-        if object == "image":
-            return []
-
-        mask_strs = []
-        for intent_tree in self._stack:
-            node_dict = intent_tree.node_dict
-            if object == node_dict['object'].get_max_value():
-                object_mask_str = node_dict['object_mask_str'].get_max_value()
-                mask_strs.append(object_mask_str)
-
-        # Remove duplicates
-        mask_strs = list(set(mask_strs))
-        return mask_strs
-
-
 class State(object):
     """
     Dialogue State
-    Manages intent pulling and frame stacking
 
     Attributes:
         ontology (object): object that creates intent trees
-        framestack (list): frame stack that records previous intent
+        executionhistory (object): frame stack that records previous intent
+        sysintent (object): convient wrapper class
     """
 
-    def __init__(self, ontology):
-
-        self.ontology = ontology
+    def __init__(self, ontology_json):
+        self.ontology = OntologyEngine(ontology_json)
         self.executionhistory = ExecutionHistory()
 
         self.sysintent = SysIntent()
+
+        self.turn_id = 0
+
+    def reset(self):
+        self.ontology.clear()
+        self.executionhistory.clear()
+        self.sysintent.clear()
+        # Record turn_id in state
+        self.turn_id = 0
 
     def update(self, dialogue_act, intent, slots, turn_id):
         """
@@ -105,25 +55,34 @@ class State(object):
         Args: 
             dialogue act: slot dict
         """
-        if dialogue_act is None or len(dialogue_act) == 0:
+        if dialogue_act is None or\
+          len(dialogue_act) == 0 or \
+          dialogue_act['conf'] < 0.5:
             return
 
         if dialogue_act['value'] in UserAct.confirm_acts():
-            value = dialogue_act['value']
-            if value == UserAct.AFFIRM:
-                conf = dialogue_act['conf']
-            elif value == UserAct.NEGATE:
-                conf = 1 - dialogue_act['conf']
-
             # Get previous confirmed slot
             prev_confirm_slot = self.sysintent.confirm_slots[0]
-
             slot_name = prev_confirm_slot['slot']
+            slot_node = self.ontology.get_slot(slot_name)
 
-            obsrv = slot_to_observation(prev_confirm_slot, turn_id)
-            obsrv["conf"] = conf
+            value = dialogue_act['value']
 
-            self.ontology.get_slot(slot_name).add_observation(**obsrv)
+            if issubclass(slot_node.__class__, nodelib('PSToolNode')):
+                if value == UserAct.AFFIRM:
+                    pass  # Don't have to do anything to the PSToolNode
+                else:
+                    slot_node.clear()
+            else:
+                if value == UserAct.AFFIRM:
+                    conf = dialogue_act['conf']
+                elif value == UserAct.NEGATE:
+                    conf = 1 - dialogue_act['conf']
+
+                obsrv = slot_to_observation(prev_confirm_slot, turn_id)
+                obsrv["conf"] = conf
+
+                slot_node.add_observation(**obsrv)
 
     def update_intent(self, intent_slot, turn_id):
         """
@@ -180,6 +139,9 @@ class State(object):
         copied_tree = copy.deepcopy(intent_tree)  # Copy the intent tree
         self.executionhistory.push(copied_tree)
 
+    #########################
+    #      Get & Clear      #
+    #########################
     def get_slot(self, slot_name):
         return self.ontology.get_slot(slot_name)
 
@@ -198,10 +160,6 @@ class State(object):
     def clear_history(self):
         self.executionhistory.clear()
 
-    def clear(self):
-        self.ontology.clear()
-        self.executionhistory.clear()
-
     def to_json(self):
         """
         Format to json to save as history
@@ -210,15 +168,41 @@ class State(object):
 
     def to_list(self):
         """
-        State as list for RL agent observation space
-        """
-        # Slots
-        names = []
-        l = []
-        c = []
-        for node in self.ontology.slots.values():
-            names.append(node.name)
-            l += node.to_list()
-            c += [node.get_max_conf()]
+        State Feature Definition here
 
-        return c + l
+        """
+        feature = []
+        ####################
+        #       Slots      #
+        ####################
+
+        # Top Ks
+        topks = []
+        for node in self.ontology.slots.values():
+            topks += node.to_list()
+        feature += topks
+
+        #######################
+        #   History features  #
+        #######################
+        # num_executions
+        num_executions = self.executionhistory.size()
+
+        h = []
+        buckets = [0, 1, 2, 3, 5]
+
+        h = [0.] * len(buckets)
+        for idx, bucket_size in enumerate(buckets):
+            if num_executions >= bucket_size:
+                h[idx] = 1.0
+                break
+        feature += h
+
+        # turn_id
+        turn_id = self.turn_id
+        turn_id_max = 30  # Should set to same as user patience
+        t = [0.] * turn_id_max
+        t[turn_id] = 1.0
+        feature += t
+
+        return feature

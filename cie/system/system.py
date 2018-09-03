@@ -1,9 +1,8 @@
 import logging
 
 from ..core import SystemAct
-from ..ontology import OntologyEngine
+from ..state import State
 from ..policy import builder as policylib, ActionMapper
-from .state import State
 from ..visionengine import VisionEnginePortal
 from ..util import find_slot_with_key, build_slot_dict, slots_to_args, load_from_json
 
@@ -12,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 def SystemPortal(system_config):
     ontology_json = load_from_json(system_config['ontology'])
-
-    ontology = OntologyEngine(ontology_json)
-    state = State(ontology)
+    state = State(ontology_json)
     visionengine = VisionEnginePortal(system_config['visionengine'])
 
     # Setup Policy here
@@ -30,7 +27,7 @@ def SystemPortal(system_config):
     policy_name = policy_config["name"]
     policy = policylib(policy_name)(policy_config, action_mapper)
 
-    system = System(state, visionengine, policy)
+    system = System(state, policy, visionengine)
     return system
 
 
@@ -46,15 +43,12 @@ class System(object):
         action_map (dict)
     """
 
-    def __init__(self, state, visionengine, policy=None):
+    def __init__(self, state, policy, visionengine):
         # Components
 
         self.state = state
-        self.visionengine = visionengine
         self.policy = policy
-
-        if self.policy is None:
-            logger.warning("policy not loaded in system constructor!")
+        self.visionengine = visionengine
 
     def load_policy(self, policy):
         self.policy = policy
@@ -64,7 +58,7 @@ class System(object):
         Resets for a new dialogue session
         """
         self.observation = {}
-        self.state.clear()
+        self.state.reset()
         self.policy.reset()
         self.turn_id = 0
 
@@ -80,7 +74,7 @@ class System(object):
         """
         Update dialogue state with user_acts
         """
-        # Update actions from user
+        # Get acts from photoshop & user
         photoshop_acts = self.observation.get('photoshop_acts', list())
         user_acts = self.observation.get('user_acts', list())
         observed_acts = photoshop_acts + user_acts
@@ -113,7 +107,7 @@ class System(object):
         system_acts = [sys_act]
 
         ######################
-        #   Perform action   #
+        #     Post Policy    #
         ######################
         sys_dialogue_act = sys_act['dialogue_act']['value']
         if sys_dialogue_act == SystemAct.CONFIRM:
@@ -127,11 +121,12 @@ class System(object):
         elif sys_dialogue_act == SystemAct.EXECUTE:
             # Stack the intent to history and clear slots
             intent = sys_act['intent']['value']
-            self.state.stack_intent(intent)
-            #self.state.clear_ontology()
+            if intent not in ["undo", "redo"]:
+                self.state.stack_intent(intent)
 
         # Update turn_id
         self.turn_id += 1
+        self.state.turn_id += 1
 
         # Build Return object
         system_act = {}

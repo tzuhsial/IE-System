@@ -27,6 +27,7 @@ class BeliefNode(object):
     """
 
     LAMBDA = 1.0
+    K = 5
 
     def __init__(self,
                  name,
@@ -136,17 +137,20 @@ class BeliefNode(object):
     def to_list(self):
         """
         Convert the status of the slot node to list
+        Returns top k sorted values
         If has possible values, return list of conf corresponding to each value => imitates prediction
         Else: return the number of entries in the map & maximum confidence score
         """
         l = []
-        if self.name not in ["object"] and len(self.possible_values) > 0:
+        if len(self.possible_values) > 0:
             # has possible values
             l = []
-            for value in self.possible_values:
-                value_conf = self.value_conf_map.get(value, 0.0)
-                l.append(value_conf)
+            sorted_conf = sorted(
+                self.value_conf_map.values(), reverse=True)  # Values
+            sorted_topk_conf = sorted_conf[:self.K]
+            l = sorted_topk_conf
         else:
+            # In this case, it is usually PSToolNode
             # Return number of values in map & max confidence score
             max_conf = self.get_max_conf()
             l = [max_conf]
@@ -227,14 +231,37 @@ class BeliefNode(object):
             if child.last_update_turn_id >= self.last_update_turn_id:
                 child_intent = child.pull()
                 optional = self.optional[child_name]
-                if optional:
-                    child_intent.request_slots = [
-                    ]  # Optional child node's request slots is empty!
+                if optional:  # Do not request optional children
+                    child_intent.request_slots = []
                 children_intent += child_intent
 
             update_turn_id = max(child.last_update_turn_id, update_turn_id)
 
         return children_intent, update_turn_id
+
+
+class IntentBeliefNode(BeliefNode):
+    """
+    While most belief nodes need only top-k sorted values,
+    we cannot sort intent, since it will decide what actions to execute
+    """
+
+    def to_list(self):
+        """
+        """
+        l = []
+        if len(self.possible_values) > 0:
+            # Return confidence in sorted order
+            l = []
+            for value in self.possible_values:
+                conf = self.value_conf_map.get(value, 0.0)
+                l.append(conf)
+        else:
+            # In this case, it is usually PSToolNode
+            # Return number of values in map & max confidence score
+            max_conf = self.get_max_conf()
+            l = [max_conf]
+        return l
 
 
 class IntentNode(BeliefNode):
@@ -363,13 +390,15 @@ class PSToolNode(BeliefNode):
         """
         Only one value can be present at the time
         """
+        class_name = self.__class__.__name__
+
         if conf < 1.0:
-            logger.error(
-                "PSToolNode {} observed confidence less than 1.0!".format(
-                    self.name))
+            logger.error("{} {} observed confidence less than 1.0!"\
+                .format(class_name, self.name))
             return False
         if value == "":
-            logger.info("PSToolNode observed value empty")
+            logger.info("{} {} observed value empty".format(
+                class_name, self.name))
             return False
         prev_value_conf_map = copy.deepcopy(self.value_conf_map)
         self.value_conf_map = {}
@@ -377,6 +406,37 @@ class PSToolNode(BeliefNode):
         if not result:
             self.value_conf_map = prev_value_conf_map
         return result
+
+
+class PSInfoNode(PSToolNode):
+    """
+    Stores information of Photoshop, has same behavior as PSToolNode, 
+    but we need to differentiate for state feature representation construction
+    """
+    pass
+
+
+class PSBinaryInfoNode(PSToolNode):
+    """
+    While the confidence is always 1.0, 
+    Stores True/False
+    Examples:
+        has_next_history
+        has_previous_history
+    """
+
+    def to_list(self):
+        """
+        Return 1.0 for true and 0.0 for false
+        """
+        if len(self.value_conf_map) == 0:
+            return [0.0]
+
+        assert len(self.value_conf_map) == 1
+        value = list(self.value_conf_map.keys())[0]
+        assert value is True or value is False
+        l = [1.0] if value else [0.0]
+        return l
 
 
 class ObjectMaskStrNode(BeliefNode):
@@ -388,7 +448,7 @@ class ObjectMaskStrNode(BeliefNode):
     There are 3 child nodes
     1. b64_img_str
     2. object
-    3. object_mask_id
+    3. gesture_click
 
     Attrbutes:
         name (str): name of the slot

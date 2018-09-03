@@ -38,9 +38,11 @@
                 },
                 "action_mapper": {
                     "ignore_intents": ["intent"],
-                    "ignore_slots": ["original_b64_img_str"]
+                    "ignore_slots": ["original_b64_img_str"
+                        s
+                    ]
                 },
-                "save_replaymemory": "memory/rulepolicy.pickle"
+                "save_replaymemory": "memory/rulepolicy_error0.pickle"
             }
         },
         "photoshop": {
