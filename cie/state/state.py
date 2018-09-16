@@ -199,7 +199,7 @@ class State(object):
         feature += h
 
         # turn_id
-        turn_id = self.turn_id
+        turn_id = self.turn_id - 1
         turn_id_max = 30  # Should set to same as user patience
         t = [0.] * turn_id_max
         t[turn_id] = 1.0

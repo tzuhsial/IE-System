@@ -25,7 +25,8 @@ def SystemPortal(system_config):
     print("state_size", policy_config["state_size"])
     print("action_size", policy_config["action_size"])
     policy_name = policy_config["name"]
-    policy = policylib(policy_name)(policy_config, action_mapper)
+    policy = policylib(policy_name)(
+        policy_config, action_mapper, ontology_json=ontology_json)
 
     system = System(state, policy, visionengine)
     return system
@@ -38,9 +39,8 @@ class System(object):
 
     Attributes:
         state (object)
-        visionengine (object)
         policy (object)
-        action_map (dict)
+        visionengine (object)
     """
 
     def __init__(self, state, policy, visionengine):
@@ -89,6 +89,43 @@ class System(object):
             }
             self.state.update(**args)
 
+        # Update turn_id
+        self.turn_id += 1
+        self.state.turn_id += 1
+
+    def post_policy(self, system_acts):
+        """
+        Preprocess system_acts into 
+        Args:
+            system_acts (list): list of system acts
+        Returns:
+            system_act 
+        """
+        sys_act = system_acts[0]
+
+        sys_dialogue_act = sys_act['dialogue_act']['value']
+        if sys_dialogue_act == SystemAct.CONFIRM:
+            confirm_slots = sys_act["slots"]
+            self.state.sysintent.confirm_slots = confirm_slots
+
+        elif sys_dialogue_act == SystemAct.QUERY:
+            query_slots = sys_act['slots']
+            self.query_visionengine(query_slots)
+
+        elif sys_dialogue_act == SystemAct.EXECUTE:
+            # Stack the intent to history and clear slots
+            intent = sys_act['intent']['value']
+            if intent not in ["undo", "redo"]:
+                self.state.stack_intent(intent)
+
+        # Build Return object
+        system_act = {}
+        system_act['system_acts'] = system_acts
+        system_act['system_utterance'] = self.template_nlg(system_acts)
+        system_act['episode_done'] = self.observation.get(
+            'episode_done', False)
+        return system_act
+
     def act(self):
         """ 
         Perform action according to observation
@@ -109,31 +146,7 @@ class System(object):
         ######################
         #     Post Policy    #
         ######################
-        sys_dialogue_act = sys_act['dialogue_act']['value']
-        if sys_dialogue_act == SystemAct.CONFIRM:
-            confirm_slots = sys_act["slots"]
-            self.state.sysintent.confirm_slots = confirm_slots
-
-        elif sys_dialogue_act == SystemAct.QUERY:
-            query_slots = sys_act['slots']
-            self.query_visionengine(query_slots)
-
-        elif sys_dialogue_act == SystemAct.EXECUTE:
-            # Stack the intent to history and clear slots
-            intent = sys_act['intent']['value']
-            if intent not in ["undo", "redo"]:
-                self.state.stack_intent(intent)
-
-        # Update turn_id
-        self.turn_id += 1
-        self.state.turn_id += 1
-
-        # Build Return object
-        system_act = {}
-        system_act['system_acts'] = system_acts
-        system_act['system_utterance'] = self.template_nlg(system_acts)
-        system_act['episode_done'] = self.observation.get(
-            'episode_done', False)
+        system_act = self.post_policy(system_acts)
 
         return system_act
 
@@ -158,7 +171,7 @@ class System(object):
                 {mask_str: 0.5 for mask_str in mask_strs}
         object_mask_str_node.last_update_turn_id += 1
 
-        # Use gesture
+        # Filter candidates with gesture_click
         gesture_click = self.state.get_slot('gesture_click').get_max_value()
         if gesture_click is not None:
             object_mask_str_node.filter_candidates(gesture_click)
@@ -167,7 +180,7 @@ class System(object):
         """
         Queries execution history with execution slots
         """
-        pass
+        raise NotImplementedError
 
     def get_reward(self):
         rewards = self.policy.rewards

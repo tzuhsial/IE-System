@@ -59,7 +59,6 @@ class AgendaBasedUserSimulator(object):
         """
         Returns number of completed goals, excluding "undo, redo"
         """
-
         remaining_goals = 0
         for g in self.agenda:
             if g['intent']['value'] not in ["undo", "redo"]:

@@ -28,6 +28,9 @@ class EvaluationManager(object):
     def pprint_summary(self, summary):
         for name, seq in summary.items():
             print_mean_std(name, seq)
+            if name == "goal":
+                success_rate = (np.array(seq) == 3).mean()
+                print('success', success_rate)
 
     def save(self, path):
         util.save_to_pickle(self.history, path)

@@ -210,7 +210,7 @@ class BeliefNode(object):
         max_conf = slot.get('conf', 0.0)
         if max_conf < 0.5:
             intent.request_slots.append(slot)
-        elif max_conf < self.threshold:
+        elif max_conf < self.threshold:  # 0.8
             intent.confirm_slots.append(slot)
         else:
             intent.execute_slots.append(slot)
@@ -242,8 +242,9 @@ class BeliefNode(object):
 
 class IntentBeliefNode(BeliefNode):
     """
-    While most belief nodes need only top-k sorted values,
-    we cannot sort intent, since it will decide what actions to execute
+    Most belief nodes need only top-k sorted values
+    However, intent cannot be sorted, else we will not know 
+    which action to execute
     """
 
     def to_list(self):
@@ -299,7 +300,8 @@ class IntentNode(BeliefNode):
         return sysintent
 
     def add_observation(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Intent node should never receive observations!")
 
     def build_node_dict(self):
         """
@@ -430,6 +432,7 @@ class PSBinaryInfoNode(PSToolNode):
         Return 1.0 for true and 0.0 for false
         """
         if len(self.value_conf_map) == 0:
+            logger.info("This should not happen, though")
             return [0.0]
 
         assert len(self.value_conf_map) == 1

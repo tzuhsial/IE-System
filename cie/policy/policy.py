@@ -163,12 +163,13 @@ class BasePolicy(object):
         replaymemory (object): records (state, action, reward, next_action, episode_done)
     """
 
-    def __init__(self, config, action_mapper):
-        self.state_size = config["state_size"]
-        self.action_size = config["action_size"]
+    def __init__(self, policy_config, action_mapper, **kwargs):
+        self.config = policy_config
+        self.state_size = policy_config["state_size"]
+        self.action_size = policy_config["action_size"]
         self.action_mapper = action_mapper
 
-        self.replaymemory = ReplayMemory(**config["replaymemory"])
+        self.replaymemory = ReplayMemory(**policy_config["replaymemory"])
 
     def reset(self):
         self.rewards = []
@@ -191,6 +192,7 @@ class BasePolicy(object):
         action_idx = self.step(state_list)
         sys_act = self.action_mapper(action_idx, state)
 
+        # Feature size
         self.previous_state = self.state
         self.previous_action = self.action
         self.state = state_list
@@ -330,7 +332,7 @@ class DQNPolicy(BasePolicy):
         action_mapper:
     """
 
-    def __init__(self, policy_config, action_mapper):
+    def __init__(self, policy_config, action_mapper, **kwargs):
         # Setup config
         self.config = policy_config
         self.action_mapper = action_mapper
@@ -422,7 +424,7 @@ class DQNPolicy(BasePolicy):
             self.epsilon = self.scheduler.end_value()
         return self.epsilon
 
-    def epsilon_greedy_policy(self, qvalues, epsilon=None):
+    def epsilon_greedy_policy(self, qvalues):
         """
         Sample according to probability
         """
@@ -494,7 +496,7 @@ class A2CPolicy(BasePolicy):
     Implementation of an actor-critic policy
     """
 
-    def __init__(self, policy_config, action_mapper):
+    def __init__(self, policy_config, action_mapper, **kwargs):
         # Setup config
         self.config = policy_config
         self.config["actor"]["input_size"] = policy_config["state_size"]
@@ -553,10 +555,10 @@ class A2CPolicy(BasePolicy):
     def step(self, state):
         """
         Args:
-        - state: list
+            state: list
 
         Return: 
-        - action_idx: int
+            action_idx: int
         """
         if isinstance(state, list):
             assert not any(isinstance(x, list) for x in state)
@@ -574,9 +576,9 @@ class A2CPolicy(BasePolicy):
         self.rewards.append(reward)
         self.episode_done = episode_done
 
-    ########################
-    #  Tensorflow Related  #
-    ########################
+    ##########################
+    #   Tensorflow Related   #
+    ##########################
     def compute_reward(self, rewards, gamma):
         Gts = []
         T = len(rewards)
@@ -640,6 +642,216 @@ class A2CPolicy(BasePolicy):
         Load existing session
         """
         print("[A2CPolicy] Restoring from {}".format(load_path))
+        self.saver.restore(self.sess, load_path)
+
+    def log_scalar(self, tag, value, step):
+        """
+        Log scalar to tensorboard
+        Args:
+            tag (str): name of scalar
+            value (float): value
+            step (int): number of step
+        """
+        summary = tf_utils.create_summary_value(tag, value)
+        self.writer.add_summary(summary, step)
+
+
+class HierarchicalPolicy(BasePolicy):
+    """
+    TODO: implement Hierarchical policy
+    with meta controller and shared subpolicies
+    
+    """
+
+    def __init__(self, policy_config, action_mapper, **kwargs):
+        # Setup config
+        self.config = policy_config
+        self.action_mapper = action_mapper
+        self.ontology_json = kwargs['ontology_json']
+
+        # Controller output size equals to the number of subpolices
+        num_controllers = len(self.ontology_json["intents"])
+
+        self.config["meta_controller"]["input_size"] = policy_config[
+            "state_size"]
+        self.config["meta_controller"]["output_size"] = num_controllers
+
+        # Controller input size
+        # Shared controllers for all intents
+        self.config["controller"][
+            "input_size"] = policy_config["state_size"] + num_controllers
+        self.config["controller"]["output_size"] = policy_config["action_size"]
+
+        # Build with configuration
+        self.build_from_config()
+
+        # Create session and saver
+        self.sess = tf_utils.create_session()
+        self.saver = tf_utils.create_saver()
+
+        # Initialize all variables
+        tf_utils.initialize_all_variables(self.sess)
+
+        # Log to tensorboard
+        logdir = self.config["logdir"]
+        self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
+
+    def build_from_config(self):
+
+        # Directly load config
+        self.batch_size = self.config["batch_size"]
+        self.epsilon = float(self.config["scheduler"]['init_epsilon'])
+        self.gamma = float(self.config["gamma"])
+
+        # Create Meta controller and controller
+        # Meta controller
+        source_name = 'meta_controller'
+        target_name = 'target_meta_controller'
+        meta_controller_config = self.config["meta_controller"]
+        self.meta_controller = modellib.QNetwork(
+            meta_controller_config, name=source_name)
+        self.target_meta_controller = modellib.QNetwork(
+            meta_controller_config, name=target_name)
+        self.copy_meta_controller_op = tf_utils.copy_variable_scope(
+            source_name, target_name)
+
+        self.meta_controller_replaymemory = ReplayMemory(
+            **self.config["replaymemory"])
+
+        # Controller
+        source_name = 'controller'
+        target_name = 'target_controller'
+        controller_config = self.config["controller"]
+        self.controller = modellib.QNetwork(
+            controller_config, name=source_name)
+        self.target_controller = modellib.QNetwork(
+            controller_config, name=target_name)
+        self.copy_controller_op = tf_utils.copy_variable_scope(
+            source_name, target_name)
+
+        # Replay Memory
+        self.controller_replaymemory = ReplayMemory(
+            **self.config["replaymemory"])
+
+        # Scheduler
+        scheduler_name = self.config["scheduler"]["scheduler"]
+        self.scheduler = schedulerlib(scheduler_name)(
+            **self.config["scheduler"])
+
+    def reset(self):
+        super(HierarchicalPolicy, self).reset()
+        self.meta_action = None
+
+    def step(self, state):
+        """
+        Args:
+        - state: list
+
+        Return: 
+        - action: int
+        """
+        if isinstance(state, list):
+            assert not any(isinstance(x, list) for x in state)
+
+        # Expect one dim only
+
+        # Meta state
+        meta_state = np.expand_dims(state, axis=0)
+
+        meta_q_values = self.meta_controller.predict_batch(
+            self.sess, meta_state)  # (batch_size, action_space)
+        meta_action = self.epsilon_greedy_policy(meta_q_values)
+
+        meta = [0.] * int(meta_q_values.size)
+        meta[meta_action] = 1.
+
+        # Controller action
+        controller_state = state + meta
+        controller_state = np.expand_dims(controller_state, axis=0)
+
+        q_values = self.controller.predict_batch(self.sess, controller_state)
+        action = self.epsilon_greedy_policy(q_values)
+
+        return action
+
+    def record(self, reward, episode_done):
+        """
+        Sends into replay memory
+        """
+        self.reward = reward
+        self.episode_done = episode_done
+
+        if self.previous_state:  # is not None
+            self.replaymemory.add(self.previous_state, self.previous_action,
+                                  self.reward, self.state, self.episode_done)
+
+    ##########################
+    #   Tensorflow Related   #
+    ##########################
+    def copy_qnetwork(self):
+        # Copy current Qnetwork to previous qnetwork
+        self.sess.run([self.copy_op])
+
+    def update_epsilon(self, current_timestep=None, test=False):
+        if not test:
+            self.epsilon = self.scheduler.value(current_timestep)
+        else:
+            self.epsilon = self.scheduler.end_value()
+        return self.epsilon
+
+    def epsilon_greedy_policy(self, qvalues, epsilon=None):
+        """
+        Sample according to probability
+        """
+        action_size = qvalues.size
+
+        max_action_index = np.argmax(qvalues)
+        probs = []
+        for action_index in range(action_size):
+            if action_index == max_action_index:
+                action_prob = 1 - self.epsilon
+            else:
+                action_prob = self.epsilon / (action_size - 1)
+            probs.append(action_prob)
+
+        action = np.random.choice(action_size, p=probs)
+        return action
+
+    def update_network(self):
+        """
+        Sample from Replay Memory and update network for one batch
+        """
+        if self.replaymemory.size() < self.batch_size:
+            return 0.0
+
+        batch_states, batch_actions, batch_rewards, batch_next_states, batch_done = \
+            self.replaymemory.sample_encode(self.batch_size)
+
+        # Target QNetwork Prediction
+        batch_target_qvalues = self.target_qnetwork.predict_batch(
+            self.sess, batch_next_states)  # (batch_size, action_size)
+
+        batch_max_target_qvalues = np.max(batch_target_qvalues, axis=-1)
+
+        batch_target_qvalues = batch_rewards + \
+            self.gamma * (1 - batch_done) * batch_max_target_qvalues
+
+        # Pass to QNetwork for update
+        batch_loss = self.qnetwork.train_batch(
+            self.sess, batch_states, batch_actions, batch_target_qvalues)
+        return batch_loss
+
+    def save(self, exp_path, global_step=None):
+        """
+        Save 
+        """
+        self.saver.save(self.sess, exp_path, global_step)
+
+    def load(self, load_path):
+        """
+        Load existing session
+        """
+        print("[DQNPolicy] Restoring from {}".format(load_path))
         self.saver.restore(self.sess, load_path)
 
     def log_scalar(self, tag, value, step):
