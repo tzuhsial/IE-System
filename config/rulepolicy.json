@@ -21,7 +21,7 @@
         "channel": {
             "ontology": "./config/imageedit.ontology.json",
             "channel": "MultimodalChannel",
-            "speech_conf_mean": 1.0,
+            "speech_conf_mean": 0.75,
             "speech_conf_std": 0.0
         },
         "system": {
@@ -32,23 +32,23 @@
             },
             "policy": {
                 "name": "RulePolicy",
+                "action_mapper": {
+                    "intents": ["open", "adjust", "close", "undo", "redo"],
+                    "slots": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "query": ["object"]
+                },
                 "replaymemory": {
-                    "memory_size": 1000,
+                    "memory_size": 2000,
                     "load_path": null
                 },
-                "action_mapper": {
-                    "ignore_intents": ["intent"],
-                    "ignore_slots": ["original_b64_img_str"
-                        s
-                    ]
-                },
-                "save_replaymemory": "memory/rulepolicy_error0.pickle"
+                "save_replaymemory": "memory/rulepolicy_error0.25.pickle"
             }
         },
         "photoshop": {
             "photoshop": "SuperficialPhotoshop",
             "client": false,
-            "uri": "http://localhost:2005"
+            "uri": "http://localhost:2005",
+            "verbose": true
         }
     }
 }

@@ -1,5 +1,4 @@
 from configparser import ConfigParser
-import logging
 import json
 import os
 import random
@@ -10,16 +9,7 @@ sys.path.insert(0, root_dir)
 import numpy as np
 from tqdm import tqdm
 
-from cie import ChannelPortal, UserPortal, SystemPortal, PhotoshopPortal, ImageEditWorld
-from cie.policy import ActionMapper, DQNPolicy
-from cie.evaluate import EvaluationManager
-from cie import util
-
-
-def print_mean_std(name, seq):
-    seq_mean = np.mean(seq)
-    seq_std = np.std(seq)
-    print(name, "{}(+/-{})".format(seq_mean, seq_std))
+from cie import ImageEditWorld, EvaluationManager, util
 
 
 def run_agendas(agendas,
@@ -83,10 +73,6 @@ def run_agendas(agendas,
             reward_list.append(reward)
             loss += batch_loss
 
-            # Finally
-            if episode_done:
-                break
-
         ngoal = user.completed_goals()
 
         returns.append(R)
@@ -148,6 +134,7 @@ def main(argv):
 
             print("test")
             scribe.pprint_summary(test_summary)
+
     except KeyboardInterrupt:
         print("Killed by hand")
 

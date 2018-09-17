@@ -241,6 +241,14 @@
             "threshold": 1.0,
             "possible_values": null,
             "children": []
+        },
+        {
+            "name": "execute_result",
+            "node": "PSBinaryInfoNode",
+            "validator": "BooleanValidator",
+            "threshold": 1.0,
+            "possible_values": null,
+            "children": []
         }
     ]
 }

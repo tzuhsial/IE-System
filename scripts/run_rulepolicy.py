@@ -84,6 +84,7 @@ def main(argv):
         print_mean_std("turn", turns)
         print_mean_std("return", returns)
         print_mean_std("goals", goals)
+        print("success rate", (np.array(goals) == 3).mean())
 
         experience = world.agents[2].policy.replaymemory.storage
         util.save_to_pickle(experience, policy_config['save_replaymemory'])
@@ -93,6 +94,8 @@ def main(argv):
     print_mean_std("turn", turns)
     print_mean_std("return", returns)
     print_mean_std("goals", goals)
+
+    print("success rate", (np.array(goals) == 3).mean())
 
 
 if __name__ == "__main__":
