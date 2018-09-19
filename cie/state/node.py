@@ -367,6 +367,21 @@ class IntentNode(BeliefNode):
 
         return children_intent, update_turn_id
 
+    def to_list(self):
+        """
+        Flatten all slot nodes into a feature representation
+        Excluding self, since self does not carry any information
+        """
+        if len(self.node_dict) == 0:
+            logger.warning(
+                "IntentNode: {} has not called built_node_dict()".format(
+                    self.name))
+        feature = []
+        for slot_node in self.node_dict.values():
+            if slot_node != self:
+                feature += slot_node.to_list()
+        return feature
+
 
 class PSToolNode(BeliefNode):
     """

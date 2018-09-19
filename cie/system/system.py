@@ -16,8 +16,9 @@ def SystemPortal(system_config):
 
     # Setup Policy here
     policy_config = system_config["policy"]
-    ignore_config = policy_config["action_mapper"]
-    action_mapper = ActionMapper(ontology_json, ignore_config)
+    # Build action mapper
+    action_config = policy_config["action"]
+    action_mapper = ActionMapper(action_config)
 
     policy_config["state_size"] = len(state.to_list())
     policy_config["action_size"] = action_mapper.size()
@@ -26,7 +27,10 @@ def SystemPortal(system_config):
     print("action_size", policy_config["action_size"])
     policy_name = policy_config["name"]
     policy = policylib(policy_name)(
-        policy_config, action_mapper, ontology_json=ontology_json)
+        policy_config,
+        action_mapper,
+        ontology_json=ontology_json,
+        dialogue_state=state)
 
     system = System(state, policy, visionengine)
     return system

@@ -166,10 +166,22 @@ class State(object):
         """
         raise NotImplementedError
 
+    def intent_to_list(self, intent_name):
+        """
+        Get intent slot features
+        """
+        intent_slot = self.get_slot('intent')
+        intent_node = self.get_intent(intent_name)
+        intent_conf = intent_slot.value_conf_map.get(intent_name, 0.0)
+
+        feat = []
+        feat += [intent_conf]
+        feat += intent_node.to_list()
+        return feat
+
     def to_list(self):
         """
-        State Feature Definition here
-
+        State Feature 
         """
         feature = []
         ####################
@@ -182,9 +194,9 @@ class State(object):
             topks += node.to_list()
         feature += topks
 
-        #######################
-        #   History features  #
-        #######################
+        ######################
+        #   Global features  #
+        ######################
         # num_executions
         num_executions = self.executionhistory.size()
 
