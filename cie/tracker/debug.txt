@@ -1,0 +1,9 @@
+tags|intent
+brighten###B-attribute up###B-value the###I-intent building###I-mask so###B-intent that###I-intent it###I-intent does###I-intent nt###I-intent show###I-intent the###I-intent black###I-intent areas###I-intent as###I-intent much###I-intent|adjust
+you###O could###O make###B-action the###B-mask picture###I-mask smaller###B-value|adjust
+edit###B-action the###B-attribute harsh###I-attribute lighting###I-attribute|adjust
+make###O the###B-mask sky###I-mask brighter###B-attribute|adjust
+the###B-comment photo###I-comment is###I-comment too###I-comment magnified###I-comment|comment
+can###O you###O add###B-action greeen###B-attribute to###B-mask the###I-mask grass###I-mask on###I-mask the###I-mask ground###I-mask|add
+dull###O the###B-mask image###I-mask a###B-value bit###I-value (###O unsharpen###B-action )###O|adjust
+noise###B-attribute reduction###B-value (###B-mask specifically###I-mask seen###I-mask in###I-mask the###I-mask sky###I-mask )###I-mask|adjust
