@@ -167,6 +167,7 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         Reset
         """
         self.observation = {}
+        self.masks.clear()
         self.last_execute_result = False
         self.last_execute_message = ""
 

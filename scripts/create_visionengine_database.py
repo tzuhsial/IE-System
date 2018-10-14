@@ -36,7 +36,6 @@ def annToMask(img, ann):
     return m
 
 
-
 def main(args):
 
     imgs = util.load_from_jsonlines(os.path.join(args.dir, 'img.jsonl'))
@@ -57,6 +56,9 @@ def main(args):
         image = util.imread(image_path)
         b64_img_str = util.img_to_b64(image)
 
+        rev_image = util.b64_to_img(b64_img_str)
+        assert (image == rev_image).all()
+
         visionengine[b64_img_str] = {}
 
         for name in category2name_dict.values():
@@ -74,6 +76,11 @@ def main(args):
             assert ((object_mask == 0) | (object_mask == 255)).all()
 
             object_mask_str = util.img_to_b64(object_mask)
+
+            # test reverse op
+            rev_object_mask = util.b64_to_img(object_mask_str)
+            assert (rev_object_mask == object_mask).all()
+
             visionengine[b64_img_str][object_name].append(object_mask_str)
 
     util.save_to_pickle(visionengine, args.save)

@@ -289,7 +289,7 @@ if __name__ == "__main__":
     # Shuffle first
     random.shuffle(agendas)
 
-    train_agendas = agendas[:70]
+    train_agendas = agendas
     util.save_to_pickle(train_agendas, save_template.format('train'))
 
     test_agendas = agendas[70:]

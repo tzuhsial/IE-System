@@ -235,14 +235,14 @@ class System(object):
                     if slot_dict['slot'] in [
                             "object_mask_str", "gesture_click"
                     ]:
-                        sv = slot_dict['slot'] + " is " + slot_value[:5]
+                        sv = slot_dict['slot'] + " = " + slot_value[:5]
                     elif slot_dict["slot"] == "mask_strs":
                         sv = slot_dict["slot"] + "=" + str(len(slot_value))
                     else:
-                        sv = slot_dict['slot'] + " is " + slot_value
+                        sv = slot_dict['slot'] + "=" + slot_value
                     slot_list.append(sv)
 
-                utt = "Query Vision Engine: " + ', '.join(slot_list) + "."
+                utt = "Query vision engine with " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.EXECUTE:
                 execute_slots = sys_act['slots'] + [sys_act['intent']]
 

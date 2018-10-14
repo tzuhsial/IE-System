@@ -7,6 +7,8 @@ from nltk import edit_distance
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
+from ..util import build_slot_dict
+
 english_stopwords = stopwords.words('english')
 stemmer = PorterStemmer()
 
@@ -36,7 +38,9 @@ class EditmeTagger(object):
     def act(self):
         sentence = self.observation.get("user_utterance", "")
 
-        if sentence in ["yes", "no"]:
+        if sentence in ["", "undo", "redo", "close"]:
+            tracker_act = self.act_inform(sentence)
+        elif sentence in ["yes", "no"]:
             tracker_act = self.act_confirm(sentence)
         else:
             tracker_act = self.act_editme(sentence)
@@ -44,6 +48,15 @@ class EditmeTagger(object):
         act = copy.deepcopy(self.observation)
         act['user_acts'] = [tracker_act]
         return act
+
+    def act_inform(self, intent):
+        tracker_act = {
+            'dialogue_act': build_slot_dict('dialogue_act', 'inform', 1.0),
+            'slots': []
+        }
+        if intent != "":
+            tracker_act['intent'] = build_slot_dict('intent', intent, 1.0)
+        return tracker_act
 
     def act_confirm(self, sentence):
         if sentence == "yes":

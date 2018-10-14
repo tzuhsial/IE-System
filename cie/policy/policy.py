@@ -306,20 +306,6 @@ class RulePolicy(BasePolicy):
 
 
 class DQNPolicy(BasePolicy):
-    """
-    Base class for all policies, also records reward
-
-    public methods:
-        next_action
-        record
-    private methods:
-        step
-
-    Attributes:
-        config: 
-        action_mapper:
-    """
-
     def __init__(self, policy_config, action_mapper, **kwargs):
         # Setup config
         self.config = policy_config
@@ -659,8 +645,9 @@ class HierarchicalPolicy(BasePolicy):
         self.config = policy_config
         self.action_mapper = action_mapper
         self.ontology_json = kwargs['ontology_json']
+        dialogue_state = kwargs["dialogue_state"]
 
-        self.build_from_config()
+        self.build_from_config(dialogue_state)
 
         # Create session and saver
         self.sess = tf_utils.create_session()
@@ -673,52 +660,92 @@ class HierarchicalPolicy(BasePolicy):
         #logdir = self.config["logdir"]
         #self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
 
-    def build_from_config(self):
+    def build_from_config(self, dialogue_state):
         # Define options here
         state_size = self.config["state_size"]
         action_size = self.config["action_size"]
 
+        self.opt2act = {}  # option to action
+
         # Build Meta Controller
-        meta_controller_config = self.config["meta_controller"]
-        option_size = 2  # request(intent), confirm(intent)
-        option_size += len(self.action_mapper.config["intents"])
-        meta_controller_config["state_size"] = state_size
-        meta_controller_config["action_size"] = option_size
+        meta_config = self.config["meta_intent_policy"]
 
-        self.meta_controller = DQNPolicy(
-            meta_controller_config,
-            self.action_mapper,
-            qnetwork_prefix="meta_controller")
+        # Find intent related actions
+        action_config = self.action_mapper.config
+        for da in action_config.keys():
+            slots = action_config[da]
+            if "intent" in slots:
+                assert da in [SystemAct.REQUEST, SystemAct.CONFIRM]
+                action_idx = self.action_mapper.find_action_idx(
+                    da, slot="intent")
+                option_idx = len(self.opt2act)
+                self.opt2act[option_idx] = action_idx
 
-        # Build primitive action mapping
-        request_intent_idx = self.action_mapper\
-            .inv_action_map['request']['intent']
-        confirm_intent_idx = self.action_mapper\
-            .inv_action_map['confirm']['intent']
-        self.primitive_actions = {0: request_intent_idx, 1: confirm_intent_idx}
+        # Build intent policies here
+        self.intent_policies = {}
+        for intent in action_config["execute"]:
+            action_idx = self.action_mapper\
+                .find_action_idx("execute", intent=intent)
 
-        # Build Controllers
-        controller_config = self.config["controller"]
-        controller_config["state_size"] = state_size
-        controller_config["action_size"] = action_size
-        self.controllers = {}
-        self.option_execution_map = {}
-        for option_idx in range(2, option_size):
-            option_name = self.action_mapper.config["intents"][option_idx - 2]
+            option_action_dict = {}
 
-            option_policy = DQNPolicy(
-                controller_config,
+            intent_config = copy.deepcopy(self.config["intent_policy"])
+
+            intent_node = dialogue_state.get_intent(intent)
+
+            # Find actions for current intent
+            for da in action_config.keys():
+                slots = action_config[da]
+                for slot in slots:
+                    if slot in intent_node.node_dict:
+                        option_action_idx = len(option_action_dict)
+                        args = {"da": da}
+                        if da == SystemAct.EXECUTE:
+                            args["intent"] = slot
+                        else:
+                            args["slot"] = slot
+                        action_idx = self.action_mapper.find_action_idx(**args)
+                        option_action_dict[option_action_idx] = action_idx
+
+            intent_action_size = len(option_action_dict)
+            intent_config["state_size"] = state_size
+            intent_config["action_size"] = intent_action_size
+
+            option_idx = len(self.opt2act)
+            intent_action_size = len(option_action_dict)
+            self.opt2act[option_idx] = option_action_dict
+            self.intent_policies[option_idx] = DQNPolicy(
+                intent_config,
                 self.action_mapper,
-                qnetwork_prefix=option_name)
-            self.controllers[option_idx] = option_policy
-            #print('option_idx', option_idx, option_name)
-            option_execute_idx = self.action_mapper.inv_action_map['execute'][
-                option_name]
-            self.option_execution_map[option_idx] = option_execute_idx
+                qnetwork_prefix=intent + "_")
+            print("intent: {}, state: {}, action: {}"\
+                .format(intent, state_size, intent_action_size))
 
-        print("state_size", state_size)
-        print("option_size", option_size)
-        print("action_size", action_size)
+            # option idx
+        option_names = ["confirm_intent", "request_intent"
+                        ] + action_config["execute"]
+        for option_idx, obj in self.opt2act.items():
+            print(option_names[option_idx])
+            if isinstance(obj, dict):
+                for action_idx in obj.values():
+                    print(self.action_mapper(action_idx, dialogue_state))
+            else:
+                action_idx = obj
+                print(self.action_mapper(action_idx, dialogue_state))
+
+        # Build meta intent policy here
+        meta_config["state_size"] = state_size
+        meta_config["action_size"] = len(self.opt2act)
+        self.meta_intent_policy = DQNPolicy(
+            meta_config,
+            self.action_mapper,
+            qnetwork_prefix="meta_intent_policy_")
+
+        # Build primitive_actions
+        self.primitive_actions = {}
+        for option_idx, obj in self.opt2act.items():
+            if isinstance(obj, int):
+                self.primitive_actions[option_idx] = obj
 
 
 class FeudalPolicy(BasePolicy):
@@ -751,7 +778,8 @@ class FeudalPolicy(BasePolicy):
         Build 2 level hierarchy for every state 
         """
 
-        self.opt2act = {}  # Hierarchical map to map options to actions
+        # Option Action Dictionary
+        self.opt2act = {}
 
         # Build meta intent policy
         meta_config = self.config["meta_intent_policy"]

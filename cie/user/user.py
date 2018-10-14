@@ -41,6 +41,7 @@ class AgendaBasedUserSimulator(object):
         self.patience = user_config["patience"]
         self.dice_threshold = user_config["dice_threshold"]
         self.gesture_threshold = user_config["gesture_threshold"]
+        self.level = user_config["level"]
 
     def reset(self):
         self.agenda = None
@@ -157,13 +158,13 @@ class AgendaBasedUserSimulator(object):
                         if len(self.agenda):
                             reward = self.config["success_goal_reward"]
                         else:
-                            reward = 2 * self.patience
+                            reward = self.patience - self.turn_id
                     user_act = self.act_inform_goal()
                 else:
                     exec_intent_value = exec_intent["value"]
                     if exec_intent_value == "close":
                         episode_done = True
-                        reward = -self.patience
+                        reward = -self.patience  # Penalize early closes
                         user_act = self.act_bye()
 
                     elif exec_intent_value == "undo":
@@ -201,7 +202,7 @@ class AgendaBasedUserSimulator(object):
             episode_done = True
 
         if episode_done and len(self.agenda) > 0:
-            reward = -self.patience
+            reward = -self.turn_id
 
         # Build return object
         user_act = {}
@@ -237,9 +238,23 @@ class AgendaBasedUserSimulator(object):
             if gesture_slot:
                 target_slots.remove(gesture_slot)
 
-        user_slots = filter(lambda s: s['slot'] != 'object_mask_str',
-                            target_slots)
-        user_slots = list(user_slots)
+        # Users are not assumed to provide stuff in the first place
+        filtered_slots = filter(lambda s: s['slot'] != 'object_mask_str',
+                                target_slots)
+
+        # Expertise probability dict hard coded here
+        expertise = {"expert": 0.0, "intermediate": 0.2, "novice": 0.4}
+
+        if self.level in expertise:
+            drop_prob = expertise.get(self.level)
+
+            user_slots = []
+            for slot in filtered_slots:
+                if np.random.random() > drop_prob:
+                    user_slots.append(slot)
+        else:
+            raise ValueError("Unknown experience level: {}".format(self.level))
+
         user_act["slots"] = user_slots
         return user_act
 

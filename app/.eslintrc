@@ -1,0 +1,27 @@
+{
+    "parser": "babel-eslint",
+    "plugins": [
+        "babel",
+        "@torqjs/torq"
+    ],
+    "env": {
+        "@torqjs/torq/torq": true,
+        "browser": true,
+        "es6": true,
+        "node": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+        "ecmaFeatures": {
+            "experimentalObjectRestSpread": true,
+            "jsx": true
+        },
+        "sourceType": "module"
+    },
+    "rules": {
+        "@torqjs/torq/jsx-member-vars": "warn",
+        "@torqjs/torq/jsx-no-undef": "error",
+        "no-undef": "off", // letting jsx-no-undef to take over
+        "constructor-super": "off", // eslint-plugin-torq doesn't yet understand that @Component extends classes, so get lots of errors
+    }
+}

@@ -40,9 +40,11 @@ def run_agendas(agendas,
 
         state = env.reset(agenda)
 
-        meta_train_config = policy.meta_controller.config
-        meta_policy = policy.meta_controller
-        option_train_config = policy.controllers[2].config  # Shared config
+        opt2act = policy.opt2act
+        meta_policy = policy.meta_intent_policy
+        if train_mode:
+            meta_train_config = train_config["meta_intent_policy"]
+            intent_train_config = train_config["intent_policy"]
 
         while not done:  # Dialogue Session
 
@@ -53,64 +55,79 @@ def run_agendas(agendas,
             else:
                 meta_policy.update_epsilon(test=True)
 
-            option = meta_policy.step(state)
+            option_idx = meta_policy.step(state)
 
-            if option in policy.primitive_actions:
-                action = policy.primitive_actions[option]
+            if option_idx in policy.primitive_actions:
+                action = opt2act[option_idx]
                 next_state, reward, done, _ = env.step(action)
                 R += reward
+
             else:
+                intent_name = policy.action_mapper\
+                            .config["execute"][option_idx -2]
                 option_done = False
-                option_execution_index = policy.option_execution_map[option]
-                option_policy = policy.controllers[option]
+                intent_execution_idx = policy.action_mapper.find_action_idx(
+                    'execute', intent=intent_name)
+                intent_policy = policy.intent_policies[option_idx]
+
+                reward = 0
+
                 while not option_done:
                     if train_mode:
-                        option_step = update_steps[option]
-                        option_policy.update_epsilon(option_step)
+                        intent_step = update_steps[option_idx]
+                        intent_policy.update_epsilon(intent_step)
                     else:
-                        option_policy.update_epsilon(test=True)
+                        intent_policy.update_epsilon(test=True)
 
                     # Select an action using the action & sub policy
-
-                    action = option_policy.step(state)
-                    next_state, reward, done, _ = env.step(
-                        action)  # ignore external reward
+                    intent_action = intent_policy.step(state)
+                    action = opt2act[option_idx][intent_action]
+                    next_state, intent_reward, done, _ = env.step(action)
                     R += reward
+
+                    reward += intent_reward
+
                     #######################
                     #   Internal Critic   #
                     #######################
                     dialogue_state = env.agents[2].state
-                    option_executed = (option_execution_index == action)
+                    intent_prob = dialogue_state.get_slot("intent")\
+                                .value_conf_map.get(intent_name, 0.0)
+
+                    stochastic_termination = random.random() > intent_prob
+
+                    intent_executed = (intent_execution_idx == action)
                     execute_success = dialogue_state.get_slot(
                         'execute_result').get_max_value()
 
-                    option_success = option_executed and execute_success
-                    option_done = done or option_success
+                    option_success = intent_executed and execute_success
+                    option_done = done or option_success or stochastic_termination
 
                     # Now we update our controller policy
                     if train_mode:
-                        if option_done:
+                        if option_success:
                             ic_reward = train_config['internal_critic'][
                                 "option_success_reward"]
+                            option_done = True
                         else:
                             ic_reward = train_config["internal_critic"][
                                 "turn_penalty"]
-                        tup = (state, action, ic_reward, next_state,
+                        tup = (state, intent_action, ic_reward, next_state,
                                option_done)
-                        option_policy.replaymemory.add(*tup)
-                        batch_loss = option_policy.update_network()
-                        update_steps[option] += 1
+                        intent_policy.replaymemory.add(*tup)
+                        batch_loss = intent_policy.update_network()
+                        update_steps[option_idx] += 1
 
-                    if update_steps[option] % option_train_config["freeze_interval"] == 0:
-                        option_policy.copy_qnetwork()
+                        if update_steps[option_idx] % intent_train_config["freeze_interval"] == 0:
+                            intent_policy.copy_qnetwork()
 
-                    update_steps[option] += 1
+                    update_steps[option_idx] += 1
 
                     state = next_state
 
             # Update meta policy here
             if train_mode:
-                tup = (state, option, reward, next_state, done)
+                tup = (state, option_idx, reward, next_state, done)
                 meta_policy.replaymemory.add(*tup)
                 batch_loss = meta_policy.update_network()
 
@@ -177,7 +194,7 @@ def main(argv):
     # Initialize update steps for all policies
     update_steps = {}
     update_steps['meta'] = 0
-    for option_idx in policy.controllers.keys():
+    for option_idx in policy.intent_policies.keys():
         update_steps[option_idx] = 0
 
     try:

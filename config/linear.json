@@ -1,0 +1,74 @@
+{
+    "ontology": "./config/imageedit.ontology.json",
+    "agendas": {
+        "train": "./sampled_100/agenda.v1.train.pickle",
+        "test": "./sampled_100/agenda.v1.test.pickle"
+    },
+    "world": {
+        "verbose": false
+    },
+    "agents": {
+        "user": {
+            "user": "AgendaBasedUserSimulator",
+            "patience": 30,
+            "turn_penalty": 0,
+            "success_goal_reward": 0,
+            "failure_goal_penalty": 0,
+            "request_object_mask_str_penalty": 0,
+            "dice_threshold": 0.5,
+            "gesture_threshold": 0.0
+        },
+        "channel": {
+            "ontology": "./config/imageedit.ontology.json",
+            "channel": "MultimodalChannel",
+            "speech_conf_mean": 1.0,
+            "speech_conf_std": 0.0
+        },
+        "system": {
+            "ontology": "./config/imageedit.ontology.json",
+            "visionengine": {
+                "visionengine": "VisionEngineDatabase",
+                "database_path": "./sampled_100/visionengine.annotation.pickle"
+            },
+            "policy": {
+                "name": "DQNPolicy",
+                "action_mapper": {
+                    "intents": ["open", "adjust", "close", "undo", "redo"],
+                    "slots": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "query": ["object"]
+                },
+                "num_epochs": 40,
+                "batch_size": 32,
+                "freeze_interval": 100,
+                "gamma": 0.99,
+                "load": null,
+                "logdir": "./log/train_dqn_debug",
+                "save": "./exp/train_dqn_debug",
+                "qnetwork": {
+                    "input_size": null,
+                    "hidden_size": 40,
+                    "output_size": null,
+                    "dropout_rate": 0.0,
+                    "optimizer": "AdamOptimizer",
+                    "learning_rate": 1e-3
+                },
+                "replaymemory": {
+                    "memory_size": 2000,
+                    "load_path": null
+                },
+                "scheduler": {
+                    "scheduler": "LinearScheduler",
+                    "init_epsilon": 0.5,
+                    "min_epsilon": 0.05,
+                    "schedule_timesteps": 1e4
+                }
+            }
+        },
+        "photoshop": {
+            "photoshop": "SuperficialPhotoshop",
+            "client": false,
+            "uri": "http://localhost:2005",
+            "verbose": true
+        }
+    }
+}

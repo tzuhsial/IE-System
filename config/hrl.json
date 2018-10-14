@@ -1,7 +1,7 @@
 {
     "ontology": "./config/imageedit.ontology.json",
     "agendas": {
-        "train": "./sampled_100/agenda.v1.train.pickle",
+        "train": "./sampled_100/agenda.v1.all.pickle",
         "test": "./sampled_100/agenda.v1.test.pickle"
     },
     "world": {
@@ -10,7 +10,8 @@
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "patience": 30,
+            "patience": 20,
+            "level": "expert",
             "turn_penalty": 0,
             "success_goal_reward": 0,
             "failure_goal_penalty": 0,
@@ -32,19 +33,20 @@
             },
             "policy": {
                 "name": "HierarchicalPolicy",
-                "action_mapper": {
-                    "intents": ["open", "adjust", "close", "undo", "redo"],
-                    "slots": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
-                    "query": ["object"]
+                "action": {
+                    "request": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "confirm": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "query": ["object"],
+                    "execute": ["open", "adjust", "close", "undo", "redo"]
                 },
-                "num_epochs": 40,
+                "num_epochs": 100,
                 "logdir": "./log/train_hrl",
                 "save": "./exp/train_hrl",
                 "internal_critic": {
-                    "turn_penalty": 0,
-                    "option_success_reward": 10
+                    "option_success_reward": 10,
+                    "turn_penalty": 0
                 },
-                "meta_controller": {
+                "meta_intent_policy": {
                     "batch_size": 32,
                     "freeze_interval": 50,
                     "gamma": 0.99,
@@ -53,14 +55,14 @@
                     "save": "./exp/train_hrl_meta_controller",
                     "qnetwork": {
                         "input_size": null,
-                        "hidden_size": 40,
+                        "hidden_size": 20,
                         "output_size": null,
                         "dropout_rate": 0.0,
                         "optimizer": "AdamOptimizer",
                         "learning_rate": 1e-3
                     },
                     "replaymemory": {
-                        "memory_size": 1000,
+                        "memory_size": 500,
                         "load_path": null
                     },
                     "scheduler": {
@@ -70,7 +72,7 @@
                         "schedule_timesteps": 1e4
                     }
                 },
-                "controller": {
+                "intent_policy": {
                     "batch_size": 32,
                     "freeze_interval": 100,
                     "gamma": 0.99,
@@ -79,14 +81,14 @@
                     "save": "./exp/train_hrl_controller",
                     "qnetwork": {
                         "input_size": null,
-                        "hidden_size": 40,
+                        "hidden_size": 20,
                         "output_size": null,
                         "dropout_rate": 0.0,
                         "optimizer": "AdamOptimizer",
                         "learning_rate": 1e-3
                     },
                     "replaymemory": {
-                        "memory_size": 2000,
+                        "memory_size": 500,
                         "load_path": null
                     },
                     "scheduler": {

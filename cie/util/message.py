@@ -6,9 +6,10 @@ import numpy as np
 
 
 def img_to_b64(img):
-    """Coverts numpy array to base64 image string
+    """Converts RGB -> BGR, encodes to jpeg and then converts to base64
     """
-    _, nparr = cv2.imencode('.jpg', img)
+    bgr_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    _, nparr = cv2.imencode('.png', bgr_img)
     b64_img_str = base64.b64encode(nparr).decode()
     return b64_img_str
 
@@ -18,8 +19,9 @@ def b64_to_img(b64_img_str):
     """
     buf = base64.b64decode(b64_img_str)
     nparr = np.frombuffer(buf, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    return img
+    bgr_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    rgb_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
+    return rgb_img
 
 
 def build_slot_dict(slot, value=None, conf=None):

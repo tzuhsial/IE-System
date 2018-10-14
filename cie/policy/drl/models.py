@@ -87,6 +87,50 @@ class QNetwork(object):
         return batch_qvalues
 
 
+class LinearNetwork(QNetwork):
+    def __init__(self, opt, name='qnetwork'):
+        # Network Architecture Hyperparameters
+        self.input_size = int(opt['input_size'])
+        self.output_size = int(opt['output_size'])
+
+        # Build Graph, and training operation
+        self._build_network(name)
+        self._build_loss(name)
+
+        optimizer_name = opt['optimizer']
+        lr = float(opt['learning_rate'])
+
+        if optimizer_name == "AdamOptimizer":
+            self.optimizer = tf.train.AdamOptimizer(lr)  # Adam
+        else:
+            raise NotImplementedError("Optimizer: {}".format(optimizer_name))
+
+        # Define graph running ops
+        self.train_op = self.optimizer.minimize(self.loss)
+
+    def _build_network(self, name):
+        """
+        Build network with name_scope
+        """
+        with tf.variable_scope(name):
+            # Placeholders
+            self.state_placeholder = tf.placeholder(
+                dtype=tf.float32, shape=(None, self.input_size))
+            self.action_placeholder = tf.placeholder(
+                dtype=tf.int32, shape=(None, ))
+            self.qvalue_placeholder = tf.placeholder(
+                dtype=tf.int32, shape=(None, ))
+
+            self.all_qvalues_output = tf.layers.dense(
+                self.state_placeholder,
+                self.output_size)  # (batch_size, output_size)
+
+            # Gather with action indices
+            mask = tf.one_hot(self.action_placeholder, depth=self.output_size)
+            self.qvalues_output = tf.boolean_mask(self.all_qvalues_output,
+                                                  mask)
+
+
 class Critic(object):
     """
     2 Layer feed forward network, estimates value function V(S)

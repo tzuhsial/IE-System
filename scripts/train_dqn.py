@@ -33,7 +33,9 @@ def run_agendas(agendas,
     goals = []
 
     for agenda in tqdm(agendas):
-
+        if not train_mode:
+            import pdb
+            pdb.set_trace()
         world.reset()
         user.load_agenda(agenda)
 
@@ -48,6 +50,10 @@ def run_agendas(agendas,
                 policy.update_epsilon(global_step)
             else:
                 policy.update_epsilon(test=True)
+            if train_mode == False:
+                world.config["verbose"] = True
+            else:
+                pass
 
             world.parley()
 

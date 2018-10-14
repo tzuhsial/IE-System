@@ -410,8 +410,8 @@ class PSToolNode(BeliefNode):
         class_name = self.__class__.__name__
 
         if conf < 1.0:
-            logger.error("{} {} observed confidence less than 1.0!"\
-                .format(class_name, self.name))
+            logger.error("{} {} observed confidence less than 1.0!"
+                         .format(class_name, self.name))
             return False
         if value == "":
             logger.info("{} {} observed value empty".format(
@@ -518,7 +518,6 @@ class ObjectMaskStrNode(BeliefNode):
 
         object_updated = object_turn_id >= self.last_update_turn_id
         gesture_updated = gesture_click_turn_id >= self.last_update_turn_id
-
         if object_updated and gesture_updated:
 
             object_intent = object_node.pull()
@@ -534,9 +533,8 @@ class ObjectMaskStrNode(BeliefNode):
 
             # Query
             gesture_intent = gesture_click_node.pull()
-            assert gesture_intent.executable()
-
-            slots += gesture_intent.execute_slots
+            if gesture_intent.executable():
+                slots += gesture_intent.execute_slots
 
             self.intent = SysIntent(query_slots=slots)
             return self.intent
@@ -564,11 +562,9 @@ class ObjectMaskStrNode(BeliefNode):
 
             """
             gesture_click_intent = gesture_click_node.pull()
-            assert gesture_click_intent.executable()
-
-            # Propagate
-            gesture_click = gesture_click_node.get_max_value()
-            self.filter_candidates(gesture_click)
+            if gesture_click_intent.executable():
+                gesture_click = gesture_click_node.get_max_value()
+                self.filter_candidates(gesture_click)
 
         self.intent = self._build_slot_intent()
         return self.intent

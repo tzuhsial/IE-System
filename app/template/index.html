@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge, chrome=1" />
+    <title>Prototype</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+        crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+        crossorigin="anonymous"></script>
+    <link href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" rel="Stylesheet">
+    <script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+    <script src="/static/bbox_annotator.js"></script>
+    <script src="/static/index.js"></script>
+    <link rel="stylesheet" href="/static/index.css" />
+</head>
+
+<body>
+
+    <div class="container">
+        <img src="/static/marker.png" id="marker" />
+        <h3> </h3>
+
+
+        <div class="jumbotron">
+            <h3>Prototype Image Editing Dialogue System</h3>
+            <button type="submit" id="reset-button">Reset</button>
+            <button type="submit" id="sample-button">Sample</button>
+            <hr>
+            <h4> Sampled Goal </h4>
+            <span id="goal-text"></span>
+            <button id="object_mask-button">Show/Hide object location</button>
+            <div id="goal-container">
+                <img id="object_mask" src="">
+            </div>
+            <hr>
+            <h4> Image </h4>
+            <div id="container">
+                <div id="image-container">
+                    <img id="image" src="">
+                </div>
+                <div id="bbox_annotator"></div>
+                <input id="annotation_data" name="annotation_data" type="hidden" />
+            </div>
+            <hr>
+            Gestures
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="gesture_click_mode" value="option1">
+                <label class="form-check-label" for="inlineCheckbox1">gesture_click(marks a point)</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="object_mask_str_mode" value="option2">
+                <label class="form-check-label" for="inlineCheckbox2">object_mask_str(selects a region)</label>
+            </div>
+
+        </div>
+
+        <hr>
+
+        <div class="input-group mb-3">
+            <div class="input-group-prepend">
+                <span class="input-group-text" id="inputGroup-sizing-default">User Input</span>
+            </div>
+            <input type="text" class="form-control" aria-label="Default" aria-describedby="inputGroup-sizing-default"
+                id="user_utterance">
+            <div class="input-group-append">
+                <button class="btn btn-outline-secondary" type="button" id="submit">Submit</button>
+            </div>
+        </div>
+
+        <hr>
+        <form>
+            System:
+            <div name="system_utterance" id="system_utterance">
+                Welcome to Wonderland!
+            </div>
+        </form>
+
+        <div id="loading-container" style='display:none '>
+            <img src="/static/loading.gif" />
+        </div>
+        <hr>
+
+        <footer class="footer">
+            <p>&copy; Adobe Research 2018</p>
+        </footer>
+</body>
+
+</html>

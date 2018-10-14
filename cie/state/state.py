@@ -8,6 +8,7 @@ from .node import builder as nodelib
 from ..util import slot_to_observation
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class State(object):
@@ -56,8 +57,8 @@ class State(object):
             dialogue act: slot dict
         """
         if dialogue_act is None or\
-          len(dialogue_act) == 0 or \
-          dialogue_act['conf'] < 0.5:
+                len(dialogue_act) == 0 or \
+                dialogue_act['conf'] < 0.5:
             return
 
         if dialogue_act['value'] in UserAct.confirm_acts():
@@ -110,7 +111,6 @@ class State(object):
             if slot_name not in self.ontology.slots:
                 logger.info("Unknown slot: {}".format(slot_name))
                 continue
-
             obsrv = slot_to_observation(slot, turn_id)
             slot_node = self.get_slot(slot_name)
 

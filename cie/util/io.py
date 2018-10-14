@@ -58,4 +58,4 @@ def imwrite(image, image_path):
     """converts to bgr format for cv2.imwrite
     """
     bgr_img = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(bgr_img)
+    cv2.imwrite(image_path, bgr_img)
