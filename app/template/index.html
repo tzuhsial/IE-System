@@ -30,10 +30,18 @@
 
         <div class="jumbotron">
             <h3>Prototype Image Editing Dialogue System</h3>
-            <button type="submit" id="reset-button">Reset</button>
-            <button type="submit" id="sample-button">Sample</button>
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
+                Instructions
+            </button>
+            <!--
+            <button type="button" class="btn btn-secondary" id="reset-button">Reset</button>
+            -->
+            <button type="button" class="btn btn-success" id="success-button">Success</button>
+            <button type="button" class="btn btn-danger" id="failure-button">Failure</button>
+
             <hr>
             <h4> Sampled Goal </h4>
+            <button type="submit" id="sample-button">Sample</button>
             <span id="goal-text"></span>
             <button id="object_mask-button">Show/Hide object location</button>
             <div id="goal-container">
@@ -80,7 +88,7 @@
         <form>
             System:
             <div name="system_utterance" id="system_utterance">
-                Welcome to Wonderland!
+                Hi, this is a prototype image editing dialogue system. How may I help you?
             </div>
         </form>
 
@@ -90,6 +98,85 @@
         <footer class="footer">
             <p>&copy; Adobe Research 2018</p>
         </footer>
+    </div>
+    <!-- Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Instructions</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">Your task is to perform an adjustment on the image using the
+                            prototype system. Our system will try to understand your goal through gestures and text.
+                            Image regions can obtained by you directly providing an gesture(object_mask_str) or
+                            by the system performing object detection.
+                        </li>
+                        <li class="list-group-item">An adjustment goal is already sampled for you. You can click on
+                            "sample" to get another goal. An adjustment goal consists of 4 arguments: 1. intent 2.
+                            object 3. attribute 4. adjust_value. For objects that may contain multiple instances,
+                            click on "Show/Hide object location" to see where the object location should be.
+                        </li>
+                        <li class="list-group-item">You can interact with the system either by <b>gestures</b> or <b>text
+                                input</b>. After providing gestures or text input, click "submit" to send to the
+                            system.
+                            "submit" button is located next to the text input box.
+                        </li>
+                        <li class="list-group-item"><b>Gestures</b> corresponds to objects. There are 2 types of
+                            gestures 1.
+                            gesture_click 2. object_mask_str. To select an object in the image, either use
+                            gesture_click to mark a point on the image, or
+                            use object_mask_str to draw a bounding box.
+                        </li>
+                        <li class="list-group-item">
+                            <b>Text input</b> are for you to express your goal in a natural way.
+                            For example, having a goal like(intent=adjust, attribute=brightness, adjust_value=10,
+                            object=man),
+                            you could say "make the man brighter" or "adjust brightness of the man by a value of 10."
+                        </li>
+                        <li class="list-group-item">
+                            Our system will interact with you and ask questions like "What attribute do you want?",
+                            or "Let me confirm. object_mask_str=xxx". For confirmations, simple type "yes" or "no."
+                            object_mask_str will be displayed on the image for you to verify.
+                            When the system executes an action, it will show you the arguments it used.
+                            Please check if the execution arugments matches your goal. If yes, click on "success", and
+                            click on "failure".
+                        </li>
+                        <li class="list-group-item">
+                            Thank you for participating!
+                        </li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="end-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">End</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Thank you for participating! You can now close the window</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

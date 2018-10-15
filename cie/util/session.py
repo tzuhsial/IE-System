@@ -22,6 +22,9 @@ class SessionManager(object):
     def add_turn(self, session_id, system_state, photoshop_state, turn_info):
         raise NotImplementedError
 
+    def add_result(self, session_id, result):
+        raise NotImplementedError
+
     def _init_dialogue(self, session_id):
         doc = {
             "session_id": session_id,
@@ -54,6 +57,17 @@ class MongoDBManager(SessionManager):
         doc["turns"].append(turn_info)
 
         self.dialogues.replace_one({"session_id": session_id}, doc)
+
+    def add_result(self, session_id, result):
+        key = {"session_id": session_id}
+        self.dialogues.update_one(
+            key,
+            {
+                "$set": {
+                    "result": result
+                }
+            }
+        )
 
 
 class TinyDBManager(SessionManager):

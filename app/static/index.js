@@ -1,6 +1,7 @@
 var sampleUrl = location.origin + "/sample";
 var stepUrl = location.origin + "/step";
 var resetUrl = location.origin + "/reset";
+var resultUrl = location.origin + "/result";
 
 // SessionID
 var d = new Date();
@@ -105,6 +106,22 @@ var submitReset = function () {
     });
 }
 
+var submitResult = function (result) {
+    var data = {
+        "session_id": session_id,
+        "result": result
+    }
+    console.log("submit", data);
+    toggleLoading(true);
+    $.post(resultUrl, data, function (response) {
+        console.log(response);
+        $("#system_utterance").text(response["system_utterance"])
+        $("#end-modal").modal("show");
+    }).always(function () {
+        toggleLoading(false);
+    });
+}
+
 var toggleLoading = function (show) {
     if (show) {
         $("#loading-container").show();
@@ -193,6 +210,13 @@ $(document).ready(function () {
 
     $("#object_mask-button").on('click', function (event) {
         $("#goal-container").toggle();
+    });
+
+    $("#success-button").on('click', function (event) {
+        submitResult("success");
+    });
+    $("#failure-button").on('click', function (event) {
+        submitResult("failure");
     });
     sampleGoal();
 });

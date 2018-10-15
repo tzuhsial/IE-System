@@ -68,7 +68,7 @@ def serve(argv):
         photoshop.reset()
 
         idx, agenda = random.choice(list(enumerate(test_agendas)))
-        agenda = test_agendas[10]
+        #agenda = test_agendas[10]
 
         open_goal = agenda[0]
         open_slots = open_goal['slots']
@@ -179,6 +179,7 @@ def serve(argv):
         sys_da = system_act['system_acts'][0]['dialogue_act']['value']
         sys_utt = system_act["system_utterance"]
         if sys_da == "query":
+
             mask_str_node = system.state.get_slot("object_mask_str")
             nresult = len(mask_str_node.value_conf_map)
             sys_utt += " Found {} results. ".format(nresult)
@@ -230,6 +231,20 @@ def serve(argv):
         obj = {}
         obj['system_utterance'] = sys_utt
         obj['b64_img_str'] = loaded_b64_img_str  # We need to return the image
+        return jsonify(obj)
+
+    @app.route("/result", methods=["POST"])
+    def results():
+        # Load sesssion
+        print("result")
+        session_id = int(request.form.get("session_id", 0))  # default to 0
+        result = request.form.get("result", None)
+
+        session.add_result(session_id, result)
+
+        # Create return_object
+        obj = {}
+        obj["system_utterance"] = "Result recorded. Thank you for participating!"
         return jsonify(obj)
 
     @app.route("/reset", methods=["POST"])
