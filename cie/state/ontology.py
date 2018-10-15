@@ -119,3 +119,24 @@ class OntologyEngine(object):
     def clear(self):
         for intent_tree in self.intents.values():
             intent_tree.clear()
+
+    def to_json(self):
+        """
+        """
+        obj = {}
+
+        for slot_name, slot_node in self.slots.items():
+            obj[slot_name] = {
+                'value_conf': list(slot_node.value_conf_map.items()),
+                'last_update_turn_id': slot_node.last_update_turn_id
+            }
+        return obj
+
+    def from_json(self, obj):
+        """
+        Load slot values from obj 
+        """
+        for slot_name, slot_obj in obj.items():
+            self.slots[slot_name].value_conf_map = dict(
+                slot_obj["value_conf"])
+            self.slots[slot_name].last_update_turn_id = slot_obj["last_update_turn_id"]

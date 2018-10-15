@@ -8,7 +8,7 @@ from .node import builder as nodelib
 from ..util import slot_to_observation
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class State(object):
@@ -162,9 +162,19 @@ class State(object):
 
     def to_json(self):
         """
-        Format to json to save as history
+        Serialize to json
         """
-        raise NotImplementedError
+        obj = {}
+        obj["history"] = self.executionhistory.to_json()
+        obj["slot_values"] = self.ontology.to_json()
+        return obj
+
+    def from_json(self, obj):
+        """
+        Load from serialized json
+        """
+        self.executionhistory.from_json(obj["history"])
+        self.ontology.from_json(obj["slot_values"])
 
     def intent_to_list(self, intent_name):
         """

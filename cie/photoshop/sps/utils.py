@@ -21,20 +21,22 @@ def imread(image_path):
 
 
 def img_to_b64(img):
-    """Coverts numpy array to base64 image string
+    """Converts RGB -> BGR, encodes to jpeg and then converts to base64
     """
-    _, nparr = cv2.imencode('.jpg', img)
+    bgr_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    _, nparr = cv2.imencode('.png', bgr_img)
     b64_img_str = base64.b64encode(nparr).decode()
     return b64_img_str
 
 
 def b64_to_img(b64_img_str):
-    """Converts base64 string back to numpy array using shape
+    """Converts base64 string back to numpy array
     """
     buf = base64.b64decode(b64_img_str)
     nparr = np.frombuffer(buf, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    return img
+    bgr_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    rgb_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
+    return rgb_img
 
 
 ##########################
@@ -56,7 +58,7 @@ def random_colors(N, bright=True):
     hsv = [(i / N, 1, brightness) for i in range(N)]
     colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
     for idx, tup in enumerate(colors):
-        colors[idx] = list(map(lambda c : c * 255, tup))
+        colors[idx] = list(map(lambda c: c * 255, tup))
     return colors
 
 
@@ -92,6 +94,7 @@ def plot_diff(img1, img2, cmap=None, figname='diff.png'):
     plt.imshow(img2)
     if figname is not None:
         plt.savefig(figname)
+
 
 def plot_figure(img, figname="test.png"):
     plt.figure()

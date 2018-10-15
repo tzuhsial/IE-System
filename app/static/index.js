@@ -1,7 +1,11 @@
 var sampleUrl = location.origin + "/sample";
-var openUrl = location.origin + "/open";
 var stepUrl = location.origin + "/step";
 var resetUrl = location.origin + "/reset";
+
+// SessionID
+var d = new Date();
+var n = d.getTime();
+var session_id = n.toString();
 
 // States
 // gesture_click
@@ -12,41 +16,10 @@ var ycor = -1;
 var editor = null;
 var bb_cors = null;
 
-var previewFile = function () {
-    var preview = document.querySelector('#image');
-    var file = document.querySelector('input[type=file]').files[0];
-    var reader = new FileReader();
-
-    reader.addEventListener("load", function () {
-        preview.src = reader.result;
-        var b64_img_str = preview.src.split(',')[1];
-        submitImage(b64_img_str);
-    }, false);
-
-    if (file) {
-        reader.readAsDataURL(file);
-    }
-}
-
-
-var submitImage = function (b64_img_str) {
-    data = {}
-    data["b64_img_str"] = b64_img_str;
-
-    toggleLoading(true);
-    $.post(openUrl, data, function (response) {
-        console.log(response);
-        $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
-    }).always(function () {
-        toggleLoading(false);
-    })
-}
-
-
-
 var submitRequest = function (user_utterance) {
 
-    data = {}
+    var data = {}
+    data["session_id"] = session_id;
     data['user_utterance'] = user_utterance;
 
     // Add Gestures slots
@@ -91,8 +64,11 @@ var submitRequest = function (user_utterance) {
 
 var sampleGoal = function () {
     //console.log("Randomly sampling a goal...");
+    var data = {
+        "session_id": session_id,
+    }
     toggleLoading(true);
-    $.post(sampleUrl, {}, function (response) {
+    $.post(sampleUrl, data, function (response) {
         console.log(response);
         var b64_img_str = response["b64_img_str"];
         $("#image").attr("src", "data:image/png;base64," + b64_img_str);
@@ -115,6 +91,20 @@ var sampleGoal = function () {
     })
 }
 
+var submitReset = function () {
+    var data = {
+        "session_id": session_id
+    }
+    toggleLoading(true);
+    $.post(resetUrl, data, function (response) {
+        console.log("reset");
+        $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
+        $("#system_utterance").text(response["system_utterance"])
+    }).always(function () {
+        toggleLoading(false);
+    });
+}
+
 var toggleLoading = function (show) {
     if (show) {
         $("#loading-container").show();
@@ -127,14 +117,7 @@ $(document).ready(function () {
 
     $("#reset-button").on('click', function (e) {
         e.preventDefault();
-
-        toggleLoading(true);
-        $.post(resetUrl, {}, function (response) {
-            console.log("reset");
-        }).always(function () {
-            toggleLoading(false);
-        });
-
+        submitReset();
     });
 
     $("#sample-button").on('click', function (e) {

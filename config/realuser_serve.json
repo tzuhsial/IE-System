@@ -1,5 +1,11 @@
 {
     "ontology": "./config/imageedit.ontology.json",
+    "session": {
+        "session": "MongoDBManager",
+        "host": null,
+        "port": null,
+        "db_path": null
+    },
     "agendas": {
         "train": "./sampled_100/agenda.v1.train.pickle",
         "test": "./sampled_100/agenda.v1.test.pickle"

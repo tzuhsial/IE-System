@@ -578,8 +578,10 @@ class ObjectMaskStrNode(BeliefNode):
         n_clicked = 0
 
         for mask_candidate in self.value_conf_map:
-            n_clicked += self.check_overlap(gesture_click, mask_candidate)
             self.value_conf_map[mask_candidate] = 0.7
+            if self.check_overlap(gesture_click, mask_candidate):
+                self.value_conf_map[mask_candidate] = 0.9
+                n_clicked += 1
 
         if n_clicked == 0 or n_clicked > 1:
             self.value_conf_map.clear()

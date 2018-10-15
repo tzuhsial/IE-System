@@ -4,6 +4,7 @@ import os
 import pprint
 import random
 import sys
+import time
 from configparser import ConfigParser
 root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.insert(0, root_dir)
@@ -13,11 +14,14 @@ pp = pprint.PrettyPrinter(indent=2)
 import numpy as np
 from flask import Flask, jsonify, request, render_template
 
+
 from cie import TrackerPortal, SystemPortal, PhotoshopPortal
 from cie import util
 
+
 # Log outputs
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 logger.addHandler(ch)
@@ -27,6 +31,9 @@ def serve(argv):
     config_file = argv[2]
     config = util.load_from_json(config_file)
     test_agendas = util.load_from_pickle(config["agendas"]["test"])
+
+    # Load Session Manager
+    session = util.SessionPortal(config["session"])
 
     # Load agents here
     agents_config = config["agents"]
@@ -50,12 +57,18 @@ def serve(argv):
         """
         Sample a goal and an image
         """
+        # Load sesssion
+        session_id = int(request.form.get("session_id", 0))  # default to 0
+        print("session_id", session_id)
+        dialogue = session.retrieve(session_id)
+
+        # Action
         tracker.reset()
         system.reset()
         photoshop.reset()
 
         idx, agenda = random.choice(list(enumerate(test_agendas)))
-        #agenda = test_agendas[10]
+        agenda = test_agendas[10]
 
         open_goal = agenda[0]
         open_slots = open_goal['slots']
@@ -72,20 +85,23 @@ def serve(argv):
         else:
             loaded_b64_img_str = util.img_to_b64(img)
 
+        photoshop_act = photoshop.act()
         # Intent adjust
-
-        system.observe({})
+        system.observe(photoshop_act)
         system_act = system.act()
 
-        # Build return object
+        # Save to session
+        turn_info = {"agenda_id": idx, "turn": 0}
+        state_json = system.state.to_json()
+        ps_json = photoshop.to_json()
+        session.add_turn(session_id, state_json, ps_json, turn_info)
 
+        # Build return object
         goal = {}
         for slot in agenda[1]["slots"]:
             goal[slot["slot"]] = slot["value"]
 
         goal["intent"] = agenda[1]["intent"]["value"]
-
-        # object_mask_str
         object_mask = util.b64_to_img(goal["object_mask_str"])
         object_mask_img = object_mask
 
@@ -95,40 +111,26 @@ def serve(argv):
         obj = {}
         obj["b64_img_str"] = loaded_b64_img_str
         obj["goal"] = goal
-
-        return jsonify(obj)
-
-    @app.route("/open", methods=["POST"])
-    def open():
-        """ Opens an image
-        """
-        b64_img_str = request.form.get("b64_img_str", "")
-        args = {"b64_img_str":  b64_img_str}
-        result, msg = photoshop.control("load", args)
-        print("result", result)
-
-        img = photoshop.get_image()
-        if img is None:
-            loaded_b64_img_str = ""
-        else:
-            loaded_b64_img_str = util.img_to_b64(img)
-
-        # Build return object
-        obj = {}
-        obj["b64_img_str"] = loaded_b64_img_str
         return jsonify(obj)
 
     @app.route("/step", methods=["POST"])
     def step():
+        # Load sesssion
+        session_id = int(request.form.get("session_id", 0))  # default to 0
+        print("session_id", session_id, "step")
+        dialogue = session.retrieve(session_id)
+        system.state.from_json(dialogue["system_state"])
+        photoshop.from_json(dialogue["photoshop_state"])
 
-        user_utterance = request.form.get('user_utterance', '')
-        print("user_utterance:", user_utterance)
+        # Continue doing what's supposed to be done
+        user_utt = request.form.get('user_utterance', '')
+        print("user_utterance:", user_utt)
 
         click_coordinates = request.form.get("gesture_click", None)
         box_coordinates = request.form.get("object_mask_str", None)
 
         user_act = {
-            "user_utterance": user_utterance,
+            "user_utterance": user_utt,
         }
 
         tracker.observe(user_act)
@@ -189,13 +191,13 @@ def serve(argv):
 
             result, msg = photoshop.control(
                 'load_mask_strs', {"mask_strs": mask_strs})
-            assert result, "load_mask_strs failure in SimplePhotoshop"
 
             # Perform a 2nd action
             system.observe({})
             system_act = system.act()
 
             sys_utt += system_act["system_utterance"]
+
         else:
             # Always load mask_strs
             mask_str_node = system.state.get_slot("object_mask_str")
@@ -209,6 +211,7 @@ def serve(argv):
         print("System:", sys_utt)
         photoshop.observe(system_act)
         photoshop_act = photoshop.act()
+
         img = photoshop.get_image()
         if img is None:
             loaded_b64_img_str = ""
@@ -216,6 +219,12 @@ def serve(argv):
             loaded_b64_img_str = util.img_to_b64(img)
 
         system.observe(photoshop_act)
+        # Record to session
+        turn_info = {"user": user_utt,
+                     "system": sys_utt, "turn": system.turn_id}
+        state_json = system.state.to_json()
+        ps_json = photoshop.to_json()
+        session.add_turn(session_id, state_json, ps_json, turn_info)
 
         # Create return_object
         obj = {}
@@ -225,6 +234,14 @@ def serve(argv):
 
     @app.route("/reset", methods=["POST"])
     def reset():
+        # Load sesssion
+        print("reset")
+        session_id = int(request.form.get("session_id", 0))  # default to 0
+        print("session_id", session_id, "reset")
+        dialogue = session.retrieve(session_id)
+        system.state.from_json(dialogue["system_state"])
+        photoshop.from_json(dialogue["photoshop_state"])
+
         tracker.reset()
         system.reset()
         photoshop.reset()
@@ -234,6 +251,16 @@ def serve(argv):
             loaded_b64_img_str = ""
         else:
             loaded_b64_img_str = util.img_to_b64(img)
+
+        photoshop_act = photoshop.act()
+        system.observe(photoshop_act)
+        system_act = system.act()
+
+        # Save to session
+        turn_info = {"reset": True}
+        state_json = system.state.to_json()
+        ps_json = photoshop.to_json()
+        session.add_turn(session_id, state_json, ps_json, turn_info)
 
         # Create return_object
         obj = {}
@@ -248,24 +275,48 @@ def terminal(argv):
     config_file = argv[2]
     config = util.load_from_json(config_file)
 
+    session = util.SessionPortal(config["session"])
+    session_id = int(time.time())
+
+    #
+    agendas = util.load_from_pickle(config["agendas"]["test"])
+
     # Load agents here
     agents_config = config["agents"]
     tracker = TrackerPortal(agents_config["tracker"])
     system = SystemPortal(agents_config["system"])
     photoshop = PhotoshopPortal(agents_config["photoshop"])
 
+    # Initialize session
     tracker.reset()
     system.reset()
     photoshop.reset()
 
+    agenda = agendas[10]
+    open_goal = agenda[0]
+
+    open_goal = agenda[0]
+    open_slots = open_goal['slots']
+
+    image_path_slot = util.find_slot_with_key("image_path", open_slots)
+
+    image_path = image_path_slot['value']
+    result, msg = photoshop.control("open", {'image_path': image_path})
+    assert result
+    turn_info = {"turn": 0, "agenda_idx": 10}
+    session.add_turn(session_id, system.state.to_json(),
+                     photoshop.to_json(), turn_info)
     photoshop_act = {}
     while True:
-        sentence = input("User: ")
+        # Load from session
+        logger.info("Loading from session {}".format(session_id))
+        dialogue = session.retrieve(session_id)
+        system.state.from_json(dialogue["system_state"])
+        photoshop.from_json(dialogue["photoshop_state"])
 
-        user_act = {"user_utterance": sentence,
-                    # "episode_done": False,
-                    # "reward": 0
-                    }
+        user_utt = input("User: ")
+
+        user_act = {"user_utterance": user_utt}
 
         tracker.observe(user_act)
         tracker_act = tracker.act()
@@ -275,10 +326,18 @@ def terminal(argv):
         system.observe(photoshop_act)
         system.observe(tracker_act)
         system_act = system.act()
-
-        print("System:", system_act["system_utterance"])
-        photoshop.observe(system.act())
+        sys_utt = system_act["system_utterance"]
+        print("System:", sys_utt)
+        photoshop.observe(system_act)
         photoshop_act = photoshop.act()
+
+        # Save to session
+        logger.info("Saving session")
+        turn_info = {"user": user_utt,
+                     "system": sys_utt, "turn": system.turn_id}
+        state_json = system.state.to_json()
+        ps_json = photoshop.to_json()
+        session.add_turn(session_id, state_json, ps_json, turn_info)
 
 
 if __name__ == "__main__":

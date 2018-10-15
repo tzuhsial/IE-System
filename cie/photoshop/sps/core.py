@@ -79,7 +79,7 @@ class SimplePhotoshop(object):
         """
         Photoshop Control Actions
         TODO: customize error message
-        Args: 
+        Args:
             control_type (str):
             arguments (dict):
         Returns:
@@ -147,7 +147,7 @@ class SimplePhotoshop(object):
 
     def control_redo(self, arguments={}):
         if not self.history.hasNextHistory():
-            #print("[photoshop] execution failure: no next history")
+            # print("[photoshop] execution failure: no next history")
             msg = "Error occured when executing \"redo\": no next history"
             return False, msg
         (action_type, arguments), self.img = self.history.redo()
@@ -155,7 +155,7 @@ class SimplePhotoshop(object):
 
     def control_undo(self, arguments={}):
         if not self.history.hasPreviousHistory():
-            #print("[photoshop] execution failure: no previous history")
+            # print("[photoshop] execution failure: no previous history")
             msg = "Error occured when executing \"undo\": no previous history"
             return False, msg
         (action_type, arguments), self.img = self.history.undo()
@@ -266,7 +266,7 @@ class SimplePhotoshop(object):
 
     @Selector.mask_region
     def edit(self, edit_type, arguments):
-        """ 
+        """
         Args:
             edit_type (str)
             arguments (dict)
@@ -279,7 +279,7 @@ class SimplePhotoshop(object):
         elif edit_type == PSAct.Edit.ADJUST_COLOR:
             edited_img = self.edit_adjust_color(arguments)
         else:
-            #print("Unknown edit_type: {}".format(edit_type))
+            # print("Unknown edit_type: {}".format(edit_type))
             edited_img = None
         return edited_img
 
@@ -305,19 +305,18 @@ class SimplePhotoshop(object):
             object_names = ['global']
         else:
             object_names = [tup[0] for tup in self.masks]
-
-        #print('object_names', object_names)
-        #print('arguments', arguments)
-
+        """
         for object_name in object_names:
             if edit_type == PSAct.Edit.ADJUST:
                 attribute = arguments.get('attribute')
                 adjust_value = arguments.get('adjust_value')
+                if attribute not in self.state[object_name]:
+                    self.state[object_name][attribute] = 0
                 self.state[object_name][attribute] += adjust_value
             elif edit_type == PSAct.Edit.ADJUST_COLOR:
                 color = arguments.get('color')
                 self.state[object_name]['color'] = color
-
+        """
     def plot_diff(self, figname=None):
         img1 = self.img
         img2 = self.background

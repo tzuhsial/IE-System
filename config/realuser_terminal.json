@@ -1,5 +1,15 @@
 {
     "ontology": "./config/imageedit.ontology.json",
+    "session": {
+        "session": "MongoDBManager",
+        "host": "localhost",
+        "port": 27017,
+        "db_path": null
+    },
+    "agendas": {
+        "train": "./sampled_100/agenda.v1.train.pickle",
+        "test": "./sampled_100/agenda.v1.test.pickle"
+    },
     "world": {
         "verbose": false
     },
@@ -30,9 +40,9 @@
             }
         },
         "photoshop": {
-            "photoshop": "SuperficialPhotoshop",
+            "photoshop": "SimplePhotoshop",
             "client": false,
-            "uri": "http://localhost:2005",
+            "uri": "http://localhost:3000",
             "verbose": true
         }
     }

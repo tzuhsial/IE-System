@@ -37,10 +37,10 @@ class EditmeTagger(object):
 
     def act(self):
         sentence = self.observation.get("user_utterance", "")
-
-        if sentence in ["", "undo", "redo", "close"]:
+        sentence = sentence.strip().rstrip(".")
+        if sentence.lower() in ["", "undo", "redo", "close"]:
             tracker_act = self.act_inform(sentence)
-        elif sentence in ["yes", "no"]:
+        elif sentence.lower() in ["yes", "no"]:
             tracker_act = self.act_confirm(sentence)
         else:
             tracker_act = self.act_editme(sentence)
@@ -59,10 +59,12 @@ class EditmeTagger(object):
         return tracker_act
 
     def act_confirm(self, sentence):
-        if sentence == "yes":
+        if sentence.lower() == "yes":
             da = "affirm"
-        elif sentence == "no":
+        elif sentence.lower() == "no":
             da = "negate"
+        else:
+            raise ValueError("Unknown confirms sentence: {}".format(sentence))
 
         tracker_act = {'dialogue_act': {
             "slot": "dialogue_act", "value": da, 'conf': 1.0}}

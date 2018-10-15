@@ -1,5 +1,10 @@
+import numpy as np
+
+from . import utils
+
+
 class EditHistory(object):
-    """ 
+    """
         Stores the edit history of Photoshop
         Also stores the resulting image for convenience
     """
@@ -31,7 +36,7 @@ class EditHistory(object):
         self._actions = self._actions[:self._ptr + 1]
         self._images = self._images[:self._ptr + 1]
 
-        self._actions.append((edit_type, args))
+        self._actions.append([edit_type, args])
         self._images.append(img)
 
         self._ptr += 1
@@ -54,3 +59,19 @@ class EditHistory(object):
         assert self._ptr < (len(self._actions) - 1)
         self._ptr += 1
         return self._actions[self._ptr], self._images[self._ptr]
+
+    def to_json(self):
+        obj = {}
+        if self._background is not None:
+            obj["background"] = utils.img_to_b64(self._background)
+        obj["actions"] = self._actions
+        obj["images"] = [utils.img_to_b64(img) for img in self._images]
+        obj["ptr"] = self._ptr
+        return obj
+
+    def from_json(self, obj):
+        if 'background' in obj:
+            self._background = utils.b64_to_img(obj["background"])
+        self._actions = obj["actions"]
+        self._images = [utils.b64_to_img(i) for i in obj["images"]]
+        self._ptr = obj["ptr"]

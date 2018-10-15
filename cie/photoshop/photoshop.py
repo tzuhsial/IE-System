@@ -183,13 +183,15 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         """
         # Get all system actions
         system_acts = self.observation.get('system_acts', list())
-        sys_act = system_acts[0]
-        sys_dialogue_act = sys_act['dialogue_act']['value']
 
-        if sys_dialogue_act == SystemAct.EXECUTE:
-            intent = sys_act['intent']['value']
-            slots = sys_act['slots']
-            self.act_execute(intent, slots)
+        if len(system_acts) > 0:
+            sys_act = system_acts[0]
+            sys_dialogue_act = sys_act['dialogue_act']['value']
+
+            if sys_dialogue_act == SystemAct.EXECUTE:
+                intent = sys_act['intent']['value']
+                slots = sys_act['slots']
+                self.act_execute(intent, slots)
 
         ps_act = self.act_inform()
 
@@ -213,7 +215,7 @@ class SimplePhotoshopAgent(SimplePhotoshop):
             execute_result, msg = self.control(intent, args)
         else:
             execute_result, msg = self.execute(intent, args)
-
+        print("[Photoshop] execute:", execute_result)
         self.last_execute_result = execute_result
         self.last_execute_message = msg
 
@@ -272,6 +274,18 @@ class SimplePhotoshopAgent(SimplePhotoshop):
         }
 
         return ps_act
+
+    def to_json(self):
+        obj = {}
+        obj["history"] = self.history.to_json()
+        obj["masks"] = [[m_idx, img_to_b64(m)] for m_idx, m in self.masks]
+        obj["state"] = self.state
+        return obj
+
+    def from_json(self, obj):
+        self.history.from_json(obj["history"])
+        self.masks = obj["masks"]
+        self.state = obj["state"]
 
 
 class SimplePhotoshopClient(object):

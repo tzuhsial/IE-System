@@ -27,6 +27,14 @@ class ExecutionHistory(object):
     def clear(self):
         return self._stack.clear()
 
+    def to_json(self):
+        obj = {}
+        obj["size"] = self.size()
+        return obj
+
+    def from_json(self, obj):
+        self._stack = [None] * obj["size"]
+
     def select_object(self, object, **kwargs):
         """
         Args
