@@ -66,7 +66,7 @@ class SimplePhotoshop(object):
             colors = utils.random_colors(len(masks))
             for (mask_id, mask), color in zip(masks, colors):
                 img = Selector.apply_polygon(img, mask, color)
-                img = Selector.apply_caption(img, mask, str(mask_id), color)
+                #img = Selector.apply_caption(img, mask, str(mask_id), color)
         return img
 
     def get_masks(self):

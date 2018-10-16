@@ -57,6 +57,8 @@ class Selector(object):
         Draw a polygon onto the image 
         """
         # Find contours
+        if isinstance(mask, str):
+            mask = utils.b64_to_img(mask)
         padded_mask = np.zeros(
             (mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
         padded_mask[1:-1, 1:-1] = mask[:, :, 0]

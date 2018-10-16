@@ -4,6 +4,11 @@
 
 ### Getting Started
 
+To start the system website, you will need
+1. [Conversational Image Editing](https://github.com/iammrhelo/ConversationalImageEditing)(this repo)
+2. [EditmeTagger](https://github.com/iammrhelo/EditmeTagger)(NLU)
+3. [MongoDB](https://docs.mongodb.com/manual/installation/#mongodb-community-edition)(for session and logging purposes)
+
 #### Installation
 
 Create a conda environment and setup with the necessary packages
@@ -12,5 +17,15 @@ Create a conda environment and setup with the necessary packages
 # Creates a conda environment named "cie" in python3.5
 conda create -n cie python=3.5
 pip install -r requirements.txt
-conda install -c menpo opencv3
+conda install -c menpo opencv3 
 ```
+
+#### Start service
+
+### TODO
+* User Interface
+    - [ ] Debug gesture_click on object location image
+    - [ ] object_mask_str user input should remove system queries
+    - [ ] Display turn count
+* Photoshop
+    - [ ] Optimize image processing, this is the current bottleneck
