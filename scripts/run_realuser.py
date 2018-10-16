@@ -74,8 +74,11 @@ def serve(argv):
         open_slots = open_goal['slots']
 
         image_path_slot = util.find_slot_with_key("image_path", open_slots)
-
         image_path = image_path_slot['value']
+        image_name = os.path.basename(image_path)
+        image_dir = "./sampled_100/image"
+        image_path = os.path.join(image_dir, image_name)
+        print('image_path:', image_path)
         result, msg = photoshop.control("open", {'image_path': image_path})
         assert result
 
@@ -146,6 +149,7 @@ def serve(argv):
             img = photoshop.get_image()
             gesture_click = np.zeros_like(img)
             gesture_click[x][y][:] = 255
+            # Perhaps we can expand a little bit
             gesture_click_str = util.img_to_b64(gesture_click)
 
             gesture_click_slot = {'slot': 'gesture_click',
@@ -189,7 +193,6 @@ def serve(argv):
             mask_strs = []
             for mask_idx, mask_str in enumerate(mask_str_node.value_conf_map.keys()):
                 mask_strs.append((mask_idx, mask_str))
-
             result, msg = photoshop.control(
                 'load_mask_strs', {"mask_strs": mask_strs})
 
