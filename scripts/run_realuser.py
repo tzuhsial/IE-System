@@ -283,7 +283,7 @@ def serve(argv):
         obj['b64_img_str'] = loaded_b64_img_str
         return jsonify(obj)
 
-    app.run(host='0.0.0.0', port=2000, debug=True)
+    app.run(host='0.0.0.0', port=2000)
 
 
 def terminal(argv):
@@ -314,8 +314,11 @@ def terminal(argv):
     open_slots = open_goal['slots']
 
     image_path_slot = util.find_slot_with_key("image_path", open_slots)
-
     image_path = image_path_slot['value']
+    image_dir = "./sampled_100/image"
+    image_name = os.path.basename(imag_path)
+    image_path = os.path.join(image_dir, image_name)
+
     result, msg = photoshop.control("open", {'image_path': image_path})
     assert result
     turn_info = {"turn": 0, "agenda_idx": 10}
