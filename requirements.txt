@@ -1,5 +1,8 @@
-Flask==1.0.2
-numpy==1.14.5
-requests==2.18.4
-scikit-image==0.14.0
-transitions==0.6.8
+requests
+flask
+numpy
+nltk
+tensorflow
+scikit-image
+pymongo
+tinydb
