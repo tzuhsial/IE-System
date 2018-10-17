@@ -22,6 +22,12 @@ conda install -c menpo opencv3
 
 #### Start service
 
+After starting EditmeTagger and MongoDB on localhost, run the following command to start the service. Current config uses Rule-based Policy.
+```bash
+./realuser_server.sh
+```
+
+
 ### TODO
 * User Interface
     - [ ] Debug gesture_click on object location image
