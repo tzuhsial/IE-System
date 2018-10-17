@@ -1,7 +1,5 @@
 # Conversational Image Editing
 
-
-
 ### Getting Started
 
 To start the system website, you will need
@@ -27,11 +25,16 @@ After starting EditmeTagger and MongoDB on localhost, run the following command 
 ./realuser_server.sh
 ```
 
-
 ### TODO
+* Evaluation
+    - [x] Set maximum number of turns, or execution
+    - [x] Customize goal index instead of random sampling
+    - [x] Record selected policy
+
 * User Interface
-    - [ ] Debug gesture_click on object location image
-    - [ ] object_mask_str user input should remove system queries
-    - [ ] Display turn count
+    - [x] Debug gesture_click on object location image
+    - [x] object_mask_str user input should remove system queries
+    - [x] Display turn count
+
 * Photoshop
     - [ ] Optimize image processing, this is the current bottleneck
