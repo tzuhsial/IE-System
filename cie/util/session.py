@@ -37,7 +37,7 @@ class SessionManager(object):
 
 class MongoDBManager(SessionManager):
     def __init__(self, host=None, port=None, **kwargs):
-        #self.client = MongoClient(host, port)
+        # self.client = MongoClient(host, port)
         self.client = MongoClient()
         self.db = self.client["cie"]
         self.dialogues = self.db["dialogues"]
@@ -57,6 +57,17 @@ class MongoDBManager(SessionManager):
         doc["turns"].append(turn_info)
 
         self.dialogues.replace_one({"session_id": session_id}, doc)
+
+    def add_policy(self, session_id, policy):
+        key = {"session_id": session_id}
+        self.dialogues.update_one(
+            key,
+            {
+                "$set": {
+                    "policy": policy
+                }
+            }
+        )
 
     def add_result(self, session_id, result):
         key = {"session_id": session_id}

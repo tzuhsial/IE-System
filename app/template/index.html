@@ -33,15 +33,30 @@
             <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
                 Instructions
             </button>
+            <!--->
             <!--
             <button type="button" class="btn btn-secondary" id="reset-button">Reset</button>
             -->
-            <button type="button" class="btn btn-success" id="success-button">Success</button>
-            <button type="button" class="btn btn-danger" id="failure-button">Failure</button>
 
             <hr>
-            <h4> Sampled Goal </h4>
-            <button type="submit" id="sample-button">Sample</button>
+            <div class="form-group">
+                <label for="sel1">
+                    <h4>Select Goal</h4>
+                </label>
+                <select class="form-control" id="sel1">
+                    <option selected disabled>Choose here</option>
+                    <option>1</option>
+                    <option>2</option>
+                    <option>3</option>
+                    <option>4</option>
+                    <option>5</option>
+                    <option>6</option>
+                    <option>7</option>
+                    <option>8</option>
+                    <option>9</option>
+                    <option>10</option>
+                </select>
+            </div>
             <span id="goal-text"></span>
             <button id="object_mask-button">Show/Hide object location</button>
             <div id="goal-container">
@@ -96,7 +111,8 @@
             </div>
         </form>
 
-
+        <hr>
+        <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
         <hr>
 
         <footer class="footer">
@@ -117,7 +133,8 @@
                 <div class="modal-body">
                     <ul class="list-group">
                         <li class="list-group-item">Your task is to perform an adjustment on the image using the
-                            prototype system. Our system will try to understand your goal through gestures and text.
+                            prototype system. Our system will try to understand your goal through gestures and
+                            text.
                             Image regions can obtained by you directly providing an gesture(object_mask_str) or
                             by the system performing object detection.
                         </li>
@@ -126,7 +143,8 @@
                             object 3. attribute 4. adjust_value. For objects that may contain multiple instances,
                             click on "Show/Hide object location" to see where the object location should be.
                         </li>
-                        <li class="list-group-item">You can interact with the system either by <b>gestures</b> or <b>text
+                        <li class="list-group-item">You can interact with the system either by <b>gestures</b> or
+                            <b>text
                                 input</b>. After providing gestures or text input, click "submit" to send to the
                             system.
                             "submit" button is located next to the text input box.
@@ -141,18 +159,21 @@
                             <b>Text input</b> are for you to express your goal in a natural way.
                             For example, having a goal like(intent=adjust, attribute=brightness, adjust_value=10,
                             object=man),
-                            you could say "make the man brighter" or "adjust brightness of the man by a value of 10."
+                            you could say "make the man brighter" or "adjust brightness of the man by a value of
+                            10."
                         </li>
                         <li class="list-group-item">
                             Our system will interact with you and ask questions like "What attribute do you want?",
                             or "Let me confirm. object_mask_str=xxx". For confirmations, simple type "yes" or "no."
                             object_mask_str will be displayed on the image for you to verify.
-                            When the system executes an action, it will show you the arguments it used.
-                            Please check if the execution arugments matches your goal. If yes, click on "success", and
-                            click on "failure".
+                            When the system executes an action, it will show you the arguments it used. The image will
+                            also be modified accordingly
                         </li>
                         <li class="list-group-item">
-                            Thank you for participating!
+                            A dialogue will end when system executes an action or <b>10</b> turns is reached.
+                            Afterwards, a popup will ask you whether the system has achieved your goal or not.
+                            Click on yes or no to record your response. The popup can also be shown by clicking
+                            on the End Dialogue button
                         </li>
                     </ul>
                 </div>
@@ -167,13 +188,15 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">End</h5>
+                    <h5 class="modal-title">Thank you for participating! </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p>Thank you for participating! You can now close the window</p>
+                    <p> Did the system successfully execute your goal? </p>
+                    <button type="button" class="btn btn-lg btn-success" id="success-button">Yes</button>
+                    <button type="button" class="btn btn-lg btn-danger" id="failure-button">No</button>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

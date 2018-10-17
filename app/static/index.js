@@ -7,7 +7,7 @@ var resultUrl = location.origin + "/result";
 var d = new Date();
 var n = d.getTime();
 var session_id = n.toString();
-var turn_count = 0;
+var turn_count = 1;
 
 // States
 // gesture_click
@@ -61,23 +61,30 @@ var submitRequest = function (user_utterance) {
 
     toggleLoading(true);
     $.post(stepUrl, data, function (response) {
-        console.log(response);
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
-        $("#system_utterance").text(response["system_utterance"])
+
+        var sys_utt = response["system_utterance"];
+
         updateTurnCount();
+        if (turn_count >= 10 || sys_utt.includes("Execute")) {
+            sys_utt += ". You may now click on End Dialogue ";
+            $("#end-modal").modal('show');
+        }
+        $("#system_utterance").text(sys_utt);
+
     }).always(function () {
         toggleLoading(false);
     })
 }
 
-var sampleGoal = function () {
+var sampleGoal = function (goal_idx = -1) {
     //console.log("Randomly sampling a goal...");
     var data = {
         "session_id": session_id,
+        "goal_idx": goal_idx
     }
     toggleLoading(true);
     $.post(sampleUrl, data, function (response) {
-        console.log(response);
         var b64_img_str = response["b64_img_str"];
         $("#image").attr("src", "data:image/png;base64," + b64_img_str);
 
@@ -231,11 +238,21 @@ $(document).ready(function () {
         $("#goal-container").toggle();
     });
 
+    $("select").on('change', function (e) {
+        var goal_idx = parseInt(this.value);
+        sampleGoal(goal_idx);
+    })
+
+
     $("#success-button").on('click', function (event) {
         submitResult("success");
     });
     $("#failure-button").on('click', function (event) {
         submitResult("failure");
     });
-    sampleGoal();
+    //sampleGoal();
+
+    $("#end-button").on("click", function () {
+        $("#end-modal").modal("show");
+    })
 });

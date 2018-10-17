@@ -59,6 +59,7 @@ def serve(argv):
         """
         # Load sesssion
         session_id = int(request.form.get("session_id", 0))  # default to 0
+        goal_idx = int(request.form.get("goal_idx", -1))
         print("session_id", session_id)
         dialogue = session.retrieve(session_id)
 
@@ -67,8 +68,10 @@ def serve(argv):
         system.reset()
         photoshop.reset()
 
-        idx, agenda = random.choice(list(enumerate(test_agendas)))
-        #agenda = test_agendas[10]
+        if goal_idx >= 0:
+            idx, agenda = goal_idx, test_agendas[goal_idx]
+        else:
+            idx, agenda = random.choice(list(enumerate(test_agendas)))
 
         open_goal = agenda[0]
         open_slots = open_goal['slots']
@@ -98,6 +101,7 @@ def serve(argv):
         state_json = system.state.to_json()
         ps_json = photoshop.to_json()
         session.add_turn(session_id, state_json, ps_json, turn_info)
+        session.add_policy(session_id, system.policy.__class__.__name__)
 
         # Build return object
         goal = {}
@@ -223,6 +227,7 @@ def serve(argv):
             loaded_b64_img_str = util.img_to_b64(img)
 
         system.observe(photoshop_act)
+
         # Record to session
         turn_info = {"user": user_utt,
                      "system": sys_utt, "turn": system.turn_id}
@@ -286,7 +291,7 @@ def serve(argv):
         obj['b64_img_str'] = loaded_b64_img_str
         return jsonify(obj)
 
-    app.run(host='0.0.0.0', port=2000)
+    app.run(host='0.0.0.0', port=2000, debug=True)
 
 
 def terminal(argv):
