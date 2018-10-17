@@ -167,6 +167,7 @@ class System(object):
         object_mask_str_node = self.state.get_slot('object_mask_str')
 
         # clear_object
+        # Force directly add into object_mask_strs
         object_mask_str_node.value_conf_map.clear()
         if len(mask_strs) > 0:
             object_mask_str_node.value_conf_map = \

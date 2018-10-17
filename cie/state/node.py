@@ -489,6 +489,28 @@ class ObjectMaskStrNode(BeliefNode):
         super(ObjectMaskStrNode, self).__init__(name, threshold,
                                                 possible_values, validator)
 
+    def add_observation(self, value, conf, turn_id):
+        """
+        adding one value from clears original values
+        """
+        class_name = self.__class__.__name__
+
+        if conf < 1.0:
+            logger.error("{} {} observed confidence less than 1.0!"
+                         .format(class_name, self.name))
+            return False
+        if value == "":
+            logger.info("{} {} observed value empty".format(
+                class_name, self.name))
+            return False
+        prev_value_conf_map = copy.deepcopy(self.value_conf_map)
+        self.value_conf_map = {} 
+        result = super(ObjectMaskStrNode, self).add_observation(
+            value, conf, turn_id)
+        if not result:
+            self.value_conf_map = prev_value_conf_map
+        return result
+
     def pull(self):
         """
         ObjectMaskNode should have 3 children

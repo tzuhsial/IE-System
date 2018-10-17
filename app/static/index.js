@@ -7,6 +7,7 @@ var resultUrl = location.origin + "/result";
 var d = new Date();
 var n = d.getTime();
 var session_id = n.toString();
+var turn_count = 0;
 
 // States
 // gesture_click
@@ -16,6 +17,11 @@ var ycor = -1;
 // Bounding box
 var editor = null;
 var bb_cors = null;
+
+var updateTurnCount = function (inc = 1) {
+    turn_count += inc;
+    $("#turn-count").text("Turn Count: " + turn_count);
+}
 
 var submitRequest = function (user_utterance) {
 
@@ -58,6 +64,7 @@ var submitRequest = function (user_utterance) {
         console.log(response);
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
         $("#system_utterance").text(response["system_utterance"])
+        updateTurnCount();
     }).always(function () {
         toggleLoading(false);
     })
@@ -85,8 +92,8 @@ var sampleGoal = function () {
         goal_text += ", attribute=" + goal["attribute"];
         goal_text += ", adjust_value=" + goal["adjust_value"];
         $("#goal-text").text(goal_text);
-
         $("#system_utterance").text(response["system_utterance"]);
+        updateTurnCount(-turn_count);
     }).always(function () {
         toggleLoading(false);
     })
@@ -101,6 +108,7 @@ var submitReset = function () {
         console.log("reset");
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
         $("#system_utterance").text(response["system_utterance"])
+        updateTurnCount(-turn_count);
     }).always(function () {
         toggleLoading(false);
     });
@@ -209,6 +217,17 @@ $(document).ready(function () {
     });
 
     $("#object_mask-button").on('click', function (event) {
+        if (xcor >= 0 && ycor >= 0) {
+            var container_height = $("#goal-container").height();
+            var marker_pos = $("#marker").offset();
+            if ($("#goal-container").is(":hidden")) {
+
+                $('#marker').css('top', marker_pos["top"] + container_height).show();
+            } else {
+                $('#marker').css('top', marker_pos["top"] - container_height).show();
+            }
+        }
+
         $("#goal-container").toggle();
     });
 
