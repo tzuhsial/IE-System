@@ -173,13 +173,13 @@ class System(object):
             object_mask_str_node.value_conf_map = \
                 {mask_str: 0.5 for mask_str in mask_strs}
         object_mask_str_node.last_update_turn_id += 1
-        print("Query results:", len(mask_strs))
+        #print("Query results:", len(mask_strs))
 
         # Filter candidates with gesture_click
         gesture_click = self.state.get_slot('gesture_click').get_max_value()
         if gesture_click is not None:
             object_mask_str_node.filter_candidates(gesture_click)
-            print("Filtered results", len(object_mask_str_node.value_conf_map))
+            #print("Filtered results", len(object_mask_str_node.value_conf_map))
 
         object_mask_str_node.last_update_turn_id += 1
 

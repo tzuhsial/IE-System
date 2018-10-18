@@ -147,15 +147,15 @@ class VisionEngineDatabase(BaseVisionEngine):
 
     def select_object(self, b64_img_str=None, object=None, position=None, adjective=None, color=None, **kwargs):
         if b64_img_str is None:
-            print("[visionengine] missing b64_img_str")
+            #print("[visionengine] missing b64_img_str")
             logging.debug("[visionengine] missing b64_img_str")
             return []
         elif object is None:
-            print("[visionengine] missing object")
+            #print("[visionengine] missing object")
             logging.debug("[visionengine] missing object")
             return []
         elif b64_img_str not in self.db:
-            print("[visionengine] b64_img_str not in db")
+            #print("[visionengine] b64_img_str not in db")
             logger.debug("{} not in db".format(b64_img_str))
             return []
         mask_strs = self.db.get(b64_img_str).get(object)

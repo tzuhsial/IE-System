@@ -329,6 +329,10 @@ class DQNPolicy(BasePolicy):
         logdir = self.config["logdir"]
         self.writer = tf_utils.create_filewriter(logdir, self.sess.graph)
 
+        # Load from existing model
+        if self.config["load"]:
+            self.load(self.config["load"])
+
     def build_from_config(self):
 
         # Directly load config

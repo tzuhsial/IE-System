@@ -45,6 +45,12 @@ def serve(argv):
     system.reset()
     photoshop.reset()
 
+    # For RL Policies
+    policy_config = config["agents"]["system"]["policy"]
+    if policy_config["name"] == "DQNPolicy":
+        assert policy_config["load"] is not None
+        system.policy.update_epsilon(test=True)
+
     app = Flask(
         __name__, template_folder='../app/template', static_folder='../app/static')
 
@@ -239,6 +245,7 @@ def serve(argv):
         obj = {}
         obj['system_utterance'] = sys_utt
         obj['b64_img_str'] = loaded_b64_img_str  # We need to return the image
+        obj['last_execute_result'] = photoshop.last_execute_result
         return jsonify(obj)
 
     @app.route("/result", methods=["POST"])

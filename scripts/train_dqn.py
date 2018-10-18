@@ -1,15 +1,22 @@
-from configparser import ConfigParser
 import json
+import logging
 import os
 import random
 import sys
+from configparser import ConfigParser
+
 root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.insert(0, root_dir)
+
 
 import numpy as np
 from tqdm import tqdm
 
-from cie import ImageEditWorld, EvaluationManager, util
+from cie import EvaluationManager, ImageEditWorld, util
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 def run_agendas(agendas,
@@ -33,9 +40,6 @@ def run_agendas(agendas,
     goals = []
 
     for agenda in tqdm(agendas):
-        if not train_mode:
-            import pdb
-            pdb.set_trace()
         world.reset()
         user.load_agenda(agenda)
 
@@ -50,10 +54,12 @@ def run_agendas(agendas,
                 policy.update_epsilon(global_step)
             else:
                 policy.update_epsilon(test=True)
+            """
             if train_mode == False:
                 world.config["verbose"] = True
             else:
                 pass
+            """
 
             world.parley()
 

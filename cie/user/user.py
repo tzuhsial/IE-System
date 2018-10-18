@@ -243,7 +243,7 @@ class AgendaBasedUserSimulator(object):
                                 target_slots)
 
         # Expertise probability dict hard coded here
-        expertise = {"expert": 0.0, "intermediate": 0.2, "novice": 0.4}
+        expertise = {"expert": 0.0,  "novice": 0.5}
 
         if self.level in expertise:
             drop_prob = expertise.get(self.level)

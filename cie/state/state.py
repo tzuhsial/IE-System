@@ -8,7 +8,7 @@ from .node import builder as nodelib
 from ..util import slot_to_observation
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class State(object):
@@ -116,7 +116,7 @@ class State(object):
 
             result = slot_node.add_observation(**obsrv)
             if not result:
-                logger.info("Failed to add observation {} to slot {}".format(
+                logger.debug("Failed to add observation {} to slot {}".format(
                     obsrv, slot_name))
 
     def pull(self):
