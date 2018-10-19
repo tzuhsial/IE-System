@@ -1,0 +1,349 @@
+{
+    "result": "failure",
+    "turns": [{
+        "agenda_id": 4,
+        "turn": 0
+    }, {
+        "system": "What image_path do you want?",
+        "turn": 2,
+        "user": "adjust the freaking tv"
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 3,
+        "user": "i already have that"
+    }, {
+        "system": "What attribute do you want?",
+        "turn": 4,
+        "user": ""
+    }, {
+        "system": "Execute: object_mask_str=iVBOR, adjust_value=, attribute=saturation, intent=adjust.",
+        "turn": 5,
+        "user": "saturation"
+    }],
+    "session_id": {
+        "$numberLong": "1539811523423"
+    },
+    "policy": "DQNPolicy",
+    "_id": {
+        "$oid": "5bc7a8c5635c4b319e670ede"
+    }
+} {
+    "result": "success",
+    "turns": [{
+        "agenda_id": 6,
+        "turn": 0
+    }, {
+        "system": "What attribute do you want?",
+        "turn": 2,
+        "user": "adjust the person by -30"
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 3,
+        "user": "saturation"
+    }, {
+        "system": "Execute: adjust_value=-30, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 4,
+        "user": ""
+    }, {
+        "system": "Execute: intent=undo.",
+        "turn": 5,
+        "user": "undo"
+    }],
+    "session_id": {
+        "$numberLong": "1539811837215"
+    },
+    "policy": "DQNPolicy",
+    "_id": {
+        "$oid": "5bc7a9ff635c4b32e79d78ee"
+    }
+} {
+    "result": "success",
+    "turns": [{
+        "agenda_id": 5,
+        "turn": 0
+    }, {
+        "system": "Let me confirm. gesture_click is ?",
+        "turn": 2,
+        "user": "adjust saturation of the clock"
+    }, {
+        "system": "Let me confirm. gesture_click is ?",
+        "turn": 3,
+        "user": "hahahah"
+    }, {
+        "system": "Let me confirm. gesture_click is ?",
+        "turn": 4,
+        "user": "hahahah"
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 5,
+        "user": "adjust the clock"
+    }, {
+        "system": "Execute: attribute=saturation, object_mask_str=iVBOR, adjust_value=, intent=adjust.",
+        "turn": 6,
+        "user": ""
+    }, {
+        "system": "Execute: attribute=saturation, object_mask_str=iVBOR, adjust_value=10, intent=adjust.",
+        "turn": 7,
+        "user": "adjust 10 "
+    }],
+    "session_id": {
+        "$numberLong": "1539827656881"
+    },
+    "policy": "DQNPolicy",
+    "_id": {
+        "$oid": "5bc7e7cb731f62387986d0cb"
+    }
+} {
+    "result": "success",
+    "turns": [{
+        "agenda_id": 4,
+        "turn": 0
+    }, {
+        "system": "Let me confirm. gesture_click is ?",
+        "turn": 2,
+        "user": "adjust saturation of the tv"
+    }, {
+        "system": "Let me confirm. object_mask_str is ?",
+        "turn": 3,
+        "user": "no"
+    }, {
+        "system": "Execute: attribute=saturation, object_mask_str=iVBOR, adjust_value=, intent=adjust.",
+        "turn": 4,
+        "user": ""
+    }, {
+        "system": "Execute: attribute=saturation, object_mask_str=iVBOR, adjust_value=5, intent=adjust.",
+        "turn": 5,
+        "user": "adjust saturation of the tv by 5"
+    }],
+    "session_id": {
+        "$numberLong": "1539828215984"
+    },
+    "policy": "DQNPolicy",
+    "_id": {
+        "$oid": "5bc7ea06731f62387986d0cf"
+    }
+} {
+    "result": "failure",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539899059610"
+    },
+    "turns": [{
+        "agenda_id": 1,
+        "turn": 0
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 2,
+        "user": "adjust the saturation of the chair to 10 "
+    }, {
+        "system": "Execute: adjust_value=10, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": ""
+    }, {
+        "agenda_id": 2,
+        "turn": 0
+    }, {
+        "system": "What image_path do you want?",
+        "turn": 2,
+        "user": "make the knife more blurry"
+    }, {
+        "system": "Let me confirm. gesture_click is iVBOR?",
+        "turn": 3,
+        "user": ""
+    }, {
+        "system": "Execute: adjust_value=, attribute=, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 4,
+        "user": "Yeah I confirm"
+    }, {
+        "system": "Execute: adjust_value=30, attribute=contrast, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 5,
+        "user": "adjust the contrast of the knife to minus 30"
+    }, {
+        "agenda_id": 3,
+        "turn": 0
+    }],
+    "_id": {
+        "$oid": "5bc8feb5635c4b511394b285"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539899498507"
+    },
+    "turns": [{
+        "agenda_id": 3,
+        "turn": 0
+    }, {
+        "system": "Execute: adjust_value=10, attribute=, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 2,
+        "user": "Adjust THE SATURATION OF the car to 10"
+    }, {
+        "system": "Execute: adjust_value=10, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": "adjust the car's saturation to 10"
+    }],
+    "_id": {
+        "$oid": "5bc9006e635c4b511394b286"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539899605490"
+    },
+    "turns": [{
+        "agenda_id": 4,
+        "turn": 0
+    }, {
+        "system": "Execute: adjust_value=5, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 2,
+        "user": "adjust the tv saturation by 5"
+    }, {
+        "agenda_id": 5,
+        "turn": 0
+    }],
+    "_id": {
+        "$oid": "5bc900dd635c4b511394b287"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539899853170"
+    },
+    "turns": [{
+        "agenda_id": 5,
+        "turn": 0
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 2,
+        "user": "make the clock more saturated by 5"
+    }, {
+        "system": "Execute: adjust_value=5, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": ""
+    }, {
+        "agenda_id": 6,
+        "turn": 0
+    }],
+    "_id": {
+        "$oid": "5bc901d1635c4b511394b288"
+    }
+} {
+    "result": "failure",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539899943820"
+    },
+    "turns": [{
+        "agenda_id": 6,
+        "turn": 0
+    }, {
+        "system": "Execute: adjust_value=30, attribute=brightness, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 2,
+        "user": "make the man 30% less bright"
+    }],
+    "_id": {
+        "$oid": "5bc9022b635c4b511394b289"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539901897825"
+    },
+    "turns": [{
+        "agenda_id": 7,
+        "turn": 0
+    }, {
+        "system": "Let me confirm. gesture_click is ?",
+        "turn": 2,
+        "user": "make the man brighter"
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 3,
+        "user": "make the man brighter"
+    }, {
+        "system": "Execute: adjust_value=, attribute=brightness, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 4,
+        "user": ""
+    }, {
+        "system": "Execute: adjust_value=30, attribute=brightness, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 5,
+        "user": "make the man 30 brighter"
+    }],
+    "_id": {
+        "$oid": "5bc909cb635c4b511394b28b"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539902281357"
+    },
+    "turns": [{
+        "agenda_id": 8,
+        "turn": 0
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 2,
+        "user": "make the laptop 10 darker"
+    }, {
+        "system": "Execute: adjust_value=10, attribute=, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": "make the laptop 10 darker"
+    }, {
+        "system": "Execute: adjust_value=-10, attribute=brightness, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 4,
+        "user": "make the laptop -10 brighter"
+    }],
+    "_id": {
+        "$oid": "5bc90b4b635c4b511394b28c"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539903388180"
+    },
+    "turns": [{
+        "agenda_id": 9,
+        "turn": 0
+    }, {
+        "system": "What object_mask_str do you want?",
+        "turn": 2,
+        "user": "increase the man's saturation by 10"
+    }, {
+        "system": "Execute: adjust_value=10, attribute=saturation, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": "man"
+    }, {
+        "agenda_id": 10,
+        "turn": 0
+    }],
+    "_id": {
+        "$oid": "5bc90f9e635c4b511394b28d"
+    }
+} {
+    "result": "success",
+    "policy": "DQNPolicy",
+    "session_id": {
+        "$numberLong": "1539903737612"
+    },
+    "turns": [{
+        "agenda_id": 10,
+        "turn": 0
+    }, {
+        "system": "What attribute do you want?",
+        "turn": 2,
+        "user": "adjust zebra's lightness by 5"
+    }, {
+        "system": "Execute: adjust_value=5, attribute=lightness, object_mask_str=iVBOR, intent=adjust.",
+        "turn": 3,
+        "user": "lightness"
+    }],
+    "_id": {
+        "$oid": "5bc910fc635c4b511394b28e"
+    }
+}
