@@ -18,6 +18,10 @@ conda activate cie
 pip install --uprade pip
 pip install -r requirements.txt
 conda install -c menpo opencv3 
+sudo apt-get update
+sudo apt-get install libgtk2.0-dev
+import nltk
+nltk.download('stopwords')
 ```
 
 #### Start service
