@@ -28,7 +28,7 @@ exit()
 
 #### Start service
 
-After starting EditmeTagger and MongoDB on localhost (```sudo service mongod start```), run the following command to start the service. Current config uses Rule-based Policy.
+After starting EditmeTagger and MongoDB on localhost (```sudo service mongod start```), run the following command to start the service. Current config uses Rule-based Policy. Note: If you plan to use EC2 instance, create a security group that allows all incoming traffic to TCP port 2000.
 ```bash
 ./realuser_server.sh
 ```
