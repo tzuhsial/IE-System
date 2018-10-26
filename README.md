@@ -15,6 +15,7 @@ Create a conda environment and setup with the necessary packages
 # Creates a conda environment named "cie" in python3.5
 conda create -n cie python=3.5
 conda activate cie
+pip install --uprade pip
 pip install -r requirements.txt
 conda install -c menpo opencv3 
 ```
