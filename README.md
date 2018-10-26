@@ -23,6 +23,7 @@ sudo apt-get install libgtk2.0-dev
 python
 import nltk
 nltk.download('stopwords')
+exit()
 ```
 
 #### Start service
