@@ -14,13 +14,21 @@ Create a conda environment and setup with the necessary packages
 ```bash
 # Creates a conda environment named "cie" in python3.5
 conda create -n cie python=3.5
+conda activate cie
+pip install --uprade pip
 pip install -r requirements.txt
 conda install -c menpo opencv3 
+sudo apt-get update
+sudo apt-get install libgtk2.0-dev
+python
+import nltk
+nltk.download('stopwords')
+exit()
 ```
 
 #### Start service
 
-After starting EditmeTagger and MongoDB on localhost, run the following command to start the service. Current config uses Rule-based Policy.
+After starting EditmeTagger and MongoDB on localhost (```sudo service mongod start```), run the following command to start the service. Current config uses Rule-based Policy. Note: If you plan to use EC2 instance, create a security group that allows all incoming traffic to TCP port 2000.
 ```bash
 ./realuser_server.sh
 ```
