@@ -1,5 +1,11 @@
 {
     "ontology": "./config/imageedit.ontology.json",
+    "session": {
+        "session": "MongoDBManager",
+        "host": null,
+        "port": null,
+        "db_path": null
+    },
     "agendas": {
         "train": "./sampled_100/agenda.v1.train.pickle",
         "test": "./sampled_100/agenda.v1.test.pickle"
@@ -8,22 +14,9 @@
         "verbose": false
     },
     "agents": {
-        "user": {
-            "user": "AgendaBasedUserSimulator",
-            "level": "novice",
-            "patience": 20,
-            "turn_penalty": 0,
-            "success_goal_reward": 0,
-            "failure_goal_penalty": 0,
-            "request_object_mask_str_penalty": 0,
-            "dice_threshold": 0.5,
-            "gesture_threshold": 0.0
-        },
-        "channel": {
-            "ontology": "./config/imageedit.ontology.json",
-            "channel": "MultimodalChannel",
-            "speech_conf_mean": 0.5,
-            "speech_conf_std": 0.0
+        "tracker": {
+            "tracker": "EditmeTagger",
+            "uri": "http://localhost:2004/tag"
         },
         "system": {
             "ontology": "./config/imageedit.ontology.json",
@@ -43,13 +36,13 @@
                     "memory_size": 2000,
                     "load_path": null
                 },
-                "save_replaymemory": "memory/rulepolicy.novice.error0.pickle"
+                "save_replaymemory": null
             }
         },
         "photoshop": {
-            "photoshop": "SuperficialPhotoshop",
+            "photoshop": "SimplePhotoshop",
             "client": false,
-            "uri": "http://localhost:2005",
+            "uri": "http://localhost:3000",
             "verbose": true
         }
     }

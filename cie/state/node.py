@@ -27,6 +27,7 @@ class BeliefNode(object):
     """
 
     LAMBDA = 1.0
+    DECAY = 0.2
     K = 5
 
     def __init__(self,
@@ -89,15 +90,27 @@ class BeliefNode(object):
             return False
 
         # Rule-based belief update
+        """
         for key in self.value_conf_map:
             self.value_conf_map[key] *= (1 - self.LAMBDA)
             logger.debug("node {} decayed value {} conf to {}".format(
                 self.name, key, self.value_conf_map[key]))
+        """
+
+        for key in self.value_conf_map:
+            prev_conf = self.value_conf_map[key]
+            self.value_conf_map[key] = max(0.0, prev_conf - self.DECAY)
+            logger.debug("node {} decayed value {} conf to {}".format(
+                self.name, key, self.value_conf_map[key]))
 
         # Simply assign confidence for now
+
         prev_decayed_conf = self.value_conf_map.get(value, 0.0)
-        self.value_conf_map[value] = prev_decayed_conf + self.LAMBDA * conf
+        # self.value_conf_map[value] = prev_decayed_conf + self.LAMBDA * conf
+        self.value_conf_map[value] = min(
+            prev_decayed_conf + self.LAMBDA * conf, 1.0)
         self.last_update_turn_id = turn_id
+        # print(self.name, self.value_conf_map)
         return True
 
     def get_max_conf_value(self):
@@ -161,7 +174,7 @@ class BeliefNode(object):
     #########################
     def add_child(self, node, optional=False):
         """
-        adds children 
+        adds children
         Args:
             node (obj): the child node to be added
             optional (bool): whether this child is optional
@@ -208,12 +221,36 @@ class BeliefNode(object):
         intent = SysIntent()
         slot = self.to_json()
         max_conf = slot.get('conf', 0.0)
-        if max_conf < 0.5:
-            intent.request_slots.append(slot)
-        elif max_conf < self.threshold:  # 0.8
-            intent.confirm_slots.append(slot)
+
+        # Top 2 hypothesis
+        sorted_values = sorted(
+            self.value_conf_map.items(), key=lambda x: (-x[1], x[0]))
+
+        if len(sorted_values) <= 1:
+
+            if max_conf < 0.5:
+                intent.request_slots.append(slot)
+            elif max_conf < self.threshold:  # 0.8
+                intent.confirm_slots.append(slot)
+            else:
+                intent.execute_slots.append(slot)
+            return intent
+
+        (top_value, top_prob) = sorted_values[0]
+        (sec_value, sec_prob) = sorted_values[1]
+
+        top_slot = {"slot": self.name, "value": top_value, "conf": top_prob}
+        sec_slot = {"slot": self.name, "value": sec_value, "conf": sec_prob}
+
+        if top_prob >= self.threshold:
+            intent.execute_slots.append(top_slot)
         else:
-            intent.execute_slots.append(slot)
+            if top_prob > 0.6:
+                intent.confirm_slots.append(top_slot)
+            elif top_prob > 0.3 and top_prob - sec_prob >= 0.2:
+                intent.confirm_slots.append(top_slot)
+            else:
+                intent.request_slots.append(top_slot)
         return intent
 
     def _build_children_intent(self):
@@ -408,7 +445,6 @@ class PSToolNode(BeliefNode):
         Only one value can be present at the time
         """
         class_name = self.__class__.__name__
-
         if conf < 1.0:
             logger.error("{} {} observed confidence less than 1.0!"
                          .format(class_name, self.name))
@@ -494,17 +530,18 @@ class ObjectMaskStrNode(BeliefNode):
         adding one value from clears original values
         """
         class_name = self.__class__.__name__
-
+        """
         if conf < 1.0:
             logger.error("{} {} observed confidence less than 1.0!"
                          .format(class_name, self.name))
             return False
+        """
         if value == "":
             logger.info("{} {} observed value empty".format(
                 class_name, self.name))
             return False
         prev_value_conf_map = copy.deepcopy(self.value_conf_map)
-        self.value_conf_map = {} 
+        self.value_conf_map = {}
         result = super(ObjectMaskStrNode, self).add_observation(
             value, conf, turn_id)
         if not result:

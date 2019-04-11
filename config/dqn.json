@@ -1,7 +1,7 @@
 {
     "ontology": "./config/imageedit.ontology.json",
     "agendas": {
-        "train": "./sampled_100/agenda.v1.all.pickle",
+        "train": "./sampled_100/agenda.v1.train.pickle",
         "test": "./sampled_100/agenda.v1.test.pickle"
     },
     "world": {
@@ -10,11 +10,11 @@
     "agents": {
         "user": {
             "user": "AgendaBasedUserSimulator",
-            "level": "expert",
+            "level": "novice",
             "patience": 20,
             "turn_penalty": 0,
-            "success_goal_reward": 10,
-            "failure_goal_penalty": -10,
+            "success_goal_reward": 0,
+            "failure_goal_penalty": 0,
             "request_object_mask_str_penalty": 0,
             "dice_threshold": 0.5,
             "gesture_threshold": 0.0
@@ -22,7 +22,7 @@
         "channel": {
             "ontology": "./config/imageedit.ontology.json",
             "channel": "MultimodalChannel",
-            "speech_conf_mean": 1.0,
+            "speech_conf_mean": 0.5,
             "speech_conf_std": 0.0
         },
         "system": {
@@ -43,9 +43,9 @@
                 "batch_size": 32,
                 "freeze_interval": 100,
                 "gamma": 0.99,
-                "load": null,
-                "logdir": "./log/train_dqn_debug",
-                "save": "./exp/train_dqn_debug",
+                "load": "./exp/dqn",
+                "logdir": "./log/dqn2",
+                "save": "./exp/dqn2",
                 "qnetwork": {
                     "input_size": null,
                     "hidden_size": 40,

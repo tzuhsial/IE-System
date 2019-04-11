@@ -53,6 +53,9 @@ def run_agendas(agendas, world):
             if episode_done:
                 break
 
+        #import pdb
+        # pdb.set_trace()
+
         ngoals = user.completed_goals()
 
         Turns.append(turn)
@@ -78,6 +81,7 @@ def main(argv):
 
     # Main loop here
     policy_config = config["agents"]["system"]["policy"]
+    """
     if policy_config["save_replaymemory"]:
         turns, returns, goals = run_agendas(train_agendas, world)
         print("Train")
@@ -88,7 +92,7 @@ def main(argv):
 
         experience = world.agents[2].policy.replaymemory.storage
         util.save_to_pickle(experience, policy_config['save_replaymemory'])
-
+    """
     turns, returns, goals = run_agendas(test_agendas, world)
     print("Test")
     print_mean_std("turn", turns)

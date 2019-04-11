@@ -191,7 +191,6 @@ class AgendaBasedUserSimulator(object):
         if user_act is None:
             user_act = self.act_inform_goal()
 
-        # TODO: customizer user behavior for more than one user acts
         user_acts.append(user_act)
 
         # Update turn_id

@@ -170,10 +170,19 @@
                             also be modified accordingly
                         </li>
                         <li class="list-group-item">
-                            A dialogue will end when system executes an action or <b>10</b> turns is reached.
+                            You goal is to evaluate the <b>Execution</b> of the system. This means an edit action on
+                            the image.
+                            However, the system may execute before obtaining the necessary arguments. As a result,
+                            nothing will happen
+                            to the image, and you can see execute_result: False in the system response. If an edit
+                            action is successfully
+                            executed, you will see execute_result: True.
+                        </li>
+                        <li class="list-group-item">
+                            The dialogue will end when system executes an action or <b>10</b> turns is reached.
                             Afterwards, a popup will ask you whether the system has achieved your goal or not.
                             Click on yes or no to record your response. The popup can also be shown by clicking
-                            on the End Dialogue button
+                            on the End Dialogue button. To perform another round, please refresh the webpage.
                         </li>
                     </ul>
                 </div>
@@ -197,6 +206,7 @@
                     <p> Did the system successfully execute your goal? </p>
                     <button type="button" class="btn btn-lg btn-success" id="success-button">Yes</button>
                     <button type="button" class="btn btn-lg btn-danger" id="failure-button">No</button>
+                    <p>After recording, please refresh the webpage for a different session id</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

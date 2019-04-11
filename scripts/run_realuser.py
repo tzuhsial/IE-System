@@ -257,6 +257,9 @@ def serve(argv):
 
         session.add_result(session_id, result)
 
+        dialogue = session.retrieve(session_id)
+        print('turns', dialogue['turns'])
+
         # Create return_object
         obj = {}
         obj["system_utterance"] = "Result recorded. Thank you for participating!"
@@ -269,6 +272,7 @@ def serve(argv):
         session_id = int(request.form.get("session_id", 0))  # default to 0
         print("session_id", session_id, "reset")
         dialogue = session.retrieve(session_id)
+        print('dialogue turns', dialogue['turns'])
         system.state.from_json(dialogue["system_state"])
         photoshop.from_json(dialogue["photoshop_state"])
 
@@ -331,7 +335,7 @@ def terminal(argv):
     image_path_slot = util.find_slot_with_key("image_path", open_slots)
     image_path = image_path_slot['value']
     image_dir = "./sampled_100/image"
-    image_name = os.path.basename(imag_path)
+    image_name = os.path.basename(image_path)
     image_path = os.path.join(image_dir, image_name)
 
     result, msg = photoshop.control("open", {'image_path': image_path})

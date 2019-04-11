@@ -64,10 +64,18 @@ var submitRequest = function (user_utterance) {
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
 
         var sys_utt = response["system_utterance"];
+        var last_execute_result = response["last_execute_result"];
+        console.log(response)
 
         updateTurnCount();
-        if (turn_count >= 10 || sys_utt.includes("Execute")) {
-            sys_utt += ". You may now click on End Dialogue ";
+
+        if (sys_utt.includes("Execute")) {
+            sys_utt += " Execution result " + last_execute_result.toString() + ".";
+        }
+
+        if (turn_count >= 10 || (sys_utt.includes("Execute") & last_execute_result)) {
+
+            sys_utt += " You may now click on End Dialogue ";
             $("#end-modal").modal('show');
         }
         $("#system_utterance").text(sys_utt);
@@ -100,7 +108,7 @@ var sampleGoal = function (goal_idx = -1) {
         goal_text += ", adjust_value=" + goal["adjust_value"];
         $("#goal-text").text(goal_text);
         $("#system_utterance").text(response["system_utterance"]);
-        updateTurnCount(-turn_count);
+        updateTurnCount(-turn_count + 1);
     }).always(function () {
         toggleLoading(false);
     })

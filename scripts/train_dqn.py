@@ -49,17 +49,17 @@ def run_agendas(agendas,
         loss = 0
         episode_done = False
 
+        debug = False
+        if debug and not train_mode:
+            world.config["verbose"] = True
+            import pdb
+            pdb.set_trace()
+
         while not episode_done:
             if train_mode:
                 policy.update_epsilon(global_step)
             else:
                 policy.update_epsilon(test=True)
-            """
-            if train_mode == False:
-                world.config["verbose"] = True
-            else:
-                pass
-            """
 
             world.parley()
 
