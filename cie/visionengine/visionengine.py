@@ -134,6 +134,44 @@ class MaskRCNNClient(BaseVisionEngine):
         return mask_strs
 
 
+class MAttNetClient(BaseVisionEngine):
+    """
+    Client to self-hosted MAttNet server
+
+    Supports referring expression
+    """
+
+    def __init__(self, **kwargs):
+        self.uri = kwargs['uri']
+
+    def select_object(self, b64_img_str, object, **kwargs):
+        """
+        Args:
+            b64_img_str: numpy image in base64 string format
+            object: referring expression
+
+        Returns:
+            mask_strs: list of b64_mask_strs
+        """
+
+        # Unlike MingYan's engine, does not allow referring expressions
+        data = {
+            "expr": object,
+            "b64_img_str": b64_img_str
+        }
+        try:
+            logger.info("Querying MAttNet server")
+            response = requests.post(self.uri, data=data)
+            response.raise_for_status()
+            mask_img_str = response.json()['mask_img_str']
+            mask_strs = [mask_img_str]
+        except Exception as e:
+            print(e)
+            logger.info(e)
+            mask_strs = []
+        return mask_strs
+
+
 class VisionEngineDatabase(BaseVisionEngine):
     """
     Inferenced results from VisionEngine

@@ -3,6 +3,12 @@
     height: 300px;
 }
 
+.row,
+#jumbo {
+    margin-top: 20px;
+    text-align: center;
+}
+
 #image-container {
     text-align: center;
     height: 300px;

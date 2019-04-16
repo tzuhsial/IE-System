@@ -49,7 +49,6 @@ class System(object):
 
     def __init__(self, state, policy, visionengine):
         # Components
-
         self.state = state
         self.policy = policy
         self.visionengine = visionengine
@@ -159,6 +158,7 @@ class System(object):
         args = slots_to_args(query_slots)
         b64_img_str = self.state.get_slot(
             'original_b64_img_str').get_max_value()
+        assert b64_img_str is not None
         args['b64_img_str'] = b64_img_str
 
         mask_strs = self.visionengine.select_object(**args)
@@ -170,16 +170,18 @@ class System(object):
         # Force directly add into object_mask_strs
         object_mask_str_node.value_conf_map.clear()
         if len(mask_strs) > 0:
+            # MAttNet should only return 1 result, though
             object_mask_str_node.value_conf_map = \
-                {mask_str: 0.5 for mask_str in mask_strs}
+                {mask_str: 1.0 for mask_str in mask_strs}
+
         object_mask_str_node.last_update_turn_id += 1
         #print("Query results:", len(mask_strs))
 
         # Filter candidates with gesture_click
-        gesture_click = self.state.get_slot('gesture_click').get_max_value()
-        if gesture_click is not None:
-            object_mask_str_node.filter_candidates(gesture_click)
-            #print("Filtered results", len(object_mask_str_node.value_conf_map))
+        #gesture_click = self.state.get_slot('gesture_click').get_max_value()
+        # if gesture_click is not None:
+        #    object_mask_str_node.filter_candidates(gesture_click)
+        #print("Filtered results", len(object_mask_str_node.value_conf_map))
 
         object_mask_str_node.last_update_turn_id += 1
 
@@ -210,7 +212,10 @@ class System(object):
             elif sys_dialogue_act == SystemAct.REQUEST:
                 req_slot = sys_act['slots'][0]
                 req_name = req_slot['slot']
-                utt = "What {} do you want?".format(req_name)
+                if req_name == "adjust_value":
+                    utt = "What value would you like to adjust?"
+                else:
+                    utt = "What {} do you want?".format(req_name)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = "Let me confirm. "
@@ -229,8 +234,8 @@ class System(object):
                     confirm_list.append(sv)
                 utt += ','.join(confirm_list) + "?"
             elif sys_dialogue_act == SystemAct.QUERY:
+                """
                 query_slots = sys_act['slots']
-
                 slot_list = []
 
                 for slot_dict in query_slots:
@@ -246,9 +251,17 @@ class System(object):
                     slot_list.append(sv)
 
                 utt = "Query vision engine with " + ', '.join(slot_list) + "."
-            elif sys_dialogue_act == SystemAct.EXECUTE:
-                execute_slots = sys_act['slots'] + [sys_act['intent']]
+                """
+                utt = ""
+                slot_list = []
+                for slot_dict in sys_act['slots']:
+                    slot_value = str(slot_dict.get('value', ""))
+                    if slot_dict['slot'] == "object":
+                        utt += "Query: {}".format(slot_value)
 
+            elif sys_dialogue_act == SystemAct.EXECUTE:
+                """
+                execute_slots = sys_act['slots'] + [sys_act['intent']]
                 slot_list = []
                 for slot in execute_slots:
                     slot_value = str(slot.get('value', ""))
@@ -260,6 +273,15 @@ class System(object):
                         sv = slot['slot'] + "=" + slot_value
                     slot_list.append(sv)
                 utt = "Execute: " + ', '.join(slot_list) + "."
+                """
+                execute_slots = sys_act['slots'] + [sys_act['intent']]
+                slot_list = []
+                for slot in execute_slots:
+                    slot_value = str(slot.get('value', ""))
+                    if slot['slot'] in ['attribute', 'adjust_value']:
+                        sv = slot['slot'] + "=" + slot_value
+                        slot_list.append(sv)
+                utt = "Adjust " + ', '.join(slot_list) + "."
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:

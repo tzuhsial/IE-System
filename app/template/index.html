@@ -4,93 +4,58 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge, chrome=1" />
-    <title>Prototype</title>
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <title>Image Editing Chatbot</title>
+    <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon">
+    <link href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" rel="Stylesheet">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/index.css" />
 
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-        crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-        crossorigin="anonymous">
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-        crossorigin="anonymous"></script>
-    <link href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" rel="Stylesheet">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
     <script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
-    <script src="/static/bbox_annotator.js"></script>
-    <script src="/static/index.js"></script>
-    <link rel="stylesheet" href="/static/index.css" />
+    <script src="/static/js/index.js"></script>
+
 </head>
 
 <body>
 
     <div class="container">
-        <img src="/static/marker.png" id="marker" />
-        <h3> </h3>
 
+        <div class="row">
+            <h3 id="turn-count">Turn count: 0 / 10</h3>
+        </div>
 
-        <div class="jumbotron">
-            <h3>Prototype Image Editing Dialogue System</h3>
-            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
-                Instructions
-            </button>
-            <!--->
-            <!--
-            <button type="button" class="btn btn-secondary" id="reset-button">Reset</button>
-            -->
-
-            <hr>
-            <div class="form-group">
-                <label for="sel1">
-                    <h4>Select Goal</h4>
-                </label>
-                <select class="form-control" id="sel1">
-                    <option selected disabled>Choose here</option>
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                    <option>5</option>
-                    <option>6</option>
-                    <option>7</option>
-                    <option>8</option>
-                    <option>9</option>
-                    <option>10</option>
-                </select>
-            </div>
-            <span id="goal-text"></span>
-            <button id="object_mask-button">Show/Hide object location</button>
+        <div class="row" id="goal">
+            <h3></h3>
             <div id="goal-container">
                 <img id="object_mask" src="">
             </div>
-            <hr>
-            <h4> Image </h4>
+        </div>
+
+        <div class="jumbotron">
             <div id="container">
                 <div id="image-container">
-                    <img id="image" src="">
+                    <img id="image" src="/static/images/COCO_train2014_000000229598.jpg">
                 </div>
-                <div id="bbox_annotator"></div>
-                <input id="annotation_data" name="annotation_data" type="hidden" />
             </div>
-            <hr>
-            Gestures
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="gesture_click_mode" value="option1">
-                <label class="form-check-label" for="inlineCheckbox1">gesture_click(marks a point)</label>
-            </div>
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="object_mask_str_mode" value="option2">
-                <label class="form-check-label" for="inlineCheckbox2">object_mask_str(selects a region)</label>
-            </div>
-
         </div>
+        <hr>
+
+
+        <form>
+            System:
+            <div name="system_utterance" id="system_utterance">
+                Hi, this is an image editing chatbot. How may I help you?
+            </div>
+        </form>
 
         <hr>
+
+
         <div id="loading-container" style='display:none '>
-            <img src="/static/loading.gif" />
+            <img src="/static/images/loading.gif" />
         </div>
-        <div>
-            <h3 id="turn-count"></h3>
-        </div>
+
 
         <div class="input-group mb-3">
             <div class="input-group-prepend">
@@ -103,94 +68,17 @@
             </div>
         </div>
 
-        <hr>
-        <form>
-            System:
-            <div name="system_utterance" id="system_utterance">
-                Hi, this is a prototype image editing dialogue system. How may I help you?
-            </div>
-        </form>
+
 
         <hr>
-        <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
+        <div class="row">
+            <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
+        </div>
         <hr>
 
         <footer class="footer">
-            <p>&copy; Adobe Research 2018</p>
+            <p>&copy; CMU LTI 2018</p>
         </footer>
-    </div>
-    <!-- Modal -->
-    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="exampleModalLabel">Instructions</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <ul class="list-group">
-                        <li class="list-group-item">Your task is to perform an adjustment on the image using the
-                            prototype system. Our system will try to understand your goal through gestures and
-                            text.
-                            Image regions can obtained by you directly providing an gesture(object_mask_str) or
-                            by the system performing object detection.
-                        </li>
-                        <li class="list-group-item">An adjustment goal is already sampled for you. You can click on
-                            "sample" to get another goal. An adjustment goal consists of 4 arguments: 1. intent 2.
-                            object 3. attribute 4. adjust_value. For objects that may contain multiple instances,
-                            click on "Show/Hide object location" to see where the object location should be.
-                        </li>
-                        <li class="list-group-item">You can interact with the system either by <b>gestures</b> or
-                            <b>text
-                                input</b>. After providing gestures or text input, click "submit" to send to the
-                            system.
-                            "submit" button is located next to the text input box.
-                        </li>
-                        <li class="list-group-item"><b>Gestures</b> corresponds to objects. There are 2 types of
-                            gestures 1.
-                            gesture_click 2. object_mask_str. To select an object in the image, either use
-                            gesture_click to mark a point on the image, or
-                            use object_mask_str to draw a bounding box.
-                        </li>
-                        <li class="list-group-item">
-                            <b>Text input</b> are for you to express your goal in a natural way.
-                            For example, having a goal like(intent=adjust, attribute=brightness, adjust_value=10,
-                            object=man),
-                            you could say "make the man brighter" or "adjust brightness of the man by a value of
-                            10."
-                        </li>
-                        <li class="list-group-item">
-                            Our system will interact with you and ask questions like "What attribute do you want?",
-                            or "Let me confirm. object_mask_str=xxx". For confirmations, simple type "yes" or "no."
-                            object_mask_str will be displayed on the image for you to verify.
-                            When the system executes an action, it will show you the arguments it used. The image will
-                            also be modified accordingly
-                        </li>
-                        <li class="list-group-item">
-                            You goal is to evaluate the <b>Execution</b> of the system. This means an edit action on
-                            the image.
-                            However, the system may execute before obtaining the necessary arguments. As a result,
-                            nothing will happen
-                            to the image, and you can see execute_result: False in the system response. If an edit
-                            action is successfully
-                            executed, you will see execute_result: True.
-                        </li>
-                        <li class="list-group-item">
-                            The dialogue will end when system executes an action or <b>10</b> turns is reached.
-                            Afterwards, a popup will ask you whether the system has achieved your goal or not.
-                            Click on yes or no to record your response. The popup can also be shown by clicking
-                            on the End Dialogue button. To perform another round, please refresh the webpage.
-                        </li>
-                    </ul>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="modal" tabindex="-1" role="dialog" id="end-modal">
@@ -206,7 +94,6 @@
                     <p> Did the system successfully execute your goal? </p>
                     <button type="button" class="btn btn-lg btn-success" id="success-button">Yes</button>
                     <button type="button" class="btn btn-lg btn-danger" id="failure-button">No</button>
-                    <p>After recording, please refresh the webpage for a different session id</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

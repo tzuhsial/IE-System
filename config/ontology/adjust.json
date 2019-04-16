@@ -1,0 +1,90 @@
+{
+    "intents": [{
+            "name": "intent",
+            "node": "IntentNode",
+            "speech": true,
+            "children": [{
+                "name": "intent",
+                "optional": false
+            }]
+        },
+        {
+            "name": "adjust",
+            "node": "IntentNode",
+            "speech": true,
+            "children": [{
+                    "name": "object_mask_str",
+                    "optional": false
+                },
+                {
+                    "name": "attribute",
+                    "optional": false
+                },
+                {
+                    "name": "adjust_value",
+                    "optional": false
+                }
+            ]
+        }
+    ],
+    "slots": [{
+            "name": "intent",
+            "node": "BeliefNode",
+            "threshold": 0.8,
+            "possible_values": ["adjust"],
+            "children": []
+        },
+        {
+            "name": "original_b64_img_str",
+            "node": "PSToolNode",
+            "threshold": 1.0,
+            "possible_values": null,
+            "children": []
+        },
+        {
+            "name": "attribute",
+            "node": "BeliefNode",
+            "validator": "StringValidator",
+            "threshold": 0.8,
+            "possible_values": [
+                "brightness",
+                "contrast",
+                "hue",
+                "saturation",
+                "lightness"
+            ],
+            "children": []
+        },
+        {
+            "name": "adjust_value",
+            "node": "BeliefNode",
+            "validator": "IntegerValidator",
+            "threshold": 0.8,
+            "possible_values": [],
+            "children": []
+        },
+        {
+            "name": "object",
+            "node": "BeliefNode",
+            "validator": "StringValidator",
+            "threshold": 0.8,
+            "possible_values": [],
+            "children": []
+        },
+        {
+            "name": "object_mask_str",
+            "node": "ObjectMaskStrNode",
+            "threshold": 0.8,
+            "possible_values": null,
+            "children": [{
+                    "name": "original_b64_img_str",
+                    "optional": false
+                },
+                {
+                    "name": "object",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

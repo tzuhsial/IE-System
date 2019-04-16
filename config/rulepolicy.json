@@ -1,9 +1,5 @@
 {
     "ontology": "./config/imageedit.ontology.json",
-    "agendas": {
-        "train": "./sampled_100/agenda.v1.train.pickle",
-        "test": "./sampled_100/agenda.v1.test.pickle"
-    },
     "world": {
         "verbose": false
     },
@@ -26,6 +22,12 @@
             "speech_conf_std": 0.0
         },
         "system": {
+            "tracker": {
+                "tracker": "NLIETagger",
+                "client": false,
+                "model_path": null,
+                "uri": null
+            },
             "ontology": "./config/imageedit.ontology.json",
             "visionengine": {
                 "visionengine": "VisionEngineDatabase",
@@ -34,10 +36,10 @@
             "policy": {
                 "name": "RulePolicy",
                 "action": {
-                    "request": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
-                    "confirm": ["intent", "image_path", "attribute", "adjust_value", "object_mask_str", "object", "gesture_click"],
+                    "request": ["attribute", "adjust_value", "object"],
+                    "confirm": ["attribute", "adjust_value", "object"],
                     "query": ["object"],
-                    "execute": ["open", "adjust", "close", "undo", "redo"]
+                    "execute": ["adjust"]
                 },
                 "replaymemory": {
                     "memory_size": 2000,
@@ -47,7 +49,7 @@
             }
         },
         "photoshop": {
-            "photoshop": "SuperficialPhotoshop",
+            "photoshop": "SimplePhotoshop",
             "client": false,
             "uri": "http://localhost:2005",
             "verbose": true

@@ -558,25 +558,27 @@ class ObjectMaskStrNode(BeliefNode):
         Returns:
             self.intent (object)
         """
-        assert sorted(self.children.keys()) == ['gesture_click', 'object', 'original_b64_img_str'],\
-            "ObjectMaskNode has wrong children"
+        # assert sorted(self.children.keys()) == ['gesture_click', 'object', 'original_b64_img_str'],\
+        #    "ObjectMaskNode has wrong children"
 
         object_node = self.children['object']
-        gesture_click_node = self.children["gesture_click"]
+        #gesture_click_node = self.children["gesture_click"]
 
         # Update current last_update_turn_id according to children
         object_mask_str_turn_id = self.last_update_turn_id
         object_turn_id = object_node.last_update_turn_id
-        gesture_click_turn_id = gesture_click_node.last_update_turn_id
+        #gesture_click_turn_id = gesture_click_node.last_update_turn_id
 
-        self.last_update_turn_id = max(object_mask_str_turn_id, object_turn_id,
-                                       gesture_click_turn_id)
+        self.last_update_turn_id = max(object_mask_str_turn_id, object_turn_id)
+        # self.last_update_turn_id = max(object_mask_str_turn_id, object_turn_id,
+        #                               gesture_click_turn_id)
 
         # Start to do pulling
         self.intent = SysIntent()
 
         object_updated = object_turn_id >= self.last_update_turn_id
-        gesture_updated = gesture_click_turn_id >= self.last_update_turn_id
+        #gesture_updated = gesture_click_turn_id >= self.last_update_turn_id
+        gesture_updated = False
         if object_updated and gesture_updated:
 
             object_intent = object_node.pull()
@@ -591,9 +593,9 @@ class ObjectMaskStrNode(BeliefNode):
             slots = object_intent.execute_slots
 
             # Query
-            gesture_intent = gesture_click_node.pull()
-            if gesture_intent.executable():
-                slots += gesture_intent.execute_slots
+            #gesture_intent = gesture_click_node.pull()
+            # if gesture_intent.executable():
+            #    slots += gesture_intent.execute_slots
 
             self.intent = SysIntent(query_slots=slots)
             return self.intent
@@ -662,14 +664,19 @@ class ObjectMaskStrNode(BeliefNode):
             mask_str_slot = self.to_json()
             intent.execute_slots.append(mask_str_slot)
             return intent
-
-        if self.get_max_conf() < 0.5:
+        elif self.get_max_conf() < 0.5:
             # Request object_mask_str directly
             mask_str_slot = util.build_slot_dict('object_mask_str')
             intent.request_slots.append(mask_str_slot)
             return intent
+        else:
+            object_slot = util.build_slot_dict('object')
+            intent.request_slots.append(object_slot)
+            return intent
 
         # Filter out values that are between threshold and 0.5
+        """ 
+        # MAttNet only returns 1 mask 
         mask_strs = list(self.value_conf_map.keys())
         if len(mask_strs) == 1:  # Confirm, since there is only 1 result
             mask_str = mask_strs[0]
@@ -678,7 +685,7 @@ class ObjectMaskStrNode(BeliefNode):
         else:  # > 1, request object_mask_id
             gesture_click_slot = util.build_slot_dict('gesture_click')
             intent.request_slots.append(gesture_click_slot)
-
+        """
         return intent
 
     def check_overlap(self, gesture_click, mask_candidate):

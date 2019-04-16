@@ -2,7 +2,4 @@ requests
 flask
 numpy
 nltk
-tensorflow
-scikit-image
 pymongo
-tinydb

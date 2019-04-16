@@ -1,7 +1,10 @@
 from .channel import ChannelPortal
+from .nlu import NLUPortal
 from .user import UserPortal
 from .system import SystemPortal
 from .photoshop import PhotoshopPortal
+from . import util
+from .core import SystemAct
 
 
 class ImageEditWorld(object):
@@ -197,3 +200,140 @@ class ImageEditEnvironment(ImageEditWorld):
         info = {}
 
         return state, reward, done, info
+
+
+def load_dialoguesystem(args):
+    """
+    Load Dialogue System
+    1. NLU 
+    2. System (State + VisionEngine + Dialogue Manager)
+    3. Photoshop
+    """
+    global nlu
+    global system
+    global photoshop
+
+    config_file = args.config
+    config = util.load_from_json(config_file)
+
+    # Load agents here
+    agents_config = config["agents"]
+    nlu = NLUPortal(agents_config["system"]["nlu"])
+    system = SystemPortal(agents_config["system"])
+    photoshop = PhotoshopPortal(agents_config["photoshop"])
+
+
+class ImageEditDialogueSystem(object):
+    """
+    Interface to real user, can be
+    - terminal
+    - server
+
+    Attributes
+    - nlu
+    - system
+    - photoshop
+    """
+
+    def __init__(self, config_file):
+        """
+        Set config and build agents
+        Args:
+            config_file (str)
+        """
+        # Load config
+        config = util.load_from_json(config_file)
+        agents_config = config["agents"]
+
+        # Create modules
+        self.nlu = NLUPortal(agents_config["system"]["nlu"])
+        self.system = SystemPortal(agents_config["system"])
+        self.photoshop = PhotoshopPortal(agents_config["photoshop"])
+
+    def reset(self):
+        self.nlu.reset()
+        self.system.reset()
+        self.photoshop.reset()
+
+        self.acts = [{}] * 4  # first one for user
+
+    def open(self, image_path):
+        """
+        TODO: load b64_img_str
+        """
+        result, msg = self.photoshop.control(
+            "open", {'image_path': image_path})
+        assert result
+
+        # Photoshop action
+        self.acts[3] = self.photoshop.act()
+
+    def step(self, user_utterance):
+        # Order:
+        # user, nlu, system, photoshop
+
+        ################
+        #   User Act   #
+        ################
+
+        # Pass to NLU to get result
+        user_act = {"user_utterance": user_utterance}
+        self.acts[0] = user_act
+
+        ################
+        #    NLU Act   #
+        ################
+        self.nlu.observe(user_act)
+        nlu_act = self.nlu.act()
+        self.acts[1] = nlu_act
+
+        ##################
+        #   System Act   #
+        ##################
+        photoshop_act = self.acts[3]
+        self.system.observe(photoshop_act)
+        self.system.observe(nlu_act)
+        system_act = self.system.act()
+        self.acts[2] = system_act
+
+        sys_utt = system_act["system_utterance"]
+
+        sys_dialogue_act = system_act['system_acts'][0]['dialogue_act']['value']
+
+        if sys_dialogue_act == SystemAct.QUERY:
+            # Interact with Vision Engine
+            # Should always return something
+            ObjectMaskStrNode = self.system.state.get_slot('object_mask_str')
+            assert len(ObjectMaskStrNode.value_conf_map) == 1
+
+            mask_strs = []
+            for b64_mask_str in ObjectMaskStrNode.value_conf_map.keys():
+                mask_strs.append((1, b64_mask_str))
+
+            # Load mask strs
+            result, msg = self.photoshop.control(
+                'load_mask_strs', {"mask_strs": mask_strs})
+            assert result
+
+            system_act = self.system.act()
+            # Update sys_dialogue_act
+            sys_dialogue_act = system_act['system_acts'][0]['dialogue_act']['value']
+            sys_utt += " " + system_act["system_utterance"]
+
+        ####################
+        #   Photoshop Act  #
+        ####################
+        self.photoshop.observe(system_act)
+        photoshop_act = self.photoshop.act()
+        self.acts[3] = photoshop_act
+
+        ############################
+        #   Reset Upon Execution   #
+        ############################
+        print("sys_dialogue_act", sys_dialogue_act)
+        if sys_dialogue_act == SystemAct.EXECUTE:
+            self.system.reset()  # Reset state
+            self.photoshop.reset()  # Clear everything
+
+        # Return system text
+        return sys_utt
