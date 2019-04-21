@@ -1,5 +1,4 @@
 {
-    "ontology": "./config/ontology/adjust.json",
     "session": {
         "session": "MongoDBManager",
         "host": null,
@@ -7,38 +6,39 @@
         "db_path": null
     },
     "agents": {
+        "visionengine": {
+            "visionengine": "MAttNetClient",
+            "uri": "http://128.2.204.98:6000/detect",
+            "database_path": null
+        },
         "system": {
             "nlu": {
                 "nlu": "NLIETagger",
                 "client": true,
                 "uri": "http://0.0.0.0:6000/nlu"
             },
-            "ontology": "./config/ontology/adjust.json",
-            "visionengine": {
-                "visionengine": "MAttNetClient",
-                "uri": "http://128.2.204.98:6000/detect",
-                "database_path": null
-            },
-            "policy": {
-                "name": "RulePolicy",
-                "action": {
-                    "request": ["attribute", "adjust_value", "object", "intent"],
-                    "confirm": ["attribute", "adjust_value", "object", "intent", "object_mask_str"],
-                    "query": ["object"],
-                    "execute": ["adjust"]
+            "manager": {
+                "state": {
+                    "ontology": "./config/ontology/adjust.json"
                 },
-                "replaymemory": {
-                    "memory_size": 2000,
-                    "load_path": null
-                },
-                "save_replaymemory": "./memory.pickle"
+                "policy": {
+                    "name": "RulePolicy",
+                    "action": {
+                        "request": ["attribute", "adjust_value", "object", "intent"],
+                        "confirm": ["attribute", "adjust_value", "object", "intent", "object_mask_str"],
+                        "query": ["object"],
+                        "execute": ["adjust"]
+                    },
+                    "replaymemory": {
+                        "memory_size": 2000,
+                        "load_path": null
+                    },
+                    "save_replaymemory": "./memory.pickle"
+                }
             }
         },
-        "photoshop": {
-            "photoshop": "SimplePhotoshop",
-            "client": false,
-            "uri": null,
-            "verbose": true
+        "imageeditengine": {
+            "imageeditengine": "SimpleImageEditEngine"
         }
     }
 }

@@ -3,19 +3,18 @@ import logging
 from ..core import SystemAct
 from ..state import State
 from ..policy import builder as policylib, ActionMapper
-from ..visionengine import VisionEnginePortal
 from ..util import find_slot_with_key, build_slot_dict, slots_to_args, load_from_json
 
 logger = logging.getLogger(__name__)
 
 
-def SystemPortal(system_config):
-    ontology_json = load_from_json(system_config['ontology'])
+def ManagerPortal(manager_config):
+    # Setup state
+    ontology_json = load_from_json(manager_config['state']['ontology'])
     state = State(ontology_json)
-    visionengine = VisionEnginePortal(system_config['visionengine'])
 
     # Setup Policy here
-    policy_config = system_config["policy"]
+    policy_config = manager_config["policy"]
     # Build action mapper
     action_config = policy_config["action"]
     action_mapper = ActionMapper(action_config)
@@ -23,8 +22,8 @@ def SystemPortal(system_config):
     policy_config["state_size"] = len(state.to_list())
     policy_config["action_size"] = action_mapper.size()
 
-    print("state_size", policy_config["state_size"])
-    print("action_size", policy_config["action_size"])
+    #print("state_size", policy_config["state_size"])
+    #print("action_size", policy_config["action_size"])
     policy_name = policy_config["name"]
     policy = policylib(policy_name)(
         policy_config,
@@ -32,11 +31,11 @@ def SystemPortal(system_config):
         ontology_json=ontology_json,
         dialogue_state=state)
 
-    system = System(state, policy, visionengine)
-    return system
+    manager = DialogueManager(state, policy)
+    return manager
 
 
-class System(object):
+class DialogueManager(object):
     """
     Mainly handles the interactions with the environment
     Also provides a rule-based policy
@@ -47,11 +46,10 @@ class System(object):
         visionengine (object)
     """
 
-    def __init__(self, state, policy, visionengine):
+    def __init__(self, state, policy):
         # Components
         self.state = state
         self.policy = policy
-        self.visionengine = visionengine
 
     def load_policy(self, policy):
         self.policy = policy
@@ -63,7 +61,13 @@ class System(object):
         self.observation = {}
         self.state.reset()
         self.policy.reset()
-        self.turn_id = 0
+        self.turn_id = 1
+
+    def flush(self):
+        """ Flush state values 
+        """
+        self.observation = {}
+        self.state.flush()
 
     def observe(self, observation):
         """
@@ -77,10 +81,12 @@ class System(object):
         """
         Update dialogue state with user_acts
         """
-        # Get acts from photoshop & user
-        photoshop_acts = self.observation.get('photoshop_acts', list())
+        # Get acts from imageeditengine & user & visionengine
+        imageeditengine_acts = self.observation.get(
+            'imageeditengine_acts', list())
         user_acts = self.observation.get('user_acts', list())
-        observed_acts = photoshop_acts + user_acts
+        visionengine_act = self.observation.get('visionengine_acts', list())
+        observed_acts = imageeditengine_acts + user_acts + visionengine_act
 
         for act in observed_acts:
             # Usually have only one user_act
@@ -105,19 +111,36 @@ class System(object):
             system_act 
         """
         sys_act = system_acts[0]
-
         sys_dialogue_act = sys_act['dialogue_act']['value']
         if sys_dialogue_act == SystemAct.CONFIRM:
+            # Record the previous confirmed slots
             confirm_slots = sys_act["slots"]
             self.state.sysintent.confirm_slots = confirm_slots
 
         elif sys_dialogue_act == SystemAct.QUERY:
-            query_slots = sys_act['slots']
-            self.query_visionengine(query_slots)
+            # Do nothing here
+            pass
 
         elif sys_dialogue_act == SystemAct.EXECUTE:
-            # Stack the intent to history and clear slots
-            intent = sys_act['intent']['value']
+            # Do nothing here too
+            pass
+
+        # Always add another action to give image edit engine the current mask
+        sys2ie_slots = []
+        mask_node = self.state.get_slot('object_mask_str')
+        print('mask conf', mask_node.get_max_conf())
+        if mask_node.get_max_conf() >= 0.5:
+            value, conf = mask_node.get_max_conf_value()
+            mask_slot = build_slot_dict('object_mask_str', value, conf)
+        else:
+            mask_slot = build_slot_dict('object_mask_str')
+        sys2ie_slots.append(mask_slot)
+
+        sys2ie_act = {
+            'dialogue_act': build_slot_dict('dialogue_act', SystemAct.INFORM, 1.0),
+            'slots': sys2ie_slots
+        }
+        system_acts.append(sys2ie_act)
 
         # Build Return object
         system_act = {}
@@ -149,47 +172,10 @@ class System(object):
         ######################
         system_act = self.post_policy(system_acts)
 
+        # Clear Observation
+        self.observation = {}
+
         return system_act
-
-    def query_visionengine(self, query_slots):
-        """
-        Query vision engine
-        """
-        args = slots_to_args(query_slots)
-        b64_img_str = self.state.get_slot(
-            'original_b64_img_str').get_max_value()
-        assert b64_img_str is not None
-        args['b64_img_str'] = b64_img_str
-
-        mask_strs = self.visionengine.select_object(**args)
-
-        # Postprocess with gesture_click
-        object_mask_str_node = self.state.get_slot('object_mask_str')
-
-        # clear_object
-        # Force directly add into object_mask_strs
-        object_mask_str_node.value_conf_map.clear()
-        if len(mask_strs) > 0:
-            # MAttNet should only return 1 result, though
-            object_mask_str_node.value_conf_map = \
-                {mask_str: 1.0 for mask_str in mask_strs}
-
-        object_mask_str_node.last_update_turn_id += 1
-        #print("Query results:", len(mask_strs))
-
-        # Filter candidates with gesture_click
-        #gesture_click = self.state.get_slot('gesture_click').get_max_value()
-        # if gesture_click is not None:
-        #    object_mask_str_node.filter_candidates(gesture_click)
-        #print("Filtered results", len(object_mask_str_node.value_conf_map))
-
-        object_mask_str_node.last_update_turn_id += 1
-
-    def query_executionhistory(self, query_slots):
-        """
-        Queries execution history with execution slots
-        """
-        raise NotImplementedError
 
     def get_reward(self):
         rewards = self.policy.rewards
@@ -218,21 +204,16 @@ class System(object):
                     utt = "What {} do you want?".format(req_name)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
-                utt = "Let me confirm. "
-                confirm_list = []
-                for slot_dict in confirm_slots:
-                    slot_value = str(slot_dict.get('value', ""))
-                    if slot_dict['slot'] in [
-                            "object_mask_str", "gesture_click",
-                            "original_b64_img_str"
-                    ]:
-                        sv = slot_dict['slot'] + " is " + slot_value[:5]
-                    elif slot_dict["slot"] == "mask_strs":
-                        sv = slot_dict["slot"] + " is " + str(len(slot_value))
-                    else:
-                        sv = slot_dict['slot'] + " is " + slot_value
-                    confirm_list.append(sv)
-                utt += ','.join(confirm_list) + "?"
+                utt = ""
+                assert len(confirm_slots) == 1
+                slot_dict = confirm_slots[0]
+                slot_name = slot_dict["slot"]
+                slot_value = str(slot_dict.get('value', ""))
+                if slot_dict['slot'] in ["object_mask_str"]:
+                    utt = "Is the current detected object region correct?"
+                else:
+                    utt = "Is your {} {}?".format(slot_name, slot_value)
+                utt += " (yes/no)"
             elif sys_dialogue_act == SystemAct.QUERY:
                 """
                 query_slots = sys_act['slots']
@@ -257,37 +238,15 @@ class System(object):
                 for slot_dict in sys_act['slots']:
                     slot_value = str(slot_dict.get('value', ""))
                     if slot_dict['slot'] == "object":
-                        utt += "Query: {}".format(slot_value)
+                        utt += "Sending \"{}\" to vision engine."\
+                            .format(slot_value)
 
             elif sys_dialogue_act == SystemAct.EXECUTE:
-                """
-                execute_slots = sys_act['slots'] + [sys_act['intent']]
-                slot_list = []
-                for slot in execute_slots:
-                    slot_value = str(slot.get('value', ""))
-                    if slot["slot"] == "object_mask_str":
-                        sv = slot['slot'] + "=" + slot_value[:5]
-                    elif slot["slot"] == "mask_strs":
-                        sv = slot["slot"] + "=" + str(len(slot_value))
-                    else:
-                        sv = slot['slot'] + "=" + slot_value
-                    slot_list.append(sv)
-                utt = "Execute: " + ', '.join(slot_list) + "."
-                """
-                execute_slots = sys_act['slots'] + [sys_act['intent']]
-                slot_list = []
-                for slot in execute_slots:
-                    slot_value = str(slot.get('value', ""))
-                    if slot['slot'] in ['attribute', 'adjust_value']:
-                        sv = slot['slot'] + "=" + slot_value
-                        slot_list.append(sv)
-                utt = "Adjust " + ', '.join(slot_list) + "."
+                utt = "Executed image edit."
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:
-                import pdb
-                pdb.set_trace()
-                utt = ""
+                continue
             utt_list.append(utt)
 
         full_utterance = ' '.join(utt_list)

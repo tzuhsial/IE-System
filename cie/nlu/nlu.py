@@ -37,6 +37,18 @@ class NLIETagger(object):
     def act(self):
         sentence = self.observation.get("user_utterance", "")
 
+        sentence = sentence.strip().lower()
+
+        if sentence.startswith("yes") or sentence.startswith("no"):
+            nlu_act = self.act_confirm(sentence)
+        else:
+            nlu_act = self.act_inform(sentence)
+
+        user_act = copy.deepcopy(self.observation)
+        user_act['user_acts'] = [nlu_act]
+        return user_act
+
+    def act_inform(self, sentence):
         data = {"sent": sentence}
 
         try:
@@ -87,9 +99,19 @@ class NLIETagger(object):
             'slots': slots
         }
 
-        act = copy.deepcopy(self.observation)
-        act['user_acts'] = [nlu_act]
-        return act
+        return nlu_act
+
+    def act_confirm(self, sentence):
+        if sentence.startswith("yes"):
+            da = "affirm"
+        elif sentence.startswith("no"):
+            da = "negate"
+        else:
+            raise ValueError("Unknown confirm sentence: {}".format(sentence))
+
+        nlu_act = {'dialogue_act': {
+            "slot": "dialogue_act", "value": da, 'conf': 1.0}}
+        return nlu_act
 
 
 class EditmeTagger(object):

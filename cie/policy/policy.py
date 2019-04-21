@@ -122,7 +122,7 @@ class ActionMapper(object):
         da = sys_act["dialogue_act"]['value']
         intent = sys_act["intent"]
         slots = sys_act["slots"]
-
+    
         if da != SystemAct.EXECUTE:
             key = slots[0]['slot']
         else:

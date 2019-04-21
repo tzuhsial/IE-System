@@ -50,6 +50,7 @@ class SystemAct:
     """
     GREETING = "greeting"
     ASK = "ask"
+    INFORM = "inform"
     REQUEST = "request"
     CONFIRM = "confirm"
     QUERY = "query"

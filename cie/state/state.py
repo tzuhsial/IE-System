@@ -1,8 +1,6 @@
-import copy
 import logging
 
 from ..core import UserAct, SysIntent
-from .executionhistory import ExecutionHistory
 from .ontology import OntologyEngine
 from .node import builder as nodelib
 from ..util import slot_to_observation
@@ -23,18 +21,22 @@ class State(object):
 
     def __init__(self, ontology_json):
         self.ontology = OntologyEngine(ontology_json)
-        self.executionhistory = ExecutionHistory()
-
         self.sysintent = SysIntent()
-
-        self.turn_id = 0
+        self.execution = []
 
     def reset(self):
         self.ontology.clear()
-        self.executionhistory.clear()
         self.sysintent.clear()
-        # Record turn_id in state
         self.turn_id = 0
+
+    def flush(self):
+        """
+        Flushes all slot values in ontology.
+        Records the flushed slot values in execution
+        """
+        exec_state = self.ontology.to_json()
+        self.execution.append(exec_state)
+        self.ontology.flush()
 
     def update(self, dialogue_act, intent, slots, turn_id):
         """
@@ -111,6 +113,7 @@ class State(object):
             if slot_name not in self.ontology.slots:
                 logger.info("Unknown slot: {}".format(slot_name))
                 continue
+
             obsrv = slot_to_observation(slot, turn_id)
             slot_node = self.get_slot(slot_name)
 
@@ -131,17 +134,10 @@ class State(object):
         self.sysintent = sysintent
         return self.sysintent
 
-    def stack_intent(self, intent_name):
-        """
-        Pushes the intent with previous values into the intent stack
-        """
-        intent_tree = self.get_intent(intent_name)
-        copied_tree = copy.deepcopy(intent_tree)  # Copy the intent tree
-        self.executionhistory.push(copied_tree)
-
     #########################
     #      Get & Clear      #
     #########################
+
     def get_slot(self, slot_name):
         return self.ontology.get_slot(slot_name)
 
@@ -154,27 +150,22 @@ class State(object):
     def clear_slot(self, slot_name):
         self.ontology.get_slot(slot_name).clear()
 
-    def clear_ontology(self):
-        self.ontology.clear()
-
-    def clear_history(self):
-        self.executionhistory.clear()
-
     def to_json(self):
         """
-        Serialize to json
+        Serialize to json object 
         """
-        obj = {}
-        obj["history"] = self.executionhistory.to_json()
-        obj["slot_values"] = self.ontology.to_json()
+        obj = {
+            "ontology": self.ontology.to_json(),
+            "execution": self.execution
+        }
         return obj
 
     def from_json(self, obj):
         """
         Load from serialized json
         """
-        self.executionhistory.from_json(obj["history"])
-        self.ontology.from_json(obj["slot_values"])
+        self.ontology.from_json(obj["ontology"])
+        self.execution = obj["execution"]
 
     def intent_to_list(self, intent_name):
         """
@@ -208,7 +199,7 @@ class State(object):
         #   Global features  #
         ######################
         # num_executions
-        num_executions = self.executionhistory.size()
+        num_executions = 0
 
         h = []
         buckets = [0, 1, 2, 3, 5]
@@ -221,10 +212,10 @@ class State(object):
         feature += h
 
         # turn_id
-        turn_id = self.turn_id - 1
-        turn_id_max = 30  # Should set to same as user patience
-        t = [0.] * turn_id_max
-        t[turn_id] = 1.0
-        feature += t
+        #turn_id = self.turn_id - 1
+        # turn_id_max = 30  # Should set to same as user patience
+        #t = [0.] * turn_id_max
+        #t[turn_id] = 1.0
+        #feature += t
 
         return feature
