@@ -191,16 +191,15 @@ class DialogueManager(object):
         for sys_act in system_acts:
             sys_dialogue_act = sys_act['dialogue_act']['value']
             if sys_dialogue_act == SystemAct.GREETING:
-                utt = "Hello! My name is PS. I am here to help you edit your image!"
+                utt = "Hi! This is an image editing chatbot. How may I help you?"
             elif sys_dialogue_act == SystemAct.ASK:
                 utt = "What would you like to do?"
             elif sys_dialogue_act == SystemAct.REQUEST:
                 req_slot = sys_act['slots'][0]
                 req_name = req_slot['slot']
                 if req_name == "adjust_value":
-                    utt = "What value would you like to adjust?"
-                else:
-                    utt = "What {} do you want?".format(req_name)
+                    req_name = "value (slider)"
+                utt = "What {} would you like to adjust?".format(req_name)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = ""
@@ -214,24 +213,6 @@ class DialogueManager(object):
                     utt = "Is your {} {}?".format(slot_name, slot_value)
                 utt += " (yes/no)"
             elif sys_dialogue_act == SystemAct.QUERY:
-                """
-                query_slots = sys_act['slots']
-                slot_list = []
-
-                for slot_dict in query_slots:
-                    slot_value = str(slot_dict.get('value', ""))
-                    if slot_dict['slot'] in [
-                            "object_mask_str", "gesture_click"
-                    ]:
-                        sv = slot_dict['slot'] + " = " + slot_value[:5]
-                    elif slot_dict["slot"] == "mask_strs":
-                        sv = slot_dict["slot"] + "=" + str(len(slot_value))
-                    else:
-                        sv = slot_dict['slot'] + "=" + slot_value
-                    slot_list.append(sv)
-
-                utt = "Query vision engine with " + ', '.join(slot_list) + "."
-                """
                 utt = ""
                 slot_list = []
                 for slot_dict in sys_act['slots']:

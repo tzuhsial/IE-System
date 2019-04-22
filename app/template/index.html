@@ -15,6 +15,11 @@
     <script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
     <script src="/static/js/index.js"></script>
 
+    <script>
+        // This code saves session_id into javascript
+        session_id = {{ session_id | tojson }}
+        console.log("received session code", session_id);
+    </script>
 </head>
 
 <body>
@@ -22,41 +27,96 @@
     <div class="container">
 
         <div class="row">
-            <h3 id="turn-count">Turn count: 0 / 10</h3>
-        </div>
-
-        <div class="row" id="goal">
-            <h3></h3>
-            <div id="goal-container">
-                <img id="object_mask" src="">
-            </div>
         </div>
 
         <div class="jumbotron">
-            <div id="container">
-                <div id="image-container">
+            
+            <div class="row">
+                <div class="col"></div>
+                <div class="col-6">
+                    <h3>Image Editing Chatbot Survey </h3>
+                </div>
+                <div class="col"></div>
+            </div>
+            
+            <hr>
+            
+            <div class="row">
+                <div class="col">INSTRUCTIONS
+                </div>
+                <div class="col-6" id="image-container">
                     <img id="image" src="/static/images/COCO_train2014_000000229598.jpg">
+                </div>
+                <div class="col" id="object">
+                    RIGHT DIV
+                </div>
+            </div>
+            
+            <hr>
+
+            <div name="sliders">
+                <div class="row">
+                    <div class="col">
+                    </div>
+                    <div class="col">
+                    </div>
+                    <div class="col">
+                    </div>
+
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label for="input_brightness">brightness</label>
+                        <input type="range" id="input_brightness" value="0" min="-100" max="100">
+                        <output id="output_brightness">0</output>
+                    </div>
+                    <div class="col">
+                        <label for="input_contrast">contrast</label>
+                        <input type="range" id="input_contrast" value="0" min="-100" max="100">
+                        <output id="output_contrast">0</output>
+                    </div>
+                    <div class="col">
+                        <label for="input_hue">hue</label>
+                        <input type="range" id="input_hue" value="0" min="-100" max="100">
+                        <output id="output_hue">0</output>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label for="input_saturation">saturation</label>
+                        <input type="range" id="input_saturation" value="0" min="-100" max="100">
+                        <output id="output_saturation">0</output>
+                    </div>
+                    <div class="col">
+                        <label for="input_lightness">lightness</label>
+                        <input type="range" id="input_lightness" value="0" min="-100" max="100">
+                        <output id="output_lightness">0</output>
+                    </div>
+                    <div class="col">
+                    </div>
                 </div>
             </div>
         </div>
         <hr>
 
 
+
+        <!-- Loading GIF -->
+        <div id="loading-container" style=' display:none '>
+            <img src="/static/images/loading.gif" />
+        </div>
+
+        <!-- System utterance -->
         <form>
             System:
-            <div name="system_utterance" id="system_utterance">
-                Hi, this is an image editing chatbot. How may I help you?
+            <div id="system_utterance">
+                (Please wait.)
             </div>
         </form>
 
         <hr>
 
-
-        <div id="loading-container" style='display:none '>
-            <img src="/static/images/loading.gif" />
-        </div>
-
-
+        <!-- User input -->
         <div class="input-group mb-3">
             <div class="input-group-prepend">
                 <span class="input-group-text" id="inputGroup-sizing-default">User Input</span>
@@ -69,10 +129,16 @@
         </div>
 
 
-
         <hr>
         <div class="row">
-            <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
+            <div class="col">
+                <h4 id="turn-count"></h4>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
+            </div>
+            <div class="col">
+            </div>
         </div>
         <hr>
 
@@ -82,7 +148,7 @@
     </div>
 
     <div class="modal" tabindex="-1" role="dialog" id="end-modal">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Thank you for participating! </h5>
@@ -91,9 +157,50 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p> Did the system successfully execute your goal? </p>
-                    <button type="button" class="btn btn-lg btn-success" id="success-button">Yes</button>
-                    <button type="button" class="btn btn-lg btn-danger" id="failure-button">No</button>
+                    <p> Did the system successfully did what you asked? </p>
+                    <form>
+                        <div class="form-group">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="success-yes" value="Yes">
+                                <label class="form-check-label" for="success-yes">Yes</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="success-no" value="No">
+                                <label class="form-check-label" for="success-no">No</label>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn btn-md btn-danger" id="survey-button">Get Survey Code</button>
+                            </div>
+                            <div class="col">
+                                <span class="border border-primary" id="survey-code">Survey Code</span>
+                            </div>
+                        </div>
+                        </form>
+                    </form>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+     <div class="modal" tabindex="-1" role="dialog" id="sorry-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Oops!  Something went wrong on our side!</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p> This event has been notified to the developer.  We will try and fix this as soon as possible.</p>
+                    <p> You may now close the window tab. If you would like to try again, please wait for a few hours.  Thanks. </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

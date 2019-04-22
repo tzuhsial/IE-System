@@ -97,10 +97,8 @@ class PickleManager(SessionManager):
             "imageeditengine": {},
             "acts": list()
         }
-
         session_path = self.get_session_path(session_id)
-        if not os.path.exists(session_path):
-            save_to_pickle(doc, session_path)
+        save_to_pickle(doc, session_path)
         return doc
 
     def retrieve(self, session_id):

@@ -1,32 +1,20 @@
-#container {
-    text-align: center;
-    height: 300px;
-}
-
-.row,
 #jumbo {
     margin-top: 20px;
     text-align: center;
 }
 
-#image-container {
-    text-align: center;
-    height: 300px;
+label {
+    float: left;
+    margin-right: 10px;
+    width: 100px;
 }
 
-#goal-container {
-    text-align: center;
-    height: 300px;
-    display: none;
+output {
+    margin-left: 10px;
 }
 
 
 #image {
-    max-width: auto;
-    height: 300px;
-}
-
-#object_mask {
     max-width: auto;
     height: 300px;
 }
@@ -44,17 +32,6 @@ span {
     width: 500px;
 }
 
-.row {
-    text-align: center;
-}
-
 .column {
     width: 50%;
-}
-
-#marker {
-    width: 10px;
-    height: 10px;
-    position: absolute;
-    display: None;
 }

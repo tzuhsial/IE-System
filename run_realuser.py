@@ -35,7 +35,44 @@ VisionEngine = None
 
 @app.route("/")
 def index():
-    return render_template('index.html')
+    # Assign session_id and image_path
+    # Default values for debugging purposes
+
+    session_id = request.form.get('session_id', None)
+    if session_id is None:
+        session_id = int(time.time()) # Randomly generate using timestamp
+    else:
+        session_id = int(session_id)
+        
+    image_path = request.form.get(
+        'image_path', "example/COCO_train2014_000000229598.jpg")
+    
+    # Creates session
+    SessionManager.create_session(session_id)
+
+    # Adds to
+    DialogueSystem.open(image_path)
+    system_state = DialogueSystem.to_json()
+    SessionManager.add_turn(session_id, system_state)
+
+    return render_template('index.html', session_id=session_id)
+
+@app.route("/init", methods=["POST"])
+def init():
+    session_id = int(request.form.get('session_id', 0))
+    print("session", session_id)
+
+    last_system_state = SessionManager.retrieve(session_id)
+    DialogueSystem.from_json(last_system_state)
+
+    img = DialogueSystem.get_image()
+    b64_img_str = util.img_to_b64(img)
+
+    # Create return_object
+    obj = {}
+    obj['system_utterance'] = "Hi! This is an image editing chatbot.  How may I help you?"
+    obj['b64_img_str'] = b64_img_str
+    return jsonify(obj)
 
 
 @app.route("/step", methods=["POST"])
@@ -44,17 +81,8 @@ def step():
     session_id = int(request.form.get("session_id", 0))  # default to 0
     print("session_id", session_id)
 
-    session_path = SessionManager.get_session_path(session_id)
-    if not os.path.exists(session_path):
-        SessionManager.create_session(session_id)
-        image_path = "example/COCO_train2014_000000229598.jpg"
-        DialogueSystem.open(image_path)
-
-        system_state = DialogueSystem.to_json()
-        SessionManager.add_turn(session_id, system_state)
-    else:
-        last_system_state = SessionManager.retrieve(session_id)
-        DialogueSystem.from_json(last_system_state)
+    last_system_state = SessionManager.retrieve(session_id)
+    DialogueSystem.from_json(last_system_state)
 
     user_utterance = request.form.get('user_utterance', '')
     user_act = {'user_utterance': user_utterance}
