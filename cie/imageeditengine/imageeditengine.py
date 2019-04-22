@@ -199,7 +199,28 @@ class SimpleImageEditEngine(object):
         return image
 
     def to_json(self):
-        raise NotImplementedError
+        obj = {
+            'b64_background_str': None,
+            'b64_image_str': None,
+            'b64_mask_str': None,
+            'steps': self.steps
+        }
 
-    def from_json(self):
-        raise NotImplementedError
+        if self.background is not None:
+            obj['b64_background_str'] = util.img_to_b64(self.background)
+            obj['b64_image_str'] = util.img_to_b64(self.image)
+
+        if self.mask is not None:
+            obj['b64_mask_str'] = util.img_to_b64(self.mask)
+
+        return obj
+
+    def from_json(self, obj):
+        if obj['b64_background_str'] is not None:
+            self.background = util.b64_to_img(obj['b64_background_str'])
+            self.image = util.b64_to_img(obj['b64_image_str'])
+
+        if obj['b64_mask_str'] is not None:
+            self.mask = util.b64_to_img(obj['b64_mask_str'])
+
+        self.steps = obj['steps']

@@ -130,7 +130,8 @@ class OntologyEngine(object):
         obj = {}
         for slot_name, slot_node in self.slots.items():
             obj[slot_name] = {
-                'value_conf': slot_node.value_conf_map,
+                # consistency
+                'value_conf': sorted(slot_node.value_conf_map.items()),
                 'last_update_turn_id': slot_node.last_update_turn_id
             }
         return obj
@@ -140,9 +141,5 @@ class OntologyEngine(object):
         Load slot values from obj 
         """
         for slot_name, slot_obj in obj.items():
-            print(slot_name, slot_obj)
-            import pdb
-            pdb.set_trace()
-            self.slots[slot_name].value_conf_map = dict(
-                slot_obj["value_conf"])
+            self.slots[slot_name].value_conf_map = dict(slot_obj["value_conf"])
             self.slots[slot_name].last_update_turn_id = slot_obj["last_update_turn_id"]

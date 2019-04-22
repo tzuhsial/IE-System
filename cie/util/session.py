@@ -1,119 +1,130 @@
 import logging
+import os
 import sys
 
+import pickle
 from pymongo import MongoClient
-from tinydb import TinyDB, Query
+
+from .io import save_to_pickle, load_from_pickle
 
 logger = logging.getLogger(__name__)
 
 
-def SessionPortal(session_config):
-    session_type = session_config["session"]
-    return builder(session_type)(session_config)
-
-
 class SessionManager(object):
-    def __init__(self, host=None, port=None, **kwargs):
+    """
+    Defines basic methods
+    """
+
+    def __init__(self):
+        raise NotImplementedError
+
+    def create_session(self):
         raise NotImplementedError
 
     def retrieve(self, session_id):
         raise NotImplementedError
 
-    def add_turn(self, session_id, system_state, photoshop_state, turn_info):
+    def add_turn(self, session_id, system_state):
         raise NotImplementedError
 
-    def add_result(self, session_id, result):
+    def add_survey(self, session_id, survey):
         raise NotImplementedError
-
-    def _init_dialogue(self, session_id):
-        doc = {
-            "session_id": session_id,
-            "system_state": {},
-            "photoshop_state": {},
-            "turns": list()
-        }
-        return doc
 
 
 class MongoDBManager(SessionManager):
+    """
+    Session Manager based on MongoDB
+    Not used, due to MongodB limit
+    """
+
     def __init__(self, host=None, port=None, **kwargs):
-        # self.client = MongoClient(host, port)
         self.client = MongoClient()
         self.db = self.client["cie"]
         self.dialogues = self.db["dialogues"]
 
+    def create_session(self, session_id):
+        doc = {
+            "session_id": session_id,
+            "manager": {},
+            "imageeditengine": {},
+            "acts": list()
+        }
+        self.dialogues.insert_one(doc)
+        return doc
+
     def retrieve(self, session_id):
         session_key = {"session_id": session_id}
         if self.dialogues.count_documents(session_key) == 0:
-            doc = self._init_dialogue(session_id)
-            self.dialogues.insert_one(doc)
-        return self.dialogues.find_one(session_key)
+            self.create_session(session_id)
+        doc = self.dialogues.find_one(session_key)
 
-    def add_turn(self, session_id, system_state, photoshop_state, turn_info):
+        last_system_state = {
+            "manager": doc['manager'],
+            "imageeditengine": doc['imageeditengine'],
+            "acts": doc['acts'][-1]
+        }
+        return last_system_state
 
-        doc = self.retrieve(session_id)
-        doc["system_state"] = system_state
-        doc["photoshop_state"] = photoshop_state
-        doc["turns"].append(turn_info)
-
-        self.dialogues.replace_one({"session_id": session_id}, doc)
-
-    def add_policy(self, session_id, policy):
-        key = {"session_id": session_id}
-        self.dialogues.update_one(
-            key,
-            {
-                "$set": {
-                    "policy": policy
-                }
-            }
-        )
-
-    def add_result(self, session_id, result):
-        key = {"session_id": session_id}
-        self.dialogues.update_one(
-            key,
-            {
-                "$set": {
-                    "result": result
-                }
-            }
-        )
-
-
-class TinyDBManager(SessionManager):
-    def __init__(self, db_path, **kwargs):
-        self.db = TinyDB(db_path)
-
-    def retrieve(self, session_id):
-        session = Query()
-        dialogues = self.db.search(session.id == session_id)
-        if len(dialogues) == 0:
-            doc = self._init_dialogue()
-            self.db.insert(doc)
-        else:
-            doc = dialogues[0]
+    def add_turn(self, session_id, system_state):
+        session_key = {'session_id': session_id}
+        doc = self.dialogues.find_one(session_key)
+        doc["manager"] = system_state['manager']
+        doc['imageeditengine'] = system_state['imageeditengine']
+        doc["acts"].append(system_state['acts'])
+        self.dialogues.replace_one(session_key, doc)
         return doc
 
-    def add_turn(self, session_id, state, photoshop, turn_info):
-        dialogue = self.retrieve(session_id)
-        dialogue["state"] = state
-        dialogue["photoshop"] = photoshop
-        dialogue["turns"].append(turn_info)
-        session = Query()
-        self.db.upsert(dialogue, session.id == session_id)
 
-
-def builder(string):
+class PickleManager(SessionManager):
     """
-    Gets node class with string
+    Uses file storage to store serialized sessions
     """
-    try:
-        return getattr(sys.modules[__name__], string)
-    except AttributeError:
-        logger.error("Unknown node: {}".format(string))
-        return None
 
+    def __init__(self, pickle_dir):
+        if not os.path.exists(pickle_dir):
+            os.makedirs(pickle_dir)
+        self.pickle_dir = pickle_dir
 
-if __name__ == "__main__":
-    pass
+    def get_session_path(self, session_id):
+        session_path = os.path.join(
+            self.pickle_dir, 'session.{}.pickle'.format(session_id))
+        return session_path
+
+    def create_session(self, session_id):
+        doc = {
+            "session_id": session_id,
+            "manager": {},
+            "imageeditengine": {},
+            "acts": list()
+        }
+
+        session_path = self.get_session_path(session_id)
+        if not os.path.exists(session_path):
+            save_to_pickle(doc, session_path)
+        return doc
+
+    def retrieve(self, session_id):
+        session_path = self.get_session_path(session_id)
+        if not os.path.exists(session_path):
+            self.create_session(session_id)
+
+        doc = load_from_pickle(session_path)
+
+        last_system_state = {
+            "manager": doc['manager'],
+            "imageeditengine": doc['imageeditengine'],
+            "acts": doc['acts'][-1]
+        }
+        return last_system_state
+
+    def add_turn(self, session_id, system_state):
+        session_path = self.get_session_path(session_id)
+        doc = load_from_pickle(session_path)
+        doc["manager"] = system_state['manager']
+        doc['imageeditengine'] = system_state['imageeditengine']
+        doc["acts"].append(system_state['acts'])
+        save_to_pickle(doc, session_path)
+        return doc
+
+    def add_survey(self, survey):
+        raise NotImplementedError

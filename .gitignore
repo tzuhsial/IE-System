@@ -1,6 +1,4 @@
-exp
-memory
-log
+# Self defined ignored files
 .vscode
 
 # Byte-compiled / optimized / DLL files

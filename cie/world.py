@@ -113,3 +113,16 @@ class ImageEditRealUserInterface(object):
             self.manager.flush()  # Reset state
 
         return system_act
+
+    def to_json(self):
+        obj = {
+            'acts': self.acts,
+            'manager': self.manager.to_json(),
+            'imageeditengine': self.imageeditengine.to_json()
+        }
+        return obj
+
+    def from_json(self, obj):
+        self.acts = obj['acts']
+        self.manager.from_json(obj['manager'])
+        self.imageeditengine.from_json(obj['imageeditengine'])

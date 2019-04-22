@@ -128,7 +128,6 @@ class DialogueManager(object):
         # Always add another action to give image edit engine the current mask
         sys2ie_slots = []
         mask_node = self.state.get_slot('object_mask_str')
-        print('mask conf', mask_node.get_max_conf())
         if mask_node.get_max_conf() >= 0.5:
             value, conf = mask_node.get_max_conf_value()
             mask_slot = build_slot_dict('object_mask_str', value, conf)
@@ -251,3 +250,16 @@ class DialogueManager(object):
 
         full_utterance = ' '.join(utt_list)
         return full_utterance
+
+    def to_json(self):
+        obj = {
+            "state": self.state.to_json(),
+            "policy": self.policy.to_json(),
+            "turn_id": self.turn_id
+        }
+        return obj
+
+    def from_json(self, obj):
+        self.state.from_json(obj['state'])
+        self.policy.from_json(obj['policy'])
+        self.turn_id = obj['turn_id']

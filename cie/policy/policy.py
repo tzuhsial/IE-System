@@ -208,6 +208,11 @@ class BasePolicy(object):
             self.replaymemory.add(self.previous_state, self.previous_action,
                                   self.reward, self.state, self.episode_done)
 
+    def to_json(self):
+        return {}
+    
+    def from_json(self, obj):
+        pass 
 
 class RandomPolicy(BasePolicy):
     """
