@@ -63,8 +63,12 @@ class State(object):
                 dialogue_act['conf'] < 0.5:
             return
 
+        # Handle affirm/negate
         if dialogue_act['value'] in UserAct.confirm_acts():
             # Get previous confirmed slot
+            if len(self.sysintent.confirm_slots) == 0:
+                return
+
             prev_confirm_slot = self.sysintent.confirm_slots[0]
             slot_name = prev_confirm_slot['slot']
             slot_node = self.ontology.get_slot(slot_name)

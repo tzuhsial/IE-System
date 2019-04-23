@@ -197,9 +197,12 @@ class DialogueManager(object):
             elif sys_dialogue_act == SystemAct.REQUEST:
                 req_slot = sys_act['slots'][0]
                 req_name = req_slot['slot']
-                if req_name == "adjust_value":
-                    req_name = "value (-100 to 100)"
-                utt = "What {} would you like to adjust?".format(req_name)
+                if req_name == "intent":
+                    utt = "What would you like to do?"
+                else:
+                    if req_name == "adjust_value":
+                        req_name = "value (-100 to 100)"
+                    utt = "What {} would you like to adjust?".format(req_name)
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = ""

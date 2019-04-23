@@ -102,9 +102,9 @@ class NLIETagger(object):
         return nlu_act
 
     def act_confirm(self, sentence):
-        if sentence.startswith("yes"):
+        if sentence == "yes":
             da = "affirm"
-        elif sentence.startswith("no"):
+        elif sentence == "no":
             da = "negate"
         else:
             raise ValueError("Unknown confirm sentence: {}".format(sentence))
