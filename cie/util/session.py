@@ -124,5 +124,9 @@ class PickleManager(SessionManager):
         save_to_pickle(doc, session_path)
         return doc
 
-    def add_survey(self, survey):
-        raise NotImplementedError
+    def add_survey(self, session_id, survey):
+        session_path = self.get_session_path(session_id)
+        doc = load_from_pickle(session_path)
+        doc["survey"] = survey
+        save_to_pickle(doc, session_path)
+        return doc

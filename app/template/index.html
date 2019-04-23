@@ -17,8 +17,14 @@
 
     <script>
         // This code saves session_id into javascript
-        session_id = {{ session_id | tojson }}
-        console.log("received session code", session_id);
+
+        session_id = {
+            {
+                session_id | tojson
+            }
+        }
+        //session_id = {{ session_id|tojson }}
+        //console.log("received session code", session_id);
     </script>
 </head>
 
@@ -30,7 +36,7 @@
         </div>
 
         <div class="jumbotron">
-            
+
             <div class="row">
                 <div class="col"></div>
                 <div class="col-6">
@@ -38,31 +44,32 @@
                 </div>
                 <div class="col"></div>
             </div>
-            
+
             <hr>
-            
+
             <div class="row">
-                <div class="col">INSTRUCTIONS
+                <div class="col">
+                    <button class="btn btn-primary"> Instructions </button>
                 </div>
                 <div class="col-6" id="image-container">
                     <img id="image" src="/static/images/COCO_train2014_000000229598.jpg">
                 </div>
-                <div class="col" id="object">
-                    RIGHT DIV
+                <div class="col">
                 </div>
             </div>
-            
+
             <hr>
 
             <div name="sliders">
                 <div class="row">
+                    <strong>Identified object</strong>
                     <div class="col">
-                    </div>
-                    <div class="col">
-                    </div>
-                    <div class="col">
+                        <span id="object"></span>
                     </div>
 
+                </div>
+                <div class="row">
+                    <strong>Adjustments</strong>
                 </div>
                 <div class="row">
                     <div class="col">
@@ -143,7 +150,7 @@
         <hr>
 
         <footer class="footer">
-            <p>&copy; CMU LTI 2018</p>
+            <p>&copy; CMU LTI 2019</p>
         </footer>
     </div>
 
@@ -157,29 +164,70 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p> Did the system successfully did what you asked? </p>
                     <form>
                         <div class="form-group">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="success-yes" value="Yes">
-                                <label class="form-check-label" for="success-yes">Yes</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="success-no" value="No">
-                                <label class="form-check-label" for="success-no">No</label>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col">
-                                <button type="button" class="btn btn-md btn-danger" id="survey-button">Get Survey Code</button>
-                            </div>
-                            <div class="col">
-                                <span class="border border-primary" id="survey-code">Survey Code</span>
-                            </div>
-                        </div>
-                        </form>
-                    </form>
+                            <strong> Please rate the overall performance of the chatbot. </strong>
 
+                            <div class="form-check form-check-inline" id="performance">
+                                <label>
+                                    <input class="form-check-input" type="radio" value="Very Poor">
+                                    Very Poor
+                                </label>
+                                <label>
+                                    <input class="form-check-input" type="radio" value="Poor">
+                                    Poor
+                                </label>
+                                <label>
+                                    <input class="form-check-input" type="radio" value="Fair">
+                                    Fair
+                                </label>
+
+                                <label>
+                                    <input class="form-check-input" type="radio" value="Good">
+                                    Good
+                                </label>
+
+                                <label>
+                                    <input class="form-check-input" type="radio" value="Excellent">
+                                    Excellent
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <strong> Please check all the items that apply to your experience.
+                            </strong>
+                            <div class="form-check">
+                                <label class="reasons">
+                                    <input name="reason" class="form-check-input" type="checkbox" value="bad_nlu">
+                                    Chatbot did not understand me. (Wrong attribute/value/object)
+                                </label>
+                                <label class="reasons">
+                                    <input name="reason" class="form-check-input" type="checkbox" value="bad_vision">
+                                    Chatbot detected wrong region in the image.
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Feedback area -->
+                        <!--
+                        <div class="form-group">
+                            <strong> Anything you would like to share with us? </strong>
+                            <div class="form-check">
+                                <textarea rows="2" cols="50" id="user-feedback"></textarea>
+                            </div>
+                        </div>
+                        -->
+
+
+                        <!-- Survey Code Block -->
+                        <div class="form-group" id="survey-form-group">
+                            <button type="button" class="btn btn-md btn-danger" id="survey-button">
+                                Click to get Survey Code
+                            </button>
+                            <span class="border border-primary" id="survey-code">*********</span>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -189,18 +237,20 @@
     </div>
 
 
-     <div class="modal" tabindex="-1" role="dialog" id="sorry-modal">
+    <div class="modal" tabindex="-1" role="dialog" id="sorry-modal">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Oops!  Something went wrong on our side!</h5>
+                    <h5 class="modal-title">Oops! Crashed TAT </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p> This event has been notified to the developer.  We will try and fix this as soon as possible.</p>
-                    <p> You may now close the window tab. If you would like to try again, please wait for a few hours.  Thanks. </p>
+                    <p> Something went wrong on our side! </p>
+                    <p> This event has been notified to the developer. We will try and fix this as soon as possible.</p>
+                    <p> You may now close the window tab. If you would like to try again, please wait for a few hours.
+                        Thanks. </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

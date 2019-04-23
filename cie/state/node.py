@@ -67,9 +67,9 @@ class BeliefNode(object):
         """
         self.last_update_turn_id = 0
         self.flush()
-    
+
     def flush(self):
-        self.value_conf_map = { v: 0. for v in self.possible_values }
+        self.value_conf_map = {v: 0. for v in self.possible_values}
         self.intent.clear()
 
     def add_observation(self, value, conf, turn_id):
@@ -230,7 +230,6 @@ class BeliefNode(object):
             self.value_conf_map.items(), key=lambda x: (-x[1], x[0]))
 
         if len(sorted_values) <= 1:
-
             if max_conf < 0.5:
                 intent.request_slots.append(slot)
             elif max_conf < self.threshold:  # 0.8
@@ -369,7 +368,7 @@ class IntentNode(BeliefNode):
             node = queue.pop(0)
             node.clear()
             queue += list(node.children.values())
-    
+
     def flush(self):
         """
         Clear the values & intent of itself and all the children
@@ -381,7 +380,6 @@ class IntentNode(BeliefNode):
             node = queue.pop(0)
             node.flush()
             queue += list(node.children.values())
-    
 
     def get_max_conf_value(self):
         return self.name, 1.0
@@ -560,10 +558,6 @@ class ObjectMaskStrNode(BeliefNode):
 
     def pull(self):
         """
-        ObjectMaskNode should have 3 children
-        1. b64_img_str
-        2. object
-        3. gesture_click
 
         Returns:
             self.intent (object)
@@ -595,21 +589,20 @@ class ObjectMaskStrNode(BeliefNode):
         if self.get_max_conf() >= self.threshold:
             mask_str_slot = self.to_json()
             intent.execute_slots.append(mask_str_slot)
-            return intent
         elif self.get_max_conf() >= 0.5:
             # Confirm whether our current tracked mask is correct
             sorted_values = sorted(
-                self.value_conf_map.items(), key=lambda x: (-x[1], x[0]))            
+                self.value_conf_map.items(), key=lambda x: (-x[1], x[0]))
             top_value_conf = sorted_values[0]
             value, conf = top_value_conf
-            mask_str_slot = util.build_slot_dict('object_mask_str', value, conf)
+            mask_str_slot = util.build_slot_dict(
+                'object_mask_str', value, conf)
             intent.confirm_slots.append(mask_str_slot)
-            return intent
         else:
             # Request again
             object_slot = util.build_slot_dict('object')
             intent.request_slots.append(object_slot)
-            return intent
+        return intent
 
 
 def builder(string):

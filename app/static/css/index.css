@@ -13,6 +13,14 @@ output {
     margin-left: 10px;
 }
 
+.reasons {
+    width: 500px;
+}
+
+
+#survey-form-group {
+    margin-top: 100px;
+}
 
 #image {
     max-width: auto;

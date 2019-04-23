@@ -1,18 +1,20 @@
 var initUrl = location.origin + "/init";
 var stepUrl = location.origin + "/step";
-var resetUrl = location.origin + "/reset";
-var resultUrl = location.origin + "/result";
+var surveyUrl = location.origin + "/survey";
 
 // SessionID
 var d = new Date();
-var session_id = -1;
+var session_id = 0;
 var turn_count = 0;
-var max_turn = 10;
-
+var min_turn = 10;
 
 var updateTurnCount = function (inc = 1) {
     turn_count += inc;
     $("#turn-count").text("Turn: " + turn_count);
+
+    if (turn_count == min_turn) {
+        $("#end-button").prop('disabled', false);
+    }
 }
 
 var submitInit = function () {
@@ -23,14 +25,14 @@ var submitInit = function () {
         var sys_utt = response["system_utterance"];
         $("#system_utterance").text(sys_utt);
         updateTurnCount()
-    }).fail(function() {
+    }).fail(function () {
         console.error("Failed to initialize!")
     }).always(function () {
         toggleLoading(false);
     });
 }
 
-var submitRequest = function (user_utterance) {
+var submitStep = function (user_utterance) {
 
     var data = {}
     data["session_id"] = session_id;
@@ -44,10 +46,46 @@ var submitRequest = function (user_utterance) {
 
         var sys_utt = response["system_utterance"];
 
+        //console.log(response);
+        // Show real users what is really happening.
+
+        var object = response['object'];
+        console.log('object', object);
+        if (object != null) {
+            update_object(object);
+        } else {
+            update_object("");
+        }
+
+        var sys_act = response['system_act']
+        var da = sys_act['dialogue_act']['value']
+
+        // Update slider if executed
+        if (da == "execute") {
+            var slots = sys_act['slots'];
+            var attribute = null;
+            var adjust_value = null;
+
+            for (var i = 0; i < slots.length; i++) {
+                var slot = slots[i];
+                if (slot['slot'] == "attribute") {
+                    attribute = slot['value'];
+                } else if (slot['slot'] == "adjust_value") {
+                    adjust_value = parseInt(slot['value']);
+                }
+            }
+
+            update_slider(attribute, adjust_value);
+        }
+
+
+
         updateTurnCount();
 
         $("#system_utterance").text(sys_utt);
 
+    }).fail(function () {
+        server_error();
     }).always(function () {
         toggleLoading(false);
     })
@@ -78,7 +116,7 @@ var prepare_survey = function () {
 }
 
 // Disable inputs
-var disable_inputs = function() {
+var server_error = function () {
     // Disable input
     $("#user_utterance").prop('disabled', true);
     // Disable survey
@@ -89,13 +127,56 @@ var disable_inputs = function() {
 }
 
 
-var submitSurvey = function() {
-      
-    $("#survey-code").text(session_id);
-    $("#survey-button").prop('disabled', true);
+var submitSurvey = function () {
+
+    var data = {}
+    data["session_id"] = session_id;
+
+    var survey = get_survey_data()
+    if (survey == null) {
+        alert("Please rate the performance before getting survey code!");
+        return;
+    }
+    data["survey"] = JSON.stringify(survey);
+
+    toggleLoading(true);
+    $.post(surveyUrl, data, function (response) {
+        console.log("Successfully recorded!")
+        // Show survey code to user
+        $("#survey-code").text(session_id);
+        $("#system_utterance").text("You may now close the window and submit your survey code.");
+        // Disable everything else
+        $("#user_utterance").prop('disabled', true);
+        $("#survey-button").prop('disabled', true);
+    }).fail(function () {
+        console.error("Failed to record!");
+        $("#end-modal").modal("hide");
+        server_error();
+    }).always(function () {
+        toggleLoading(false);
+    })
+
+
 }
 
-var get_survey_code = function() {
+var get_survey_data = function () {
+    var survey = {}
+    var performance = $("#performance input:radio:checked").val();
+    if (performance == null) {
+        return null
+    }
+    survey['performance'] = performance;
+
+    var reasons = []
+    $.each($("input[name='reason']:checked"), function () {
+        reasons.push($(this).val());
+    });
+
+    survey['reasons'] = reasons;
+    return survey
+}
+
+var get_survey_code = function () {
     $("#survey-button").text(session_id);
 }
 
@@ -106,7 +187,7 @@ $(document).ready(function () {
         var user_utterance = $("#user_utterance").val();
         console.log(user_utterance);
 
-        submitRequest(user_utterance);
+        submitStep(user_utterance);
 
         $("#user_utterance").val("");
     });
@@ -116,16 +197,19 @@ $(document).ready(function () {
         $("#end-modal").modal("show");
     })
 
-    $("#survey-button").on('click', function() {
+    $("#survey-button").on('click', function () {
         submitSurvey();
     });
 
+    // Initialize slider
     var attributes = ["brightness", "contrast", "hue", "saturation", "lightness"];
     for (var i = 0; i < 5; i++) {
         var attribute = attributes[i];
-        // Initialize slider
         $("#input_" + attribute).slider();
     }
+
+    // Disable end dialogue button
+    //$("#end-button").prop('disabled', true);
 
     setTimeout(function () {
         submitInit();

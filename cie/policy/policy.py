@@ -274,8 +274,12 @@ class RulePolicy(BasePolicy):
             sys_act (list): list of sys_acts
         """
         sysintent = state.pull()
+        if len(sysintent.query_slots): # Query First 
+            da = SystemAct.QUERY
+            intent = da
+            slots = sysintent.query_slots.copy()
 
-        if len(sysintent.confirm_slots):
+        elif len(sysintent.confirm_slots):
             da = SystemAct.CONFIRM
             intent = da
             slots = sysintent.confirm_slots[:1].copy()  # confirm 1 at a time
@@ -283,12 +287,15 @@ class RulePolicy(BasePolicy):
         elif len(sysintent.request_slots):
             da = SystemAct.REQUEST
             intent = da
-            slots = sysintent.request_slots[:1].copy()  # request 1 at a time
 
-        elif len(sysintent.query_slots):
-            da = SystemAct.QUERY
-            intent = da
-            slots = sysintent.query_slots.copy()
+            order = {
+                'object': 1, 
+                'attribute': 2, 
+                'adjust_value': 3,
+                'intent': 4
+            }
+            sysintent.request_slots = sorted(sysintent.request_slots, key=lambda x: order[x['slot']])
+            slots = sysintent.request_slots[:1].copy()  # request 1 at a time
 
         else:
             da = SystemAct.EXECUTE

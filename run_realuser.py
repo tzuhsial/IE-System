@@ -38,24 +38,26 @@ def index():
     # Assign session_id and image_path
     # Default values for debugging purposes
 
-    session_id = request.form.get('session_id', None)
+    session_id = request.form.get('session_id', 0)
     if session_id is None:
-        session_id = int(time.time()) # Randomly generate using timestamp
+        session_id = int(time.time())  # Randomly generate using timestamp
     else:
         session_id = int(session_id)
-        
+
     image_path = request.form.get(
         'image_path', "example/COCO_train2014_000000229598.jpg")
-    
+
     # Creates session
+    print("create session", session_id)
     SessionManager.create_session(session_id)
 
-    # Adds to
+    # Open image
     DialogueSystem.open(image_path)
     system_state = DialogueSystem.to_json()
     SessionManager.add_turn(session_id, system_state)
 
     return render_template('index.html', session_id=session_id)
+
 
 @app.route("/init", methods=["POST"])
 def init():
@@ -88,6 +90,9 @@ def step():
     user_act = {'user_utterance': user_utterance}
     print("User:", user_utterance)
 
+    prev_identified_object = DialogueSystem.manager.state.get_slot(
+        'object').get_max_value()
+
     DialogueSystem.observe(user_act)
     sys_act = DialogueSystem.act()
 
@@ -115,10 +120,29 @@ def step():
     img = DialogueSystem.get_image()
     b64_img_str = util.img_to_b64(img)
 
+    identified_object = DialogueSystem.manager.state.get_slot(
+        'object').get_max_value()
+
     # Create return_object
     obj = {}
     obj['system_utterance'] = sys_utt
     obj['b64_img_str'] = b64_img_str
+    obj['system_act'] = sys_act['system_acts'][0]
+    obj['object'] = prev_identified_object or identified_object
+    return jsonify(obj)
+
+
+@app.route("/survey", methods=["POST"])
+def survey():
+    session_id = int(request.form.get("session_id", 0))
+    survey = json.loads(request.form.get("survey", {}))
+
+    print('session_id', session_id)
+    print("survey", survey)
+
+    SessionManager.add_survey(session_id, survey)
+
+    obj = {}
     return jsonify(obj)
 
 
