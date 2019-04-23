@@ -15,7 +15,7 @@
             "nlu": {
                 "nlu": "NLIETagger",
                 "client": true,
-                "uri": "http://0.0.0.0:6000/nlu"
+                "uri": "http://128.2.204.98:5000/nlu"
             },
             "manager": {
                 "state": {
