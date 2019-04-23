@@ -12,7 +12,7 @@ var updateTurnCount = function (inc = 1) {
     turn_count += inc;
     $("#turn-count").text("Turn: " + turn_count);
 
-    if (turn_count == min_turn) {
+    if (turn_count >= min_turn) {
         $("#end-button").prop('disabled', false);
     }
 }
@@ -40,7 +40,7 @@ var submitStep = function (user_utterance) {
     data["session_id"] = session_id;
     data['user_utterance'] = user_utterance;
 
-    console.log('submit', data);
+    //console.log('submit', data);
 
     toggleLoading(true);
     $.post(stepUrl, data, function (response) {
@@ -52,7 +52,7 @@ var submitStep = function (user_utterance) {
         // Show real users what is really happening.
 
         var object = response['object'];
-        console.log('object', object);
+        //console.log('object', object);
         if (object != null) {
             update_object(object);
         } else {
@@ -78,6 +78,8 @@ var submitStep = function (user_utterance) {
             }
 
             update_slider(attribute, adjust_value);
+            // Activate end
+            $("#end-button").prop('disabled', false);
         }
 
 
@@ -187,7 +189,7 @@ $(document).ready(function () {
         e.preventDefault();
 
         var user_utterance = $("#user_utterance").val();
-        console.log(user_utterance);
+        //console.log(user_utterance);
 
         submitStep(user_utterance);
 
@@ -211,7 +213,13 @@ $(document).ready(function () {
     }
 
     // Disable end dialogue button
-    //$("#end-button").prop('disabled', true);
+    $("#end-button").prop('disabled', true);
+
+    $("#instruction-button").on("click", function () {
+        $("#instruction-modal").modal('show');
+    });
+
+
 
     setTimeout(function () {
         submitInit();

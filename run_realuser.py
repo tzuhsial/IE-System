@@ -144,7 +144,7 @@ def step():
 
 @app.route("/survey", methods=["POST"])
 def survey():
-    session_id = int(request.form.get("session_id", 0))
+    session_id = request.form.get("session_id", "-1")
     survey = json.loads(request.form.get("survey", {}))
 
     print('session_id', session_id)

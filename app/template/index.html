@@ -17,9 +17,8 @@
 
     <script>
         // This code saves session_id into javascript
-
         session_id = {{ session_id|tojson }}
-        console.log("received session id", session_id);
+        //console.log("received session id", session_id);
     </script>
 </head>
 
@@ -44,10 +43,10 @@
 
             <div class="row">
                 <div class="col">
-                    <button class="btn btn-primary"> Instructions </button>
+                    <button class="btn btn-primary" id="instruction-button"> Instructions </button>
                 </div>
                 <div class="col-6" id="image-container">
-                    <img id="image" src="/static/images/COCO_train2014_000000229598.jpg">
+                    <img id="image" src="">
                 </div>
                 <div class="col">
                 </div>
@@ -57,14 +56,14 @@
 
             <div name="sliders">
                 <div class="row">
-                    <strong>Identified object</strong>
+                    <strong>Identified Object</strong>
                     <div class="col">
                         <span id="object"></span>
                     </div>
 
                 </div>
                 <div class="row">
-                    <strong>Adjustments</strong>
+                    <strong>Attributes</strong>
                 </div>
                 <div class="row">
                     <div class="col">
@@ -137,7 +136,7 @@
                 <h4 id="turn-count"></h4>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-info" id="end-button">End Dialogue</button>
+                <button type="button" class="btn btn-info" id="end-button">End</button>
             </div>
             <div class="col">
             </div>
@@ -165,25 +164,25 @@
 
                             <div class="form-check form-check-inline" id="performance">
                                 <label>
-                                    <input class="form-check-input" type="radio" value="Very Poor">
+                                    <input name="rating" class="form-check-input" type="radio" value="Very Poor">
                                     Very Poor
                                 </label>
                                 <label>
-                                    <input class="form-check-input" type="radio" value="Poor">
+                                    <input name="rating" class="form-check-input" type="radio" value="Poor">
                                     Poor
                                 </label>
                                 <label>
-                                    <input class="form-check-input" type="radio" value="Fair">
+                                    <input name="rating" class="form-check-input" type="radio" value="Fair">
                                     Fair
                                 </label>
 
                                 <label>
-                                    <input class="form-check-input" type="radio" value="Good">
+                                    <input name="rating" class="form-check-input" type="radio" value="Good">
                                     Good
                                 </label>
 
                                 <label>
-                                    <input class="form-check-input" type="radio" value="Excellent">
+                                    <input name="rating" class="form-check-input" type="radio" value="Excellent">
                                     Excellent
                                 </label>
                             </div>
@@ -204,16 +203,6 @@
                             </div>
                         </div>
 
-                        <!-- Feedback area -->
-                        <!--
-                        <div class="form-group">
-                            <strong> Anything you would like to share with us? </strong>
-                            <div class="form-check">
-                                <textarea rows="2" cols="50" id="user-feedback"></textarea>
-                            </div>
-                        </div>
-                        -->
-
 
                         <!-- Survey Code Block -->
                         <div class="form-group" id="survey-form-group">
@@ -233,7 +222,7 @@
 
 
     <div class="modal" tabindex="-1" role="dialog" id="sorry-modal">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Oops! Crashed TAT </h5>
@@ -242,10 +231,63 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p> Something went wrong on our side! </p>
-                    <p> This event has been notified to the developer. We will try and fix this as soon as possible.</p>
-                    <p> You may now close the window tab. If you would like to try again, please wait for a few hours.
-                        Thanks. </p>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="instruction-modal">
+        <div class="modal-dialog " role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Instructions</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group">
+                        <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">1. Perform at least one edit. </h5>
+                            </div>
+                            <p> You need at least one edit or interact with 10 turns to receive a survey code. However,
+                                you can edit more if you want to.</p>
+                            <p> Good news is: You are free to decide what you want to edit. </p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">2. Types of Edits </h5>
+                            </div>
+                            <p> Our chatbot is capable of identifying common objects in images. When describing objects,
+                                please refer to the object as a whole (e.g., the man), instead of parts of the object
+                                (e.g., the man's eyebrows)</p>
+                            <p> Our chatbot can modify 5 attributes (1) brightness (2) contrast (3) hue (4) saturation
+                                (5) lightness by a value (-100 to 100), which are shown below the image. </p>
+                            <p> "Identified Object" shows what the object our chatbot identified in your instructions.
+                            </p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">3. Survey </h5>
+                            </div>
+                            <p> Click on "end" button to conduct the survey. Tell us what you think of the performance
+                                of our chatbot, and what situations apply to your experience.</p>
+                            <p> Then, click on the red button to receive your survey code to fill in at Mechanical Turk.
+                            </p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">4. Please do 1 HIT only and carefully. </h5>
+                            </div>
+                            <p> We will manually inspect every HIT so please do it carefully. 
+                                Also, please do only 1 HIT, we will reject additional HITs from workers. </p>
+                        </a>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
