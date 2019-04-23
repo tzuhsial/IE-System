@@ -138,7 +138,7 @@ def step():
     obj['system_utterance'] = sys_utt
     obj['b64_img_str'] = b64_img_str
     obj['system_act'] = sys_act['system_acts'][0]
-    obj['object'] = prev_identified_object or identified_object
+    obj['object'] = identified_object or prev_identified_object
     return jsonify(obj)
 
 
