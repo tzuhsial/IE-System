@@ -4,7 +4,7 @@ var surveyUrl = location.origin + "/survey";
 
 // SessionID
 var d = new Date();
-var session_id = 0;
+var session_id = -1;
 var turn_count = 0;
 var min_turn = 10;
 
@@ -18,7 +18,9 @@ var updateTurnCount = function (inc = 1) {
 }
 
 var submitInit = function () {
-    var data = {}
+    var data = {
+        "session_id": session_id
+    }
     toggleLoading(true);
     $.post(initUrl, data, function (response) {
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);

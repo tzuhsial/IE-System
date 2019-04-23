@@ -1,10 +1,5 @@
 {
-    "session": {
-        "session": "MongoDBManager",
-        "host": null,
-        "port": null,
-        "db_path": null
-    },
+    "image_dir": "/Users/iammrhelo/Research/Dialogue/IE-System/images",
     "agents": {
         "visionengine": {
             "visionengine": "MAttNetClient",

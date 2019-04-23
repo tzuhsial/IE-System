@@ -55,7 +55,7 @@ def apply_polygon(image, mask, color=None, caption=None):
         # and flip (y, x) to (x, y)
         verts = np.fliplr(verts) - 1
         pts = verts.reshape(-1, 1, 2).astype(np.int32)
-        masked_image = cv2.polylines(masked_image, [pts], True, color)
+        masked_image = cv2.polylines(masked_image, [pts], True, (57, 255, 20))
 
     return masked_image
 

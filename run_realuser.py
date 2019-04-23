@@ -4,9 +4,10 @@ import logging
 import os
 import pprint
 import time
+import uuid
 
 import numpy as np
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for, abort
 
 from cie import ImageEditRealUserInterface, SystemAct, VisionEnginePortal, util
 
@@ -31,21 +32,30 @@ logger.addHandler(consoleHandler)
 DialogueSystem = None
 SessionManager = None
 VisionEngine = None
+ImageDir = None 
+
+
+def generate_session_id():
+    session_id = str(uuid.UUID(bytes = os.urandom(16)))
+    return session_id
+
+def get_image_path(image_id):
+    image_name = image_id + ".jpg"
+    image_path = os.path.join(ImageDir, image_name)
+    return image_path
 
 
 @app.route("/")
 def index():
     # Assign session_id and image_path
     # Default values for debugging purposes
+    image_id = request.args.get('image_id', "-1")
+    image_path = get_image_path(image_id)
+    if not os.path.exists(image_path):
+        abort(404)
 
-    session_id = request.form.get('session_id', 0)
-    if session_id is None:
-        session_id = int(time.time())  # Randomly generate using timestamp
-    else:
-        session_id = int(session_id)
-
-    image_path = request.form.get(
-        'image_path', "example/COCO_train2014_000000229598.jpg")
+    # generate a session id
+    session_id = generate_session_id()
 
     # Creates session
     print("create session", session_id)
@@ -61,7 +71,7 @@ def index():
 
 @app.route("/init", methods=["POST"])
 def init():
-    session_id = int(request.form.get('session_id', 0))
+    session_id = request.form.get('session_id', "-1")
     print("session", session_id)
 
     last_system_state = SessionManager.retrieve(session_id)
@@ -80,7 +90,7 @@ def init():
 @app.route("/step", methods=["POST"])
 def step():
     # Load sesssion
-    session_id = int(request.form.get("session_id", 0))  # default to 0
+    session_id = request.form.get("session_id", "-1")  # default to 0
     print("session_id", session_id)
 
     last_system_state = SessionManager.retrieve(session_id)
@@ -157,6 +167,9 @@ def serve(args):
     global VisionEngine
     config_json = util.load_from_json(args.config)
     VisionEngine = VisionEnginePortal(config_json['agents']['visionengine'])
+
+    global ImageDir
+    ImageDir = config_json['image_dir']
 
     app.run(host='0.0.0.0', port=2000, debug=args.debug)
 

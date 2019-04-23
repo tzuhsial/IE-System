@@ -18,13 +18,8 @@
     <script>
         // This code saves session_id into javascript
 
-        session_id = {
-            {
-                session_id | tojson
-            }
-        }
-        //session_id = {{ session_id|tojson }}
-        //console.log("received session code", session_id);
+        session_id = {{ session_id|tojson }}
+        console.log("received session id", session_id);
     </script>
 </head>
 
