@@ -29,6 +29,7 @@ var submitInit = function () {
         updateTurnCount()
     }).fail(function () {
         console.error("Failed to initialize!")
+        server_error();
     }).always(function () {
         toggleLoading(false);
     });
@@ -189,10 +190,9 @@ $(document).ready(function () {
         e.preventDefault();
 
         var user_utterance = $("#user_utterance").val();
-        //console.log(user_utterance);
-
-        submitStep(user_utterance);
-
+        if (user_utterance.trim() != "") {
+            submitStep(user_utterance);
+        }
         $("#user_utterance").val("");
     });
 
@@ -210,6 +210,9 @@ $(document).ready(function () {
     for (var i = 0; i < 5; i++) {
         var attribute = attributes[i];
         $("#input_" + attribute).slider();
+        $("#input_" + attribute).on("slide", function (event, ui) {
+            return false;
+        });
     }
 
     // Disable end dialogue button
@@ -220,8 +223,10 @@ $(document).ready(function () {
     });
 
 
-
     setTimeout(function () {
         submitInit();
     }, 1000);
+
+    $("#instruction-modal").modal('show');
+    $("#user_utterance").focus();
 });
