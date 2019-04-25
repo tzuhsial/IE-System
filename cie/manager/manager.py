@@ -225,7 +225,18 @@ class DialogueManager(object):
                             .format(slot_value)
 
             elif sys_dialogue_act == SystemAct.EXECUTE:
-                utt = "Executed image edit."
+                utt = "Execute image edit."
+
+                slots = sys_act['slots']
+
+                expr = self.state.get_slot('object').get_max_value()
+                attribute = find_slot_with_key('attribute', slots)['value']
+                adjust_value = find_slot_with_key('adjust_value', slots)['value']
+                if adjust_value < 0:
+                    adjust_value = "-" + str(adjust_value)
+                else:
+                    adjust_value = "+" + str(adjust_value)
+                utt += "({}, {} {})".format(expr, attribute, adjust_value)
             elif sys_dialogue_act == SystemAct.BYE:
                 utt = "Goodbye! See you next time!"
             else:

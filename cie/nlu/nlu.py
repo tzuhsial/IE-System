@@ -39,7 +39,7 @@ class NLIETagger(object):
 
         sentence = sentence.strip().lower()
 
-        if sentence.startswith("yes") or sentence.startswith("no"):
+        if sentence in ["yes", "no"]:
             nlu_act = self.act_confirm(sentence)
         else:
             nlu_act = self.act_inform(sentence)

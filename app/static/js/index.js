@@ -6,15 +6,28 @@ var surveyUrl = location.origin + "/survey";
 var d = new Date();
 var session_id = -1;
 var turn_count = 0;
+var edit_count = 0;
+var min_edit = 2;
 var min_turn = 10;
+var end_turn = 20;
 
 var updateTurnCount = function (inc = 1) {
     turn_count += inc;
-    $("#turn-count").text("Turn: " + turn_count);
+    $("#turn-count").text("Turn: " + turn_count + "/" + min_turn);
 
-    if (turn_count >= min_turn) {
+    // Users manage to do nothing for 20 turns.
+    if (turn_count >= min_turn && edit_count >= min_edit) {
         $("#end-button").prop('disabled', false);
     }
+
+    if (turn_count >= end_turn) {
+        $("#end-button").prop('disabled', false);
+    }
+}
+
+var updateEditCount = function (inc = 1) {
+    edit_count += inc;
+    $("#edit-count").text("Edits: " + edit_count + "/" + min_edit);
 }
 
 var submitInit = function () {
@@ -26,7 +39,9 @@ var submitInit = function () {
         $("#image").attr("src", "data:image/png;base64," + response["b64_img_str"]);
         var sys_utt = response["system_utterance"];
         $("#system_utterance").text(sys_utt);
-        updateTurnCount()
+        // Start from 0
+        updateTurnCount(0);
+        updateEditCount(0);
     }).fail(function () {
         console.error("Failed to initialize!")
         server_error();
@@ -57,7 +72,7 @@ var submitStep = function (user_utterance) {
         if (object != null) {
             update_object(object);
         } else {
-            update_object("");
+            update_object("(Not detected)");
         }
 
         var sys_act = response['system_act']
@@ -78,16 +93,29 @@ var submitStep = function (user_utterance) {
                 }
             }
 
+            // Reset sliders
+            var attributes = ["brightness", "contrast", "hue", "saturation", "lightness"];
+            for (var i = 0; i < attributes.length; i++) {
+                update_slider(attributes[i], 0);
+            }
+
             update_slider(attribute, adjust_value);
+
             // Activate end
-            $("#end-button").prop('disabled', false);
+            updateEditCount();
+
+            // Need to satisfy both conditions:
+            // Edits 2
+            // Turns 10
+            if (edit_count >= min_edit && turn_count >= min_turn) {
+                $("#end-button").prop('disabled', false);
+            }
         }
-
-
 
         updateTurnCount();
 
         $("#system_utterance").text(sys_utt);
+        $("#system_utterance2").prop("value", sys_utt);
 
     }).fail(function () {
         server_error();
@@ -113,13 +141,6 @@ var update_object = function (object) {
     $("#object").text(object);
 }
 
-
-// Disables user input
-var prepare_survey = function () {
-    $("#end-button").prop('disabled', false);
-    $("#survey-button").prop('disabled', false);
-}
-
 // Disable inputs
 var server_error = function () {
     // Disable input
@@ -139,7 +160,7 @@ var submitSurvey = function () {
 
     var survey = get_survey_data()
     if (survey == null) {
-        alert("Please rate the performance before getting survey code!");
+        alert("Please fill in all the answers before submitting!");
         return;
     }
     data["survey"] = JSON.stringify(survey);
@@ -166,18 +187,30 @@ var submitSurvey = function () {
 
 var get_survey_data = function () {
     var survey = {}
-    var performance = $("#performance input:radio:checked").val();
-    if (performance == null) {
-        return null
+
+    // Get Multiple Choice Answers 
+    var multiple_choices = ["performance", "nlu-object", "cv", "nlu-attribute-value"];
+
+    for (var i = 0; i < multiple_choices.length; i++) {
+        var mp = multiple_choices[i];
+        var answer = $("#" + mp + " input:radio:checked").val();
+        if (answer == null) {
+            return null;
+        }
+        survey[mp] = answer;
     }
-    survey['performance'] = performance;
 
-    var reasons = []
-    $.each($("input[name='reason']:checked"), function () {
-        reasons.push($(this).val());
-    });
+    // Get feedback answers
+    var feedback_types = ["like", "dislike", "suggestion"];
+    for (var i = 0; i < feedback_types.length; i++) {
+        var ft = feedback_types[i];
+        var answer = $("#input-" + ft).val();
+        if (answer.trim() == "") {
+            return null;
+        }
+        survey[ft] = answer;
+    }
 
-    survey['reasons'] = reasons;
     return survey
 }
 
@@ -186,6 +219,7 @@ var get_survey_code = function () {
 }
 
 $(document).ready(function () {
+
     $("#submit").on('click', function (e) {
         e.preventDefault();
 
@@ -194,6 +228,12 @@ $(document).ready(function () {
             submitStep(user_utterance);
         }
         $("#user_utterance").val("");
+    });
+
+    $("#user_utterance").on('keypress', function (e) {
+        if (e.keyCode == 13) {
+            $("#submit").click();
+        }
     });
 
 

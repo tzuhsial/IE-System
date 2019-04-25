@@ -1,4 +1,5 @@
 # Self defined ignored files
+pickled
 .vscode
 
 # Byte-compiled / optimized / DLL files

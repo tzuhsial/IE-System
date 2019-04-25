@@ -33,8 +33,8 @@
             <!-- Title Row -->
             <div class="row">
                 <div class="col"></div>
-                <div class="col-6">
-                    <h3>Image Editing Chatbot Survey </h3>
+                <div class="col-5">
+                    <h3>Image Editing Chatbot</h3>
                 </div>
                 <div class="col"></div>
             </div>
@@ -43,19 +43,28 @@
 
             <!-- Image Row -->
             <div class="row">
-                <div class="col">
+                <div class="col-4">
                     <div class="row">
                         <button class="btn btn-primary" id="instruction-button"> Show Instructions </button>
                     </div>
+
+                    <!-- Spacing -->
+                    <p></p>
+                    <p></p>
                     <div class="row">
-                        <strong>Identified Object</strong>
-                        <div class="col">
-                            <span id="object"></span>
-                        </div>
+                        <strong>Detected Object</strong>
                     </div>
+                    <div class="row">
+                        <span id="object">(Not detected)</span>
+                    </div>
+
+                    <!-- Spacing -->
+                    <p></p>
+                    <p></p>
                     <div class="row">
                         <b>Attributes</b>
                     </div>
+                    <p></p>
                     <div class="row">
                         <label for="input_brightness">brightness</label>
                         <input type="range" id="input_brightness" value="0" min="-100" max="100">
@@ -87,10 +96,8 @@
                     </div>
 
                 </div>
-                <div class="col-6" id="image-container">
+                <div class="col-8" id="image-container">
                     <img id="image" src="">
-                </div>
-                <div class="col">
                 </div>
             </div>
 
@@ -105,7 +112,7 @@
 
         <hr>
         <form>
-            System:
+            Chatbot:
             <div id="system_utterance">
                 (Please wait.)
             </div>
@@ -116,10 +123,9 @@
         <!-- User input -->
         <div class="input-group mb-3">
             <div class="input-group-prepend">
-                <span class="input-group-text" id="inputGroup-sizing-default">User Input</span>
+                <span class="input-group-text" id="inputGroup-sizing-default">You say...</span>
             </div>
-            <input type="text" class="form-control" aria-label="Default" aria-describedby="inputGroup-sizing-default"
-                id="user_utterance">
+            <input type="text" class="form-control" id="user_utterance">
             <div class="input-group-append">
                 <button class="btn btn-outline-secondary" type="button" id="submit">Submit</button>
             </div>
@@ -128,11 +134,14 @@
 
         <hr>
         <div class="row">
-            <div class="col">
+            <div class="col-2">
+                <h4 id="edit-count"></h4>
+            </div>
+            <div class="col-2">
                 <h4 id="turn-count"></h4>
             </div>
-            <div class="col">
-                <button type="button" class="btn btn-info" id="end-button">End</button>
+            <div class="col-4">
+                <button type="button" class="btn btn-info" id="end-button">End Button</button>
             </div>
             <div class="col">
             </div>
@@ -144,11 +153,7 @@
         </footer>
     </div>
 
-
-
-
-
-
+    <!-- Questionnaire Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="end-modal">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -161,54 +166,117 @@
                 <div class="modal-body">
                     <form>
                         <div class="form-group">
-                            <strong> Please rate the overall performance of the chatbot. </strong>
+                            
+                            <div class="form-group">
+                                <p><strong>1. Rate the overall performance of the chatbot. </strong> </p>
 
-                            <div class="form-check form-check-inline" id="performance">
-                                <label>
-                                    <input name="rating" class="form-check-input" type="radio" value="Very Poor">
-                                    Very Poor
-                                </label>
-                                <label>
-                                    <input name="rating" class="form-check-input" type="radio" value="Poor">
-                                    Poor
-                                </label>
-                                <label>
-                                    <input name="rating" class="form-check-input" type="radio" value="Fair">
-                                    Fair
-                                </label>
+                                <div class="form-check form-check-inline" id="performance">
+                                    <label>
+                                        <input name="performance-option" class="form-check-input" type="radio" value="Very Poor">
+                                        Very Poor
+                                    </label>
+                                    <label>
+                                        <input name="performance-option" class="form-check-input" type="radio" value="Poor">
+                                        Poor
+                                    </label>
+                                    <label>
+                                        <input name="performance-option" class="form-check-input" type="radio" value="Fair">
+                                        Fair
+                                    </label>
+    
+                                    <label>
+                                        <input name="performance-option" class="form-check-input" type="radio" value="Good">
+                                        Good
+                                    </label>
+    
+                                    <label>
+                                        <input name="performance-option" class="form-check-input" type="radio" value="Excellent">
+                                        Excellent
+                                    </label>
+                                </div>
 
-                                <label>
-                                    <input name="rating" class="form-check-input" type="radio" value="Good">
-                                    Good
-                                </label>
+                                <p><strong>2. I find it difficult for the chatbot to understand the object I want.</strong></p>
+                                <div class="form-check form-check-inline" id="nlu-object">
+                                    <label>
+                                        <input name="nlu-object-option" class="form-check-input" type="radio" value="Strongly Agree">
+                                        Strongly Agree
+                                    </label>
+                                    <label>
+                                        <input name="nlu-object-option" class="form-check-input" type="radio" value="Agree">
+                                        Agree
+                                    </label>
+                                    <label>
+                                        <input name="nlu-object-option" class="form-check-input" type="radio" value="Disagree">
+                                        Disagree
+                                    </label>
+    
+                                    <label>
+                                        <input name="nlu-object-option" class="form-check-input" type="radio" value="Strongly Disagree">
+                                        Strongly Disagree
+                                    </label>
+                                </div>
 
-                                <label>
-                                    <input name="rating" class="form-check-input" type="radio" value="Excellent">
-                                    Excellent
-                                </label>
+                                <p><strong>3. The chatbot could not detect the correct region for the object. </strong></p>
+                                <div class="form-check form-check-inline" id="cv">
+                                    <label>
+                                        <input name="cv-option" class="form-check-input" type="radio" value="Strongly Agree">
+                                        Strongly Agree
+                                    </label>
+                                    <label>
+                                        <input name="cv-option" class="form-check-input" type="radio" value="Agree">
+                                        Agree
+                                    </label>
+                                    <label>
+                                        <input name="cv-option" class="form-check-input" type="radio" value="Disagree">
+                                        Disagree
+                                    </label>
+    
+                                    <label>
+                                        <input name="cv-option" class="form-check-input" type="radio" value="Strongly Disagree">
+                                        Strongly Disagree
+                                    </label>
+                                </div>
+
+                                <p><strong>4. I find it difficult for the chatbot to understand the attribute/value I want. </strong></p>
+                                <div class="form-check form-check-inline" id="nlu-attribute-value">
+                             
+                                    <label>
+                                        <input name="nlu-attribute-value-option" class="form-check-input" type="radio" value="Strongly Agree">
+                                        Strongly Agree
+                                    </label>
+                                    <label>
+                                        <input name="nlu-attribute-value-option" class="form-check-input" type="radio" value="Agree">
+                                        Agree
+                                    </label>
+                                    <label>
+                                        <input name="nlu-attribute-value-option" class="form-check-input" type="radio" value="Disagree">
+                                        Disagree
+                                    </label>
+    
+                                    <label>
+                                        <input name="nlu-attribute-value-option" class="form-check-input" type="radio" value="Strongly Disagree">
+                                        Strongly Disagree
+                                    </label>
+                                </div>
+
+                                <p><strong>5. Name one thing you liked about this chatbot. </strong></p>
+                                <input class="feedback" type="text" id="input-like">
+                                
+                                <p><strong>6. Name one thing you disliked about this chatbot. </strong></p>
+                                <input class="feedback" type="text" id="input-dislike">
+                                
+                                <p><strong>7. Suggest one improvement for this chatbot. </strong></p>
+                                <input class="feedback" type="text" id="input-suggestion">
+
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <strong> Please check all the items that apply to your experience.
-                            </strong>
-                            <div class="form-check">
-                                <label class="reasons">
-                                    <input name="reason" class="form-check-input" type="checkbox" value="bad_nlu">
-                                    Chatbot did not understand me correctly. (Wrong attribute/value/object)
-                                </label>
-                                <label class="reasons">
-                                    <input name="reason" class="form-check-input" type="checkbox" value="bad_vision">
-                                    Chatbot detected wrong region in the image.
-                                </label>
-                            </div>
-                        </div>
 
 
                         <!-- Survey Code Block -->
                         <div class="form-group" id="survey-form-group">
                             <button type="button" class="btn btn-md btn-danger" id="survey-button">
-                                Click to get Survey Code
+                                Click to submit and get survey code. 
                             </button>
                             <span class="border border-primary" id="survey-code">*********</span>
                         </div>
@@ -222,6 +290,7 @@
     </div>
 
 
+    <!-- Something fucked up Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="sorry-modal">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -244,6 +313,7 @@
         </div>
     </div>
 
+    <!-- Instruction Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="instruction-modal">
         <div class="modal-dialog " role="document">
             <div class="modal-content">
@@ -264,41 +334,34 @@
                         </a>
                         <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
                             <div class="d-flex w-100 justify-content-between">
-                                <h5 class="mb-1">2. Perform at least one edit. </h5>
+                                <h5 class="mb-1">2. Perform at least 2 edits. </h5>
                             </div>
-                            <p> Talking to the chatbot is the only way to edit the image! (Sliders do not work.)
+                            <p> Enter your instructions using natural language, as if you were talking to the chatbot.
                             </p>
-                            <p> You need at least one edit or interact with 10 turns to receive a survey code.
-                                However,
-                                you can edit more if you want to.</p>
+                            <p> You need to interact with the chatbot for at least <strong>10</strong> turns
+                                and make at least <strong>2</strong> edits.
+                            </p>
                             <p> You are free to decide what you want to edit. </p>
                         </a>
                         <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
                             <div class="d-flex w-100 justify-content-between">
-                                <h5 class="mb-1">3. Our Chatbot </h5>
+                                <h5 class="mb-1">3. Our chatbot is able to</h5>
                             </div>
-                            <p> Our chatbot can identify common objects in images. When describing objects,
-                                please refer to the object as a whole (e.g., the man), instead of parts of the
-                                object
+                            <p> Our chatbot is able to identify common objects in images. When describing objects,
+                                please refer to them as a whole (e.g., the man), instead of partial
                                 (e.g., the man's eyebrows)</p>
-
-                            <p> <b>Identified Object</b> shows the object our chatbot identified in your sentences.
+                            <p> <b>Detected Object</b> shows the object our chatbot detected in your sentences.
                             </p>
-                            <p> Our chatbot can modify 5 attributes (1) brightness (2) contrast (3) hue (4)
-                                saturation
-                                (5) lightness by a value (-100 to 100), which are shown in the <b>Attributes</b>
-                                section. </p>
+                            <p> <b>Attribute</b> section shows the attributes our chatbot is able to modify: (1)
+                                brightness (2) contrast (3) hue (4) saturation (5) lightness.
+                                The value range is -100 to 100. </p>
                         </a>
                         <a href="#" class="list-group-item list-group-item-action flex-column align-items-start">
                             <div class="d-flex w-100 justify-content-between">
-                                <h5 class="mb-1">4. Survey </h5>
+                                <h5 class="mb-1">4. Questionnaire. </h5>
                             </div>
-                            <p> Click on "end" button to conduct the survey. Tell us what you think of the
-                                performance
-                                of our chatbot, and what situations apply to your experience.</p>
-                            <p> Then, click on the red button to receive your survey code to fill in at Mechanical
-                                Turk.
-                            </p>
+                            <p> When you click on "end" button, you will go to a questionnaire. Fill out the
+                                questionnaire to get the survey code! </p>
                         </a>
 
                     </div>
