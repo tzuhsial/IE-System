@@ -32,12 +32,13 @@ logger.addHandler(consoleHandler)
 DialogueSystem = None
 SessionManager = None
 VisionEngine = None
-ImageDir = None 
+ImageDir = None
 
 
 def generate_session_id():
-    session_id = str(uuid.UUID(bytes = os.urandom(16)))
+    session_id = str(uuid.UUID(bytes=os.urandom(16)))
     return session_id
+
 
 def get_image_path(image_id):
     image_name = image_id + ".jpg"
@@ -47,14 +48,13 @@ def get_image_path(image_id):
 
 @app.route("/")
 def index():
-    # Assign session_id and image_path
-    # Default values for debugging purposes
+    # Gets image_id
     image_id = request.args.get('image_id', "-1")
     image_path = get_image_path(image_id)
     if not os.path.exists(image_path):
         abort(404)
 
-    # generate a session id
+    # Generates session id
     session_id = generate_session_id()
 
     # Creates session
@@ -63,6 +63,9 @@ def index():
 
     # Open image
     DialogueSystem.open(image_path)
+    SessionManager.add_image_id(session_id, image_id)
+
+    # Create initial state
     system_state = DialogueSystem.to_json()
     SessionManager.add_turn(session_id, system_state)
 

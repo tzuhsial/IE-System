@@ -211,7 +211,9 @@ class DialogueManager(object):
                 slot_name = slot_dict["slot"]
                 slot_value = str(slot_dict.get('value', ""))
                 if slot_dict['slot'] in ["object_mask_str"]:
-                    utt = "Is the current detected object region correct?"
+                    object_name = self.state.get_slot('object').get_max_value()
+                    utt = "I detected \"{}\" in your sentences. Is the current region (green) in the image correct?"\
+                        .format(object_name)
                 else:
                     utt = "Is your {} {}?".format(slot_name, slot_value)
                 utt += " (yes/no)"
@@ -231,7 +233,8 @@ class DialogueManager(object):
 
                 expr = self.state.get_slot('object').get_max_value()
                 attribute = find_slot_with_key('attribute', slots)['value']
-                adjust_value = find_slot_with_key('adjust_value', slots)['value']
+                adjust_value = find_slot_with_key(
+                    'adjust_value', slots)['value']
                 if adjust_value < 0:
                     adjust_value = "-" + str(adjust_value)
                 else:

@@ -93,6 +93,7 @@ class PickleManager(SessionManager):
     def create_session(self, session_id):
         doc = {
             "session_id": session_id,
+            "image_id": -1,
             "manager": {},
             "imageeditengine": {},
             "acts": list()
@@ -114,6 +115,13 @@ class PickleManager(SessionManager):
             "acts": doc['acts'][-1]
         }
         return last_system_state
+
+    def add_image_id(self, session_id, image_id):
+        session_path = self.get_session_path(session_id)
+        doc = load_from_pickle(session_path)
+        doc['image_id'] = image_id
+        save_to_pickle(doc, session_path)
+        return doc
 
     def add_turn(self, session_id, system_state):
         session_path = self.get_session_path(session_id)
