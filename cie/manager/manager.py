@@ -202,7 +202,12 @@ class DialogueManager(object):
                 else:
                     if req_name == "adjust_value":
                         req_name = "value (-100 to 100)"
+                    elif req_name == "attribute":
+                        req_name = "attribute (brightness, contrast, hue, saturation, lightness)"
                     utt = "What {} would you like to adjust?".format(req_name)
+
+                    if req_name == "object":
+                        utt += " Please describe the object as a whole (e.g., the man) instead of a detail (e.g., his eyebrows)"
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = ""
@@ -236,7 +241,7 @@ class DialogueManager(object):
                 adjust_value = find_slot_with_key(
                     'adjust_value', slots)['value']
                 if adjust_value < 0:
-                    adjust_value = "-" + str(adjust_value)
+                    adjust_value = str(adjust_value)
                 else:
                     adjust_value = "+" + str(adjust_value)
                 utt += "({}, {} {})".format(expr, attribute, adjust_value)

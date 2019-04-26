@@ -9,7 +9,7 @@ var turn_count = 0;
 var edit_count = 0;
 var min_edit = 2;
 var min_turn = 10;
-var end_turn = 20;
+var end_turn = 30;
 
 var updateTurnCount = function (inc = 1) {
     turn_count += inc;
