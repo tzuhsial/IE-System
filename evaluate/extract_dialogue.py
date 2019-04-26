@@ -2,18 +2,54 @@
 Usage:
     python extract_dialogue.py SESSION_PICKLE
 """
+import argparse 
 import json
 import os
+import pickle 
 import sys
 
-import cie.util as util
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', type=str, help="mode (stats|print)")
+    parser.add_argument('-a', '--approved', type=str, default="./evaluate/approved.txt", help="List of approved session ids")
+    parser.add_argument('-s', '--session', type=str, default='./example', help='session pickle directory')
+    args = parser.parse_args()
+    return args 
+
+def load_from_pickle(filepath):
+    """Load from pickle
+    """
+    with open(filepath, 'rb') as fin:
+        obj = pickle.load(fin)
+    return obj
+
+def visualize(session):
+    """
+    Visualize a session object
+    """
+    raise NotImplementedError
 
 def main():
-    SESSION_PICKLE = sys.argv[1]
-    session = util.load_from_pickle(sys.argv[1])
+    args = parse_args()
+    mode = args.mode
+    if mode == "print":
+        session_pickle = args.session
+        session = load_from_pickle(session_pickle)
+        print_dialogue(session)
+    elif mode == "stats":
+        raise NotImplementedError
+        session_id_list = args.approved 
+        session_dir = args.session
+        print("session_id_list", session_id_list)
+        print("session_dir", session_dir)
+    else:
+        raise ValueError("Unknown mode: {}".format(mode))
 
 
+
+
+def print_dialogue(session):
     num_edits = 0
     num_turns = 0
 
