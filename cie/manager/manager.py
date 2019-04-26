@@ -205,6 +205,9 @@ class DialogueManager(object):
                     elif req_name == "attribute":
                         req_name = "attribute (brightness, contrast, hue, saturation, lightness)"
                     utt = "What {} would you like to adjust?".format(req_name)
+
+                    if req_name == "object":
+                        utt += " Please describe the object as a whole (e.g., the man) instead of a detail (e.g., his eyebrows)"
             elif sys_dialogue_act == SystemAct.CONFIRM:
                 confirm_slots = sys_act['slots']
                 utt = ""
