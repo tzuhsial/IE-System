@@ -2,16 +2,13 @@ import argparse
 import json
 import logging
 import os
-import pprint
+import random
 import time
 import uuid
 
-import numpy as np
-from flask import Flask, jsonify, redirect, render_template, request, url_for, abort
+from flask import Flask, abort, jsonify, redirect, render_template, request
 
 from cie import ImageEditRealUserInterface, SystemAct, VisionEnginePortal, util
-
-pp = pprint.PrettyPrinter(indent=4)
 
 app = Flask(__name__, template_folder='./app/template',
             static_folder='./app/static')
@@ -29,7 +26,7 @@ logger.addHandler(consoleHandler)
 
 
 # Global Variables
-DialogueSystem = None
+Config = None
 SessionManager = None
 VisionEngine = None
 ImageDir = None
@@ -46,10 +43,17 @@ def get_image_path(image_id):
     return image_path
 
 
+def get_random_image_id():
+    image_names = os.listdir(ImageDir)
+    image_name = random.choice(image_names)
+    image_id = image_name.rstrip(".jpg")
+    return image_id
+
+
 @app.route("/")
 def index():
     # Gets image_id
-    image_id = request.args.get('image_id', "-1")
+    image_id = request.args.get('image_id', get_random_image_id())
     image_path = get_image_path(image_id)
     if not os.path.exists(image_path):
         abort(404)
@@ -58,8 +62,12 @@ def index():
     session_id = generate_session_id()
 
     # Creates session
-    print("create session", session_id)
+    print("[index] session", session_id)
     SessionManager.create_session(session_id)
+
+    # Create System
+    DialogueSystem = ImageEditRealUserInterface(Config)
+    DialogueSystem.reset()
 
     # Open image
     DialogueSystem.open(image_path)
@@ -75,7 +83,11 @@ def index():
 @app.route("/init", methods=["POST"])
 def init():
     session_id = request.form.get('session_id', "-1")
-    print("session", session_id)
+    print("[init] session", session_id)
+
+    # Create System
+    DialogueSystem = ImageEditRealUserInterface(Config)
+    DialogueSystem.reset()
 
     last_system_state = SessionManager.retrieve(session_id)
     DialogueSystem.from_json(last_system_state)
@@ -94,8 +106,13 @@ def init():
 def step():
     # Load sesssion
     session_id = request.form.get("session_id", "-1")  # default to 0
-    print("session_id", session_id)
+    print("[step] session_id", session_id)
 
+    # Create System
+    DialogueSystem = ImageEditRealUserInterface(Config)
+    DialogueSystem.reset()
+
+    # Retreive last state
     last_system_state = SessionManager.retrieve(session_id)
     DialogueSystem.from_json(last_system_state)
 
@@ -150,7 +167,7 @@ def survey():
     session_id = request.form.get("session_id", "-1")
     survey = json.loads(request.form.get("survey", {}))
 
-    print('session_id', session_id)
+    print('[survey] session_id', session_id)
     print("survey", survey)
 
     SessionManager.add_survey(session_id, survey)
@@ -160,12 +177,14 @@ def survey():
 
 
 def serve(args):
-    global DialogueSystem
-    DialogueSystem = ImageEditRealUserInterface(args.config)
-    DialogueSystem.reset()
+    """
+    Load real global arguments
+    """
+    global Config
+    Config = args.config
 
     global SessionManager
-    SessionManager = util.PickleManager('pickled')
+    SessionManager = util.PickleManager(args.session_dir)
 
     global VisionEngine
     config_json = util.load_from_json(args.config)
@@ -182,7 +201,7 @@ def terminal(args):
     Terminal mode: used for debugging purposes
     """
     # Initialize session
-    SessionManager = util.PickleManager('pickled')
+    SessionManager = util.PickleManager(args.session_dir)
 
     session_id = int(time.time())
     SessionManager.create_session(session_id)
@@ -263,6 +282,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--mode', type=str, default="terminal")
     parser.add_argument('-c', '--config', type=str, default="./config/deploy/rule.json",
                         help="Path to deployment config")
+    parser.add_argument('-s', '--session-dir', type=str, default="./pickled",
+                        help="Path to session pickle directory")
     parser.add_argument('-p', '--port', type=int,
                         default=2000, help="server port")
     parser.add_argument('-d', '--debug', action="store_true",

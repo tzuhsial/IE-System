@@ -159,6 +159,7 @@ class State(object):
         Serialize to json object 
         """
         obj = {
+            "sysintent": self.sysintent.to_json(),
             "ontology": self.ontology.to_json(),
             "execution": self.execution
         }
@@ -168,6 +169,7 @@ class State(object):
         """
         Load from serialized json
         """
+        self.sysintent.from_json(obj['sysintent'])
         self.ontology.from_json(obj["ontology"])
         self.execution = obj["execution"]
 

@@ -1,5 +1,5 @@
 {
-    "image_dir": "/Users/iammrhelo/Research/Dialogue/IE-System/images",
+    "image_dir": "/Users/iammrhelo/Research/Dialogue/IE-System/config/deploy/deploy_images",
     "agents": {
         "visionengine": {
             "visionengine": "MAttNetClient",

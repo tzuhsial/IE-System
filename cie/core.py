@@ -168,6 +168,12 @@ class SysIntent(object):
         }
         return obj
 
+    def from_json(self, obj):
+        self.confirm_slots = obj['confirm']
+        self.request_slots = obj['request']
+        self.query_slots = obj['query']
+        self.executable_slots = obj['execute']
+
     def pprint(self):
         print('confirm', self.confirm_slots)
         print('request', self.request_slots)

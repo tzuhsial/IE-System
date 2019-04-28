@@ -12,6 +12,7 @@ import sys
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # mode
     parser.add_argument('mode', type=str, help="mode (print|stats)")
     # mode: print
     parser.add_argument('-s', '--session', type=str,
@@ -75,6 +76,7 @@ def print_dialogue(session):
             print("Vision:", vision_utterance)
         print("System:", system_utterance)
 
+    print('image_id', session['image_id'])
     print(json.dumps(session['survey'], sort_keys=True,
                      indent=4, separators=(',', ': ')))
     print("[overall] edits", num_edits, "turns", num_turns)
@@ -89,11 +91,50 @@ def read_sessions(approved):
     return session_ids
 
 
+def calculate_edits(acts, obj):
+    """
+    Calculate edits related metrics
+    """
+
+    def get_dialogue_act(sys_act):
+        return sys_act['system_acts'][0]['dialogue_act']['value']
+
+    sys_dialogue_acts = [get_dialogue_act(act[2]) for act in acts]
+
+    total_edits = sys_dialogue_acts.count("execute")
+    if 'total' not in obj:
+        obj['total'] = {}
+    if total_edits not in obj['total']:
+        obj['total'][total_edits] = 0
+    obj['total'][total_edits] += 1
+
+    nedit = 1
+    nturn = 0
+    for dialogue_act in sys_dialogue_acts:
+        nturn += 1
+        if dialogue_act == "execute":
+            if nedit not in obj:
+                obj[nedit] = {}
+            if nturn not in obj[nedit]:
+                obj[nedit][nturn] = 0
+            obj[nedit][nturn] += 1
+
+            if nturn == 1:
+                import pdb
+                pdb.set_trace()
+
+            nturn = 0
+            nedit += 1
+
+    return obj
+
+
 def calculate_stats(approved, pickle_dir):
 
     session_ids = read_sessions(approved)
 
     counter = {}
+    num_edits = {}
 
     for session_id in session_ids:
         session_pickle = os.path.join(
@@ -101,6 +142,21 @@ def calculate_stats(approved, pickle_dir):
 
         session = load_from_pickle(session_pickle)
 
+        # Acts
+        acts = session['acts']
+
+        # Counter number of turns
+        nturns = len(acts)
+        if 'nturns' not in counter:
+            counter['nturns'] = {}
+        if nturns not in counter['nturns']:
+            counter['nturns'][nturns] = 0
+        counter['nturns'][nturns] += 1
+
+        # Count edit intervals
+        calculate_edits(acts, num_edits)
+
+        # Create survey
         survey = session['survey']
 
         for metric, value in survey.items():
@@ -112,6 +168,12 @@ def calculate_stats(approved, pickle_dir):
             counter[metric][value] += 1
 
     for metric, values in counter.items():
+        print("metric", metric)
+        print(json.dumps(values, sort_keys=True,
+                         indent=4, separators=(',', ': ')))
+
+    print("[edits]")
+    for metric, values in num_edits.items():
         print("metric", metric)
         print(json.dumps(values, sort_keys=True,
                          indent=4, separators=(',', ': ')))

@@ -43,10 +43,9 @@ class ImageEditRealUserInterface(object):
         self.acts = [{}] * 4  # first one for user
 
     def open(self, image_path):
+        """ Open an image
         """
-        For debugging purposes
-        TODO: load b64_img_str
-        """
+        self.reset()
         self.imageeditengine.open(image_path)
         self.acts[3] = self.imageeditengine.act()
 
