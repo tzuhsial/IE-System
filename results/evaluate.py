@@ -107,7 +107,11 @@ def calculate_edits(acts, obj):
     """
 
     def get_dialogue_act(sys_act):
-        return sys_act['system_acts'][0]['dialogue_act']['value']
+        if 'system_acts' not in sys_act:
+            # initial turn
+            return 'greeting'
+        else:
+            return sys_act['system_acts'][0]['dialogue_act']['value']
 
     sys_dialogue_acts = [get_dialogue_act(act[2]) for act in acts]
 
@@ -205,40 +209,36 @@ def approve(batch_file, session_dir, output_file):
 
     for i, row in df.iterrows():
         print("dialogue", i)
+        image_id = df.loc[i, "Input.image_id"]
         worker_id = df.loc[i, "WorkerId"]
         status = df.loc[i, "AssignmentStatus"]
         session_id = df.loc[i, "Answer.survey code"]
-
-        if worker_id in seen_workers:
-            reason = "You submitted more than one HIT.  Your additional HITs will be rejected."
-            df.loc[i, "Reject"] = reason
-        elif status == "Submitted" and pd.isnull(df.loc[i, "Reject"]):
-            # We need to make a decision
-            session_pickle = os.path.join(
-                session_dir, 'session.{}.pickle'.format(session_id))
-
-            if not os.path.exists(session_pickle):
-                # Invalid survey code
-                reason = "Your survey code is invalid. Click on the red button and the survey code will appear on the right. Afterwards, input the survey code into AMT platform"
+        print('session_id', session_id)
+        if status != "Submitted":
+            if worker_id in seen_workers:
+                reason = "You submitted more than one HIT.  Your additional HITs will be rejected."
                 df.loc[i, "Reject"] = reason
-            else:
-                session = load_from_pickle(session_pickle)
-                print_dialogue(session)
+            elif status == "Submitted" and pd.isnull(df.loc[i, "Reject"]):
+                # We need to make a decision
+                session_pickle = os.path.join(
+                    session_dir, 'session.{}.pickle'.format(session_id))
 
-                decision = None
-                while decision not in ["yes", "no"]:
-                    decision = input("Approve? (yes/no): ")
-
-                if decision == "yes":
+                if not os.path.exists(session_pickle):
+                    # Invalid survey code
+                    print("invalid session_id:", session_id)
+                    reason = "Your survey code is invalid. Click on the red button and the survey code will appear on the right. Afterwards, input the survey code into AMT platform"
+                    df.loc[i, "Reject"] = reason
+                else:
                     df.loc[i, "Approve"] = "x"
 
-                else:
-                    df.loc[i, "Reject"] = "Our manual inspection shows that you did not follow the instructions."
-
-        if isinstance(df.loc[i, "Reject"], str):
-            rejected += 1
+            if status == "Approved" and isinstance(df.loc[i, "Approve"], str):
+                approved += 1
+            else:
+                print("image_id", image_id, df.loc[i, "Reject"])
+                rejected += 1
         else:
-            approved += 1
+            print(row)
+            import pdb; pdb.set_trace()
 
         seen_workers.add(worker_id)
         outputs.append(row)
