@@ -22,11 +22,6 @@ def parse_args():
                         default="./evaluate/approved.txt", help="List of approved session ids")
     parser.add_argument('-d', '--dir', type=str,
                         help="Path to session pickle directory")
-    # mode: approve
-    parser.add_argument('-b', '--batch-file', type=str,
-                        help="AMT download batch file")
-    parser.add_argument('-o', '--output-file', type=str,
-                        help="Approve or reject file")
 
     args = parser.parse_args()
     return args
@@ -60,11 +55,6 @@ def main():
         print("approved", approved_file)
         print("session", session_dir)
         calculate_stats(approved_file, session_dir)
-    elif mode == "approve":
-        batch_file = args.batch_file
-        output_file = args.output_file
-        session_dir = args.dir
-        approve(batch_file, args.dir, output_file)
     else:
         raise ValueError("Unknown mode: {}".format(mode))
 
@@ -122,23 +112,29 @@ def calculate_edits(acts, obj):
         obj['total'][total_edits] = 0
     obj['total'][total_edits] += 1
 
-    nedit = 1
+    nedit = 0
     nturn = 0
+    total_turn = 0
+    if 'turns_for_two_edits' not in obj:
+        obj['turns_for_two_edits'] = {}
+
     for dialogue_act in sys_dialogue_acts:
         nturn += 1
+        total_turn += 1
         if dialogue_act == "execute":
+            nedit += 1
             if nedit not in obj:
                 obj[nedit] = {}
             if nturn not in obj[nedit]:
                 obj[nedit][nturn] = 0
             obj[nedit][nturn] += 1
 
-            if nturn == 1:
-                import pdb
-                pdb.set_trace()
+            if nedit == 2:
+                if total_turn not in obj['turns_for_two_edits']:
+                    obj['turns_for_two_edits'][total_turn] = 0
+                obj['turns_for_two_edits'][total_turn] += 1
 
             nturn = 0
-            nedit += 1
 
     return obj
 
@@ -186,67 +182,19 @@ def calculate_stats(approved, pickle_dir):
         print(json.dumps(values, sort_keys=True,
                          indent=4, separators=(',', ': ')))
 
+        if metric in ['like', 'dislike', 'suggestion']:
+            with open(metric + ".csv", 'w') as fout:
+                fout.write(metric + '\n')
+                for key in sorted(counter[metric].keys()):
+                    value = counter[metric][key]
+                    for _ in range(value):
+                        fout.write(key + '\n')
+
     print("[edits]")
     for metric, values in num_edits.items():
         print("metric", metric)
         print(json.dumps(values, sort_keys=True,
                          indent=4, separators=(',', ': ')))
-
-
-def approve(batch_file, session_dir, output_file):
-    """ Approve
-    """
-
-    outputs = []
-
-    df = pd.read_csv(batch_file)
-
-    seen_workers = set()
-
-    print("df", df.shape)
-    approved = 0
-    rejected = 0
-
-    for i, row in df.iterrows():
-        print("dialogue", i)
-        image_id = df.loc[i, "Input.image_id"]
-        worker_id = df.loc[i, "WorkerId"]
-        status = df.loc[i, "AssignmentStatus"]
-        session_id = df.loc[i, "Answer.survey code"]
-        print('session_id', session_id)
-        if status != "Submitted":
-            if worker_id in seen_workers:
-                reason = "You submitted more than one HIT.  Your additional HITs will be rejected."
-                df.loc[i, "Reject"] = reason
-            elif status == "Submitted" and pd.isnull(df.loc[i, "Reject"]):
-                # We need to make a decision
-                session_pickle = os.path.join(
-                    session_dir, 'session.{}.pickle'.format(session_id))
-
-                if not os.path.exists(session_pickle):
-                    # Invalid survey code
-                    print("invalid session_id:", session_id)
-                    reason = "Your survey code is invalid. Click on the red button and the survey code will appear on the right. Afterwards, input the survey code into AMT platform"
-                    df.loc[i, "Reject"] = reason
-                else:
-                    df.loc[i, "Approve"] = "x"
-
-            if status == "Approved" and isinstance(df.loc[i, "Approve"], str):
-                approved += 1
-            else:
-                print("image_id", image_id, df.loc[i, "Reject"])
-                rejected += 1
-        else:
-            print(row)
-            import pdb; pdb.set_trace()
-
-        seen_workers.add(worker_id)
-        outputs.append(row)
-
-    print("Approved", approved)
-    print("Rejected", rejected)
-
-    df.to_csv(output_file)
 
 
 if __name__ == "__main__":
