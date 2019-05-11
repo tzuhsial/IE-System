@@ -19,12 +19,12 @@ def parse_args():
     subparsers.required = True
 
     # Approve: approved HITs from AMT
-    approve_parser = subparsers.add_parser("approve")
-    approve_parser.add_argument(
+    approve_dialogue_parser = subparsers.add_parser("approve_dialogue")
+    approve_dialogue_parser.add_argument(
         '-b', '--batch-file', required=True, help="Batch file downloaded from AMT results.")
-    approve_parser.add_argument(
+    approve_dialogue_parser.add_argument(
         '-o', '--output-file', required=True, help="Approved batch file to upload to AMT.")
-    approve_parser.add_argument(
+    approve_dialogue_parser.add_argument(
         '-s', '--session-dir', required=True, help="Path to pickled sessions directory")
 
     # Extract: extract approved session ids
@@ -43,6 +43,13 @@ def parse_args():
     prepare_hit_parser.add_argument(
         '-o', '--output-csv', required=True, help="Output csv file of prepared HIT for AMT")
 
+    # Approve: approved HITs from AMT
+    approve_nlu_parser = subparsers.add_parser("approve_nlu")
+    approve_nlu_parser.add_argument(
+        '-b', '--batch-file', required=True, help="Batch file downloaded from AMT results.")
+    approve_nlu_parser.add_argument(
+        '-o', '--output-file', required=True, help="Approved batch file to upload to AMT.")
+
     # Serve Image: serve images for HIT
     serve_image_parser = subparsers.add_parser("serve_image")
     serve_image_parser.add_argument(
@@ -59,17 +66,19 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.function == "approve":
-        approve(args.batch_file, args.session_dir, args.output_file)
+    if args.function == "approve_dialogue":
+        approve_dialogue(args.batch_file, args.session_dir, args.output_file)
     elif args.function == "extract":
         extract(args.batch_file, args.output_file)
     elif args.function == "prepare_hit":
         prepare_hit(args.approved, args.session_dir, args.output_csv)
+    elif args.function == "approve_nlu":
+        approve_nlu(args.batch_file, args.output_file)
     elif args.function == "serve_image":
         serve_image(args.image_dir, args.port, args.debug)
 
 
-def approve(batch_file, session_dir, output_file):
+def approve_dialogue(batch_file, session_dir, output_file):
     """ Approve
     """
 
@@ -175,6 +184,7 @@ def prepare_hit(approved_file, session_dir, output_csv):
 
             if user_utterance:
                 words = word_tokenize(user_utterance)
+                user_utterance = " ".join(words)
 
                 bounded = []
                 for word_id, word in enumerate(words):
@@ -205,6 +215,60 @@ def prepare_hit(approved_file, session_dir, output_csv):
         writer.writerow(header)
         for row in hit_rows:
             writer.writerow(row)
+
+
+def approve_nlu(batch_file, output_file):
+
+    df = pd.read_csv(batch_file)
+    for i, row in df.iterrows():
+
+        reject = ""
+
+        prev_sys_utt = df.loc[i, "Input.prev_system_utterance"]
+        usr_utt = df.loc[i, "Input.user_utterance"]
+
+        words = usr_utt.split()
+
+        slots = ["action", "refer", "attribute", "value"]
+        pos = {}
+        for slot in slots:
+            pos[slot] = {
+                'start': df.loc[i, "Answer.{}-start".format(slot)],
+                'end': df.loc[i, "Answer.{}-end".format(slot)]
+            }
+
+        print("System:", prev_sys_utt)
+        print("User:", usr_utt)
+
+        for slot in slots:
+            start = pos[slot]['start']
+            end = pos[slot]['end']
+
+            nwords = end-start
+            if slot in ["action", "attribute", "value"] and nwords > 1:
+                reject += "Please select a one word span for {}. ".format(slot)
+
+            slot_value = " ".join(words[start:end])
+            if slot == "attribute" and slot_value not in ["brightness", "contrast", "hue", "saturation", "lightness"]:
+                reject += "Please select one of \"brightness\", \"contrast\", \"hue\", \"saturation\", \"lightness\" for attribute."
+
+            print("{}: {}".format(slot, slot_value))
+
+        da = None
+        if df.loc[i, "Answer.affirm.on"]:
+            da = "affirm"
+        elif df.loc[i, "Answer.negate.on"]:
+            da = "negate"
+        elif df.loc[i, "Answer.other.on"]:
+            da = "inform"
+        print("da:", da)
+
+        if reject != "":
+            df.loc[i, "Approve"] = "x"
+        else:
+            df.loc[i, "Reject"] = reject
+
+        df.to_csv(output_file)
 
 
 def serve_image(image_dir, port, debug):
