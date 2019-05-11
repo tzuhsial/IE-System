@@ -2,6 +2,7 @@
 Put all Amazon Mechinal Turk (AMT) related script here
 """
 import argparse
+import collections
 import csv
 import os
 import sys
@@ -43,11 +44,18 @@ def parse_args():
     prepare_hit_parser.add_argument(
         '-o', '--output-csv', required=True, help="Output csv file of prepared HIT for AMT")
 
-    # Approve: approved HITs from AMT
+    # Approve: approved NLU HITs from AMT
     approve_nlu_parser = subparsers.add_parser("approve_nlu")
     approve_nlu_parser.add_argument(
         '-b', '--batch-file', required=True, help="Batch file downloaded from AMT results.")
     approve_nlu_parser.add_argument(
+        '-o', '--output-file', required=True, help="Approved batch file to upload to AMT.")
+
+    # process nlu: process approved nlu HITs and outputs to file in ATIS format
+    process_nlu_parser = subparsers.add_parser("process_nlu")
+    process_nlu_parser.add_argument(
+        '-b', '--batch-file', required=True, help="Batch file downloaded from AMT results.")
+    process_nlu_parser.add_argument(
         '-o', '--output-file', required=True, help="Approved batch file to upload to AMT.")
 
     # Serve Image: serve images for HIT
@@ -74,6 +82,8 @@ def main():
         prepare_hit(args.approved, args.session_dir, args.output_csv)
     elif args.function == "approve_nlu":
         approve_nlu(args.batch_file, args.output_file)
+    elif args.function == "process_nlu":
+        process_nlu(args.batch_file, args.output_file)
     elif args.function == "serve_image":
         serve_image(args.image_dir, args.port, args.debug)
 
@@ -171,16 +181,16 @@ def prepare_hit(approved_file, session_dir, output_csv):
 
         image_id = session['image_id']
 
-        #print("turn", 0)
+        # print("turn", 0)
         prev_system_utterance = "Hi! This is an image editing chatbot. How may I help you?"
         for turn_id, acts in enumerate(session['acts'][1:], 1):
-            #print('system:', prev_system_utterance)
-            #print('turn', turn_id)
+            # print('system:', prev_system_utterance)
+            # print('turn', turn_id)
 
             user_utterance = acts[0].get("user_utterance", "")
-            #print("user:", user_utterance)
+            # print("user:", user_utterance)
 
-            #print("system:", system_utterance)
+            # print("system:", system_utterance)
 
             if user_utterance:
                 words = word_tokenize(user_utterance)
@@ -196,7 +206,7 @@ def prepare_hit(approved_file, session_dir, output_csv):
                 bounded.append(final_closure)
 
                 bounded_user_utterance = ' '.join(bounded)
-                #print("bounded:", bounded_user_utterance)
+                # print("bounded:", bounded_user_utterance)
                 # Order
 
                 row = [session_id, image_id, prev_system_utterance,
@@ -244,6 +254,10 @@ def approve_nlu(batch_file, output_file):
             start = pos[slot]['start']
             end = pos[slot]['end']
 
+            if end < start:
+                reject += "Your {} end index is smaller than start index."\
+                    .format(slot)
+
             nwords = end-start
             if slot in ["action", "attribute", "value"] and nwords > 1:
                 reject += "Please select a one word span for {}. ".format(slot)
@@ -269,6 +283,116 @@ def approve_nlu(batch_file, output_file):
             df.loc[i, "Reject"] = reject
 
         df.to_csv(output_file)
+
+
+def preprocess(tokens):
+    """ Preprocess tokens to tag file
+    """
+    words = []
+    for token in tokens:
+        if token in ["brightness", "contrast", "hue", "saturation", "lightness"]:
+            word = "<attribute>"
+        elif token.isdigit() or (token[0] in ["-", "+"] and token[1:].isdigit()):
+            word = "<value>"
+        else:
+            word = token
+        words.append(word)
+    return words
+
+
+def process_nlu(batch_file, output_file):
+
+    df = pd.read_csv(batch_file)
+
+    # Filter only approved
+    df = df[df['Approve'] == 'x']
+    print("number of annotations", len(df))
+
+    session_ids = df['Input.session_id'].unique().tolist()
+
+    outputs = []
+
+    # utterances
+    for session_id in session_ids:
+        # Get all rows for session_id
+        session_df = df[df["Input.session_id"] == session_id]
+
+        # Get all turn_ids
+        turn_ids = session_df['Input.turn_id'].unique().tolist()
+
+        for turn_id in turn_ids:
+
+            # Annotations
+            ann = session_df[session_df['Input.turn_id'] == turn_id]
+
+            # Get tokens
+            user_utterance = ann['Input.user_utterance'].tolist()[0]
+
+            tokens = user_utterance.lower().split()
+
+            tokens = preprocess(tokens)
+
+            # Get tags
+            tags = ['O'] * len(tokens)
+
+            slots = ["action", "refer", "attribute", "value"]
+
+            for slot in slots:
+
+                slot_counter = collections.Counter()
+                for i, row in ann.iterrows():
+                    start = row['Answer.{}-start'.format(slot)]
+                    end = row['Answer.{}-end'.format(slot)]
+
+                    pair = (start, end)
+                    slot_counter[pair] += 1
+
+                most_common_pair, freq = slot_counter.most_common()[0]
+
+                mc_start, mc_end = most_common_pair
+
+                if mc_start >= mc_end:
+                    continue
+
+                for i, pos in enumerate(range(mc_start, mc_end)):
+                    if i == 0:
+                        B_OR_I = 'B'
+                    else:
+                        B_OR_I = 'I'
+
+                    tag = '{}-{}'.format(B_OR_I, slot)
+
+                    tags[pos] = tag
+
+            # Multiple annotations
+            da_counter = collections.Counter()
+            das = ["affirm", "negate", "other"]
+            for da_name in das:
+                da_counter[da_name] += \
+                    ann['Answer.{}.on'.format(da_name)].sum()
+
+            # Get dialogue_act
+            da, freq = da_counter.most_common()[0]
+            if da == "other":
+                da = "inform"
+
+            # 3 tuple
+            # (tokens, tags, dialogue_act)
+
+            assert len(tokens) == len(tags)
+
+            combined = ['###'.join(x) for x in zip(tokens, tags)]
+            tagged_tokens = ' '.join(combined)
+
+            tup = (tagged_tokens, da)
+
+            outputs.append(tup)
+
+    with open(output_file, 'w') as fout:
+        writer = csv.writer(fout, delimiter='|')
+        header = ['tags', 'dialogue_act']
+        writer.writerow(header)
+        writer.writerows(outputs)
 
 
 def serve_image(image_dir, port, debug):
