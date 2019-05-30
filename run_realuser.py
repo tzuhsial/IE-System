@@ -196,90 +196,8 @@ def serve(args):
     app.run(host='0.0.0.0', port=2000, debug=args.debug)
 
 
-def terminal(args):
-    """
-    Terminal mode: used for debugging purposes
-    """
-    # Initialize session
-    SessionManager = util.PickleManager(args.session_dir)
-
-    session_id = int(time.time())
-    SessionManager.create_session(session_id)
-
-    # Create system
-    DialogueSystem = ImageEditRealUserInterface(args.config)
-    DialogueSystem.reset()
-
-    # Open an image
-    image_path = "example/COCO_train2014_000000229598.jpg"
-    DialogueSystem.open(image_path)
-    # result, msg = photoshop.control("open", {'image_path': image_path})
-
-    # assert result
-    system_state = DialogueSystem.to_json()
-    SessionManager.add_turn(session_id, system_state)
-
-    # Sanity Check
-    DialogueSystem.from_json(system_state)
-    system_state2 = DialogueSystem.to_json()
-    assert system_state == system_state2
-
-    # Load VisionEngine
-    config_json = util.load_from_json(args.config)
-    VisionEngine = VisionEnginePortal(config_json['agents']['visionengine'])
-
-    turn = 1
-    for usr_utt in ["adjust brightness of man on left by 50", "adjust contrast of cake in front by -50"]:
-
-        print('goal', usr_utt)
-        sys_dialogue_act = SystemAct.GREETING
-        no_and_yes = ["no.", "yes."]
-
-        while True:
-            print('turn', turn)
-            # Load from session
-            logger.info("Loading from session {}".format(session_id))
-            last_system_state = SessionManager.retrieve(session_id)
-            DialogueSystem.from_json(last_system_state)
-
-            if sys_dialogue_act == SystemAct.EXECUTE:
-                break
-            elif sys_dialogue_act == SystemAct.CONFIRM:
-                usr_or_vis_act = {"user_utterance": no_and_yes[0]}
-                no_and_yes.pop(0)
-                print('User:', usr_or_vis_act['user_utterance'])
-            elif sys_dialogue_act == SystemAct.QUERY:
-                # Send to Vision Engine
-                VisionEngine.observe(sys_act)
-                usr_or_vis_act = VisionEngine.act()
-                print("Visionengine:",
-                      usr_or_vis_act['visionengine_utterance'])
-            else:
-                # usr_utt = input("User: ")
-                usr_or_vis_act = {"user_utterance": usr_utt}
-                print('User:', usr_or_vis_act['user_utterance'])
-
-            DialogueSystem.observe(usr_or_vis_act)
-            sys_act = DialogueSystem.act()
-            sys_utt = sys_act['system_utterance']
-
-            print("System:", sys_utt)
-
-            sys_dialogue_act = sys_act['system_acts'][0]['dialogue_act']['value']
-
-            image = DialogueSystem.get_image()
-
-            util.imwrite(image, "example/terminal2/{}.png".format(turn))
-            turn += 1
-
-            # Save to session
-            current_session_state = DialogueSystem.to_json()
-            SessionManager.add_turn(session_id, current_session_state)
-
-
-if __name__ == "__main__":
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode', type=str, default="terminal")
     parser.add_argument('-c', '--config', type=str, default="./config/deploy/rule.json",
                         help="Path to deployment config")
     parser.add_argument('-s', '--session-dir', type=str, default="./pickled",
@@ -289,11 +207,9 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', action="store_true",
                         help="Flask server debug mode")
     args = parser.parse_args()
+    return args
 
-    print("mode:", args.mode)
 
-    mode = args.mode
-    if mode == "terminal":
-        terminal(args)
-    elif mode == "serve":
-        serve(args)
+if __name__ == "__main__":
+    args = parse_args()
+    serve(args)

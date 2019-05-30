@@ -1,10 +1,8 @@
 from . import util
-from .channel import ChannelPortal
 from .core import SystemAct
 from .imageeditengine import ImageEditEnginePortal
 from .manager import ManagerPortal
 from .nlu import NLUPortal
-from .user import UserPortal
 
 
 class ImageEditRealUserInterface(object):

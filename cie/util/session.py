@@ -3,7 +3,6 @@ import os
 import sys
 
 import pickle
-from pymongo import MongoClient
 
 from .io import save_to_pickle, load_from_pickle
 
@@ -29,50 +28,6 @@ class SessionManager(object):
 
     def add_survey(self, session_id, survey):
         raise NotImplementedError
-
-
-class MongoDBManager(SessionManager):
-    """
-    Session Manager based on MongoDB
-    Not used, due to MongodB limit
-    """
-
-    def __init__(self, host=None, port=None, **kwargs):
-        self.client = MongoClient()
-        self.db = self.client["cie"]
-        self.dialogues = self.db["dialogues"]
-
-    def create_session(self, session_id):
-        doc = {
-            "session_id": session_id,
-            "manager": {},
-            "imageeditengine": {},
-            "acts": list()
-        }
-        self.dialogues.insert_one(doc)
-        return doc
-
-    def retrieve(self, session_id):
-        session_key = {"session_id": session_id}
-        if self.dialogues.count_documents(session_key) == 0:
-            self.create_session(session_id)
-        doc = self.dialogues.find_one(session_key)
-
-        last_system_state = {
-            "manager": doc['manager'],
-            "imageeditengine": doc['imageeditengine'],
-            "acts": doc['acts'][-1]
-        }
-        return last_system_state
-
-    def add_turn(self, session_id, system_state):
-        session_key = {'session_id': session_id}
-        doc = self.dialogues.find_one(session_key)
-        doc["manager"] = system_state['manager']
-        doc['imageeditengine'] = system_state['imageeditengine']
-        doc["acts"].append(system_state['acts'])
-        self.dialogues.replace_one(session_key, doc)
-        return doc
 
 
 class PickleManager(SessionManager):

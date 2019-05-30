@@ -2,16 +2,6 @@ import json
 from .util import sort_slots_with_key
 
 
-class Agent:
-    """
-    Agents participating in the self play world
-    """
-    USER = "user"
-    CHANNEL = "channel"
-    SYSTEM = "system"
-    PHOTOSHOP = "photoshop"
-
-
 class UserAct:
     """
     User Dialogue Acts
@@ -19,8 +9,6 @@ class UserAct:
     INFORM = "inform"
     AFFIRM = "affirm"
     NEGATE = "negate"
-    WAIT = "wait"
-    BYE = "bye"
 
     @staticmethod
     def confirm_acts():
@@ -36,20 +24,12 @@ class UserAct:
         """
         return [UserAct.INFORM]
 
-    @staticmethod
-    def wait_acts():
-        """
-        Wait for the system to query...
-        """
-        return [UserAct.WAIT]
-
 
 class SystemAct:
     """
     System dialogue acts
     """
     GREETING = "greeting"
-    ASK = "ask"
     INFORM = "inform"
     REQUEST = "request"
     CONFIRM = "confirm"
@@ -193,34 +173,3 @@ class SysIntent(object):
         if len(self.execute_slots) != 0:
             return True
         return False
-
-
-class PhotoshopAct:
-    """
-    Defines actions that are supported by photoshop
-    """
-    OPEN = "open"
-    LOAD = "load"
-    CLOSE = "close"
-    REDO = "redo"
-    UNDO = "undo"
-    LOAD_MASK_STRS = "load_mask_strs"
-    SELECT_OBJECT = "select_object"
-    SELECT_OBJECT_MASK_ID = "select_object_mask_id"
-    DESELECT = "deselect"
-
-    ADJUST = "adjust"
-    ADJUST_COLOR = "adjust_color"
-
-    @staticmethod
-    def control_acts():
-        return [
-            PhotoshopAct.OPEN, PhotoshopAct.LOAD, PhotoshopAct.CLOSE,
-            PhotoshopAct.UNDO, PhotoshopAct.REDO, PhotoshopAct.LOAD_MASK_STRS,
-            PhotoshopAct.SELECT_OBJECT, PhotoshopAct.SELECT_OBJECT_MASK_ID,
-            PhotoshopAct.DESELECT
-        ]
-
-    @staticmethod
-    def edit_acts():
-        return [PhotoshopAct.ADJUST, PhotoshopAct.ADJUST_COLOR]
